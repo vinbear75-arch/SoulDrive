@@ -14,16 +14,25 @@ class RagContextTests(unittest.TestCase):
         self.assertIn("token499", compacted)
         self.assertIn("context trimmed", compacted)
 
-    def test_transformer_mindmap_uses_citations(self):
+    def test_legacy_evidence_mindmap_uses_evidence_text_without_meta_branches(self):
         answer = build_evidence_mindmap(
             "transformer机制是什么",
-            [{"id": "E1", "section": "Transformer"}, {"id": "E2"}, {"id": "E3"}],
+            [
+                {
+                    "id": "E1",
+                    "section": "Transformer 机制",
+                    "snippet": "Transformer 通过 Attention / Self-Attention 建模序列关系。",
+                }
+            ],
         )
 
         self.assertIsNotNone(answer)
-        self.assertIn("Transformer", answer)
-        self.assertIn("[E1]", answer)
-        self.assertIn("[E2]", answer)
+        self.assertIn("# transformer机制是什么", answer)
+        self.assertIn("## Transformer 机制", answer)
+        self.assertIn("Attention / Self-Attention", answer)
+        self.assertNotIn("## 论文依据", answer)
+        self.assertNotIn("问题焦点", answer)
+        self.assertNotIn("[E1]", answer)
 
     def test_normalize_technical_terms_keeps_transformer_name(self):
         self.assertEqual(normalize_technical_terms("变压器架构"), "Transformer 架构")

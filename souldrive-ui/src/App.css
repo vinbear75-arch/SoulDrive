@@ -990,6 +990,120 @@ button {
   color: #111111;
 }
 
+.node-actions {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+}
+
+.node-detail-button {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #111111;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #111111;
+  padding: 0;
+}
+
+.node-detail-button:hover {
+  background: #eeeeee;
+}
+
+.map-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(20, 22, 19, 0.28);
+}
+
+.map-detail-dialog {
+  width: min(560px, 100%);
+  max-height: min(620px, 88%);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid #111111;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 20px 44px rgba(17, 17, 17, 0.22);
+}
+
+.map-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 18px 0;
+}
+
+.map-detail-head div {
+  display: grid;
+  gap: 6px;
+}
+
+.map-detail-head span,
+.map-detail-meta span {
+  width: fit-content;
+  border: 1px solid #111111;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.map-detail-head h3 {
+  margin: 0;
+  color: #111111;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.map-detail-head button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #111111;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+  padding: 0;
+}
+
+.map-detail-head button:hover {
+  background: #eeeeee;
+}
+
+.map-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 0 18px;
+}
+
+.map-detail-dialog p {
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 0 18px 18px;
+  color: #262626;
+  font-size: 14px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .pipeline-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

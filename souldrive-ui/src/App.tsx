@@ -19,12 +19,26 @@ import {
   ShieldCheck,
   Upload,
   Usb,
+  X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
+import {
+  CANVAS_PADDING,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  buildMindmapLayout,
+  edgePath,
+  graphFitScale,
+  formatMindmapBranch,
+  parseMindmap,
+  type MindmapArtifact,
+  type MindmapLayout,
+  type PositionedNode,
+} from "./mindmap";
 import {
   formatSecurityActionError,
   readSecurityActionError,
@@ -193,57 +207,15 @@ interface DiagnosticSummary {
   primaryHint: string;
 }
 
-interface MindmapNode {
-  id: string;
-  title: string;
-  level: number;
-  children: MindmapNode[];
-}
-
-interface MindmapArtifact {
-  raw: string;
-  title: string;
-  nodes: MindmapNode[];
-}
-
 interface ParsedMessage {
   cleanContent: string;
   artifacts: MindmapArtifact[];
   evidence: EvidenceItem[];
 }
 
-interface PositionedNode extends MindmapNode {
-  x: number;
-  y: number;
-  depth: number;
-  hasChildren: boolean;
-  collapsed: boolean;
-}
-
-interface MindmapEdge {
-  from: PositionedNode;
-  to: PositionedNode;
-}
-
-interface MindmapLayout {
-  nodes: PositionedNode[];
-  edges: MindmapEdge[];
-  width: number;
-  height: number;
-}
-
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 const MINDMAP_BLOCK_PATTERN = /```souldrive-mindmap\s*([\s\S]*?)```/g;
 const EVIDENCE_BLOCK_PATTERN = /```souldrive-evidence\s*([\s\S]*?)```/g;
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 72;
-const LEVEL_GAP = 290;
-const ROW_GAP = 30;
-const CANVAS_PADDING = 72;
-const CANVAS_RIGHT_PADDING = 220;
-const CANVAS_BOTTOM_PADDING = 140;
-const GRAPH_PANEL_FIT_WIDTH = 980;
-const GRAPH_PANEL_FIT_HEIGHT = 660;
 const GRAPH_WHEEL_STEP = 0.006;
 const GRAPH_BUTTON_ZOOM_STEP = 0.12;
 const PAPERS_PER_PAGE = 5;
@@ -254,75 +226,6 @@ const promptTemplates = [
   "请生成一个围绕当前资料库的技术路线图，并标注关键来源。",
   "请从企业落地角度评估这些资料对应方案的可复用性、成本和实施风险。",
 ];
-
-function cleanMindmapTitle(value: string) {
-  return value
-    .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-    .replace(/[`*_#]/g, "")
-    .trim();
-}
-
-function parseMindmap(raw: string): MindmapArtifact {
-  const virtualRoot: MindmapNode = {
-    id: "root",
-    title: "root",
-    level: 0,
-    children: [],
-  };
-  const stack: MindmapNode[] = [virtualRoot];
-  let sequence = 0;
-  let hasHeading = false;
-
-  raw.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-    const bulletMatch = line.match(/^(\s*)[-*+]\s+(.+)$/);
-    let level = 1;
-    let title = trimmed;
-
-    if (headingMatch) {
-      level = headingMatch[1].length;
-      title = headingMatch[2];
-      hasHeading = true;
-    } else if (bulletMatch) {
-      const indent = bulletMatch[1].replace(/\t/g, "  ").length;
-      level = hasHeading ? Math.floor(indent / 2) + 2 : Math.floor(indent / 2) + 1;
-      title = bulletMatch[2];
-    }
-
-    const node: MindmapNode = {
-      id: `mindmap-node-${sequence}`,
-      title: cleanMindmapTitle(title),
-      level,
-      children: [],
-    };
-    sequence += 1;
-
-    while (stack.length > 1 && stack[stack.length - 1].level >= node.level) {
-      stack.pop();
-    }
-
-    stack[stack.length - 1].children.push(node);
-    stack.push(node);
-  });
-
-  if (!virtualRoot.children.length) {
-    virtualRoot.children.push({
-      id: "mindmap-node-empty",
-      title: "未生成可视化节点",
-      level: 1,
-      children: [],
-    });
-  }
-
-  return {
-    raw,
-    title: virtualRoot.children[0]?.title || "研究产物",
-    nodes: virtualRoot.children,
-  };
-}
 
 function parseEvidence(raw: string): EvidenceItem[] {
   try {
@@ -349,62 +252,6 @@ function parseMessageArtifacts(content: string): ParsedMessage {
     artifacts,
     evidence,
   };
-}
-
-function buildMindmapLayout(nodes: MindmapNode[], collapsedNodeIds: Set<string>): MindmapLayout {
-  const positionedNodes: PositionedNode[] = [];
-  const edges: MindmapEdge[] = [];
-  let leafCursor = 0;
-
-  const walk = (node: MindmapNode, depth: number): PositionedNode => {
-    const collapsed = collapsedNodeIds.has(node.id);
-    const visibleChildren = collapsed ? [] : node.children;
-    const childPositions = visibleChildren.map((child) => walk(child, depth + 1));
-
-    const y = childPositions.length
-      ? (childPositions[0].y + childPositions[childPositions.length - 1].y) / 2
-      : leafCursor++ * (NODE_HEIGHT + ROW_GAP);
-
-    const positioned: PositionedNode = {
-      ...node,
-      x: depth * LEVEL_GAP,
-      y,
-      depth,
-      hasChildren: node.children.length > 0,
-      collapsed,
-    };
-
-    positionedNodes.push(positioned);
-    childPositions.forEach((child) => edges.push({ from: positioned, to: child }));
-    return positioned;
-  };
-
-  nodes.forEach((node) => walk(node, 0));
-  const maxX = positionedNodes.reduce((current, node) => Math.max(current, node.x), 0);
-  const maxY = positionedNodes.reduce((current, node) => Math.max(current, node.y), 0);
-
-  return {
-    nodes: positionedNodes,
-    edges,
-    width: maxX + NODE_WIDTH + CANVAS_PADDING + CANVAS_RIGHT_PADDING,
-    height: Math.max(420, maxY + NODE_HEIGHT + CANVAS_PADDING + CANVAS_BOTTOM_PADDING),
-  };
-}
-
-function graphFitScale(layout: MindmapLayout) {
-  const widthScale = GRAPH_PANEL_FIT_WIDTH / Math.max(layout.width, 1);
-  const heightScale = GRAPH_PANEL_FIT_HEIGHT / Math.max(layout.height, 1);
-  return Math.max(0.26, Math.min(0.82, widthScale, heightScale));
-}
-
-function edgePath(edge: MindmapEdge) {
-  const startX = edge.from.x + CANVAS_PADDING + NODE_WIDTH;
-  const startY = edge.from.y + CANVAS_PADDING + NODE_HEIGHT / 2;
-  const endX = edge.to.x + CANVAS_PADDING;
-  const endY = edge.to.y + CANVAS_PADDING + NODE_HEIGHT / 2;
-  const middle = Math.max(88, (endX - startX) * 0.55);
-
-  return `M ${startX} ${startY} C ${startX + middle} ${startY}, ${endX - middle} ${endY}, ${endX} ${endY}`;
 }
 
 function formatAuditTime(timestamp?: number) {
@@ -1334,6 +1181,8 @@ function GraphPanel({
   mindmapLayout: MindmapLayout | null;
   toggleMindmapNode: (nodeId: string) => void;
 }) {
+  const [detailNode, setDetailNode] = useState<PositionedNode | null>(null);
+
   if (!latestMindmap || !mindmapLayout) {
     return (
       <div className="studio-empty">
@@ -1403,7 +1252,21 @@ function GraphPanel({
                         <div className="map-node-content">
                           <span className="node-level">L{node.depth + 1}</span>
                           <span className="node-title">{node.title}</span>
-                          {node.hasChildren && <span className="node-count">{node.collapsed ? `+${node.children.length}` : "-"}</span>}
+                          <span className="node-actions">
+                            <button
+                              type="button"
+                              className="node-detail-button"
+                              title="查看完整内容"
+                              aria-label={`查看 ${node.title} 的完整内容`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDetailNode(node);
+                              }}
+                            >
+                              <FileText size={11} />
+                            </button>
+                            {node.hasChildren && <span className="node-count">{node.collapsed ? `+${node.children.length}` : "-"}</span>}
+                          </span>
                         </div>
                       </foreignObject>
                     </g>
@@ -1414,6 +1277,32 @@ function GraphPanel({
           </>
         )}
       </TransformWrapper>
+      {detailNode && (
+        <div className="map-detail-backdrop" role="presentation" onClick={() => setDetailNode(null)}>
+          <section
+            className="map-detail-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="map-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="map-detail-head">
+              <div>
+                <span>L{detailNode.depth + 1}</span>
+                <h3 id="map-detail-title">节点完整内容</h3>
+              </div>
+              <button type="button" onClick={() => setDetailNode(null)} title="关闭">
+                <X size={17} />
+              </button>
+            </div>
+            <div className="map-detail-meta">
+              <span>{detailNode.hasChildren ? `${detailNode.children.length} 个子节点` : "末级节点"}</span>
+              {detailNode.collapsed && <span>已折叠</span>}
+            </div>
+            <p>{formatMindmapBranch(detailNode)}</p>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

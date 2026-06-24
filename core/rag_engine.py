@@ -191,7 +191,7 @@ class RAGEngine:
         )
         yield generated_text
         if query_requests_mindmap(query) and "souldrive-mindmap" not in generated_text.lower():
-            yield _mindmap_block(build_evidence_mindmap(query, evidence))
+            yield _mindmap_block(build_answer_mindmap(query, generated_text))
         yield _evidence_block(evidence)
 
     def _generate_answer_text(self, messages: list[dict[str, str]]) -> str:
@@ -438,90 +438,291 @@ def query_requests_mindmap(query: str) -> bool:
 
 
 def build_evidence_mindmap(query: str, evidence: list[dict]) -> str:
-    title = mindmap_title(query, evidence)
-    if is_transformer_mindmap(query, evidence):
-        return build_transformer_mindmap(title, evidence)
-    return build_answer_structure_mindmap(query, title, evidence)
+    return build_answer_mindmap(query, evidence_outline_to_answer_text(evidence))
 
 
-def build_transformer_mindmap(title: str, evidence: list[dict]) -> str:
-    primary = evidence[0].get("id", "E1") if evidence else "E1"
-    secondary = evidence[1].get("id", primary) if len(evidence) > 1 else primary
-    tertiary = evidence[2].get("id", secondary) if len(evidence) > 2 else secondary
-    lines = [
-        f"# {title}",
-        "## 核心思想",
-        f"- Transformer 以 Attention / Self-Attention 组织序列表示 [{primary}]",
-        "## 结构组成",
-        f"- 多头注意力、前馈层、残差连接和归一化共同组成 Transformer block [{secondary}]",
-        "## 主要优势",
-        f"- 并行性强，便于扩展到更大规模预训练任务 [{tertiary}]",
-        "## 论文依据",
-    ]
-    lines.extend(format_evidence_outline(evidence))
+def build_answer_mindmap(query: str, answer: str) -> str:
+    title = mindmap_topic_from_query(query)
+    outline = parse_answer_outline(answer)
+    if not outline:
+        fallback = mindmap_text(answer or query or "核心回答")
+        return "\n".join([
+            f"# {title}",
+            "## 核心回答",
+            f"- {fallback}",
+        ])
+
+    lines = [f"# {title}"]
+    for section in outline:
+        lines.append(f"## {section['title']}")
+        lines.extend(serialize_outline_children(section.get("children", []), 0))
     return "\n".join(lines)
 
 
-def build_answer_structure_mindmap(query: str, title: str, evidence: list[dict]) -> str:
-    lines = [
-        f"# {title}",
-        "## 问题焦点",
-        f"- {compact_mindmap_text(query or title, 72)}",
-        "## 关键论点",
-    ]
-    for item in evidence[:3]:
-        evidence_id = item.get("id") or "E?"
-        snippet = compact_mindmap_text(item.get("snippet") or item.get("section") or "相关论点", 86)
-        if snippet:
-            lines.append(f"- {snippet} [{evidence_id}]")
-    lines.append("## 论文依据")
-    lines.extend(format_evidence_outline(evidence))
-    return "\n".join(lines)
+def mindmap_topic_from_query(query: str) -> str:
+    normalized = strip_mindmap_request(mindmap_text(query))
+    if not normalized:
+        return "研究导图"
+
+    normalized = normalized.strip(" ？?。；;，,：:")
+    if "数据要素" in normalized and "治理目标" in normalized:
+        return "数据要素治理目标"
+    if "安全评估" in normalized and any(marker in normalized for marker in ("为什么需要", "必要", "重要")):
+        return "安全评估必要性"
+    if "生成式人工智能服务安全" in normalized and "要求" in normalized:
+        return "生成式人工智能服务安全要求"
+
+    topic = normalized
+    topic = re.sub(r"^(?:请问|请|帮我|帮忙|能否|可以)?", "", topic)
+    topic = re.sub(r"(?:主要)?(?:覆盖|包括|包含|涉及)哪些(?:方面|内容|要求)?", "", topic)
+    topic = re.sub(r"(?:分别)?(?:指向|对应|体现|说明|代表)什么(?:治理目标|目标|含义|意义)?", "", topic)
+    topic = re.sub(r"为什么需要(.+)$", r"\1必要性", topic)
+    topic = topic.replace("基本要求", "要求")
+    topic = topic.strip(" ？?。；;，,：:")
+    return compact_mindmap_title(topic or normalized)
 
 
-def mindmap_title(query: str, evidence: list[dict]) -> str:
-    query_title = mindmap_query_title(query)
-    if query_title:
-        return query_title
-    for item in evidence:
-        filename = item.get("source_filename")
-        if filename:
-            return os.path.splitext(str(filename))[0]
-    return compact_mindmap_text(" ".join((query or "研究导图").split()), 48)
+def strip_mindmap_request(value: str) -> str:
+    normalized = mindmap_text(value)
+    phrases = (
+        "请以导图的形式加以展示",
+        "以导图的形式加以展示",
+        "请以导图形式加以展示",
+        "以导图形式加以展示",
+        "请以导图的形式展示",
+        "以导图的形式展示",
+        "请以导图形式展示",
+        "以导图形式展示",
+        "请用导图说明",
+        "用导图说明",
+        "请用思维导图说明",
+        "用思维导图说明",
+        "请用结构图说明",
+        "用结构图说明",
+        "思维导图",
+        "导图",
+        "结构图",
+        "知识图谱",
+    )
+    for phrase in phrases:
+        normalized = normalized.replace(phrase, "")
+    return normalized
 
 
-def mindmap_query_title(query: str) -> str | None:
-    normalized = " ".join((query or "").split())
-    lowered = normalized.lower()
-    if "transformer" in lowered:
-        if "架构" in normalized or "architecture" in lowered:
-            return "Transformer 架构"
-        if any(marker in normalized for marker in ("机制", "原理", "定义", "是什么")):
-            return "Transformer 机制"
-        return "Transformer"
+def compact_mindmap_title(value: str, max_chars: int = 24) -> str:
+    normalized = mindmap_text(value).strip(" ？?。；;，,：:")
+    if len(normalized) <= max_chars:
+        return normalized or "研究导图"
+    return normalized[:max_chars].rstrip(" ？?。；;，,：:") or "研究导图"
+
+
+def parse_answer_outline(answer: str) -> list[dict]:
+    sections: list[dict] = []
+    current_section: dict | None = None
+    stack: list[tuple[int, dict]] = []
+    intro_lines: list[str] = []
+
+    for raw_line in (answer or "").splitlines():
+        if not raw_line.strip():
+            continue
+
+        parsed = parse_outline_line(raw_line)
+        if parsed is None:
+            cleaned = mindmap_text(raw_line)
+            if not cleaned:
+                continue
+            if is_summary_line(cleaned):
+                section = make_summary_outline_node(cleaned)
+                sections.append(section)
+                current_section = section
+                stack = [(0, section)]
+                continue
+            if current_section is None:
+                intro_lines.append(cleaned)
+                continue
+            if should_skip_intro_line(cleaned):
+                continue
+            parent = stack[-1][1] if stack else current_section
+            parent["children"].append(make_outline_node(cleaned))
+            continue
+
+        kind = parsed["kind"]
+        title = parsed["title"]
+        detail = parsed["detail"]
+        indent = parsed["indent"]
+
+        if is_summary_outline(title, detail):
+            section = make_summary_outline_node(summary_content(title, detail))
+            sections.append(section)
+            current_section = section
+            stack = [(0, section)]
+            continue
+
+        if kind == "section":
+            section = make_outline_node(title)
+            sections.append(section)
+            current_section = section
+            stack = [(0, section)]
+            if detail:
+                detail_node = make_outline_node(detail)
+                section["children"].append(detail_node)
+                stack.append((0, detail_node))
+            continue
+
+        if current_section is None and should_skip_intro_line(title):
+            continue
+
+        while stack and indent <= stack[-1][0]:
+            stack.pop()
+        parent = stack[-1][1] if stack else current_section
+        if parent is None:
+            intro_lines.append(title)
+            continue
+
+        node = make_outline_node(title)
+        parent["children"].append(node)
+        stack.append((indent, node))
+        if detail:
+            detail_node = make_outline_node(detail)
+            node["children"].append(detail_node)
+            stack.append((indent + 1, detail_node))
+
+    if sections:
+        return sections
+
+    fallback_text = " ".join(intro_lines).strip()
+    if not fallback_text:
+        return []
+    return [make_outline_node("核心回答", [make_outline_node(fallback_text)])]
+
+
+def is_summary_outline(title: str, detail: str) -> bool:
+    title_text = mindmap_text(title)
+    if title_text in ("总结", "归纳总结", "小结", "结论", "总体结论", "综合结论"):
+        return True
+    return is_summary_line(summary_content(title, detail))
+
+
+def summary_content(title: str, detail: str) -> str:
+    title_text = mindmap_text(title)
+    detail_text = mindmap_text(detail)
+    if title_text in ("总结", "归纳总结", "小结", "结论", "总体结论", "综合结论") and detail_text:
+        return detail_text
+    if detail_text:
+        return f"{title_text}：{detail_text}"
+    return title_text
+
+
+def is_summary_line(value: str) -> bool:
+    normalized = mindmap_text(value)
+    if not normalized:
+        return False
+    summary_prefixes = (
+        "综上",
+        "总之",
+        "因此",
+        "所以",
+        "整体来看",
+        "总体来看",
+        "总的来说",
+        "归纳来看",
+        "上述归纳",
+        "上述内容",
+        "由此可见",
+        "可以看出",
+        "需要说明",
+        "虽然",
+    )
+    if normalized.startswith(summary_prefixes):
+        return True
+    return any(marker in normalized for marker in ("基础框架", "总体框架", "归纳总结", "总结来看"))
+
+
+def make_summary_outline_node(content: str) -> dict:
+    cleaned = mindmap_text(content)
+    children = [make_outline_node(cleaned)] if cleaned else []
+    return make_outline_node("归纳总结", children)
+
+
+def parse_outline_line(raw_line: str) -> dict[str, int | str] | None:
+    stripped = raw_line.rstrip()
+    if not stripped.strip():
+        return None
+
+    heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped.strip())
+    if heading_match:
+        heading_level = len(heading_match.group(1))
+        title, detail = split_outline_title(heading_match.group(2))
+        if heading_level <= 2:
+            return {"kind": "section", "title": title, "detail": detail, "indent": 0}
+        return {"kind": "child", "title": title, "detail": detail, "indent": heading_level - 2}
+
+    bullet_match = re.match(
+        r"^(\s*)(?:[-*+]|(?:\d+(?:\.\d+)*[.)、．]?|[一二三四五六七八九十]+[、.．)]?))\s+(.+)$",
+        stripped,
+    )
+    if bullet_match:
+        indent = len(bullet_match.group(1).replace("\t", "  "))
+        title, detail = split_outline_title(bullet_match.group(2))
+        if indent == 0:
+            return {"kind": "section", "title": title, "detail": detail, "indent": 0}
+        return {"kind": "child", "title": title, "detail": detail, "indent": indent}
+
     return None
 
 
-def is_transformer_mindmap(query: str, evidence: list[dict]) -> bool:
-    text_parts = [query or ""]
-    for item in evidence:
-        text_parts.append(str(item.get("section") or ""))
-        text_parts.append(str(item.get("snippet") or ""))
-    return "transformer" in " ".join(text_parts).lower()
+def split_outline_title(value: str) -> tuple[str, str]:
+    normalized = mindmap_text(value)
+    normalized = re.sub(r"^(?:[（(]?[一二三四五六七八九十]+[)）]?|(?:\d+(?:\.\d+)*))(?:[、.．)]|[）)]|、)?\s*", "", normalized)
+    if "：" in normalized:
+        title, detail = normalized.split("：", 1)
+    elif ":" in normalized:
+        title, detail = normalized.split(":", 1)
+    else:
+        title, detail = normalized, ""
+    title = title.strip(" -：:。；;")
+    detail = detail.strip(" -：:。；;")
+    return title or normalized, detail
 
 
-def format_evidence_outline(evidence: list[dict]) -> list[str]:
-    if not evidence:
-        return ["- 未捕获到可展示的论文证据"]
+def should_skip_intro_line(value: str) -> bool:
+    normalized = mindmap_text(value)
+    return normalized.startswith(("主要包括", "包括以下", "可以从", "通常包括", "先看", "下面是")) or normalized.endswith(("：", ":", "如下", "如下："))
 
-    lines = []
-    for item in evidence[:5]:
-        evidence_id = item.get("id") or "E?"
-        section = compact_mindmap_text(item.get("section") or "相关论点", 64)
-        page = item.get("page_label") or item.get("page")
-        page_text = f", p.{page}" if page not in (None, "") else ""
-        lines.append(f"- {section} [{evidence_id}{page_text}]")
+
+def make_outline_node(title: str, children: list[dict] | None = None) -> dict:
+    return {"title": mindmap_text(title), "children": children or []}
+
+
+def serialize_outline_children(children: list[dict], depth: int) -> list[str]:
+    lines: list[str] = []
+    for child in children:
+        title = mindmap_text(child.get("title") or "")
+        if not title:
+            continue
+        lines.append(f"{'  ' * depth}- {title}")
+        lines.extend(serialize_outline_children(child.get("children", []), depth + 1))
     return lines
+
+
+def evidence_outline_to_answer_text(evidence: list[dict]) -> str:
+    if not evidence:
+        return ""
+
+    lines: list[str] = []
+    for item in evidence[:5]:
+        section = mindmap_text(item.get("section") or item.get("snippet") or "相关内容")
+        snippet = clean_evidence_sentence(item.get("snippet") or "")
+        if section:
+            lines.append(f"- {section}")
+        if snippet and snippet != section:
+            lines.append(f"  - {snippet}")
+    return "\n".join(lines)
+
+
+def mindmap_text(value: str) -> str:
+    normalized = re.sub(r"\[E\d+\]", "", str(value or ""))
+    return " ".join(normalized.replace("|", " ").split())
 
 
 def compact_mindmap_text(value: str, max_chars: int) -> str:
