@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import {
@@ -219,6 +219,16 @@ const EVIDENCE_BLOCK_PATTERN = /```souldrive-evidence\s*([\s\S]*?)```/g;
 const GRAPH_WHEEL_STEP = 0.006;
 const GRAPH_BUTTON_ZOOM_STEP = 0.12;
 const PAPERS_PER_PAGE = 5;
+const WORKBENCH_LAYOUT_STORAGE_KEY = "souldrive.workbench.layout.v1";
+const DEFAULT_ARTIFACT_WEIGHT = 1.25;
+const MIN_ARTIFACT_WEIGHT = 0.72;
+const MAX_ARTIFACT_WEIGHT = 2.8;
+const GRAPH_PRIORITY_ARTIFACT_WEIGHT = 2.25;
+
+interface WorkbenchLayoutPreference {
+  leftCollapsed: boolean;
+  artifactWeight: number;
+}
 
 const promptTemplates = [
   "请归纳这批论文或技术资料的核心主题、关键结论和差异，并给出引用依据。",
@@ -226,6 +236,38 @@ const promptTemplates = [
   "请生成一个围绕当前资料库的技术路线图，并标注关键来源。",
   "请从企业落地角度评估这些资料对应方案的可复用性、成本和实施风险。",
 ];
+
+function clampArtifactWeight(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_ARTIFACT_WEIGHT;
+  return Math.min(MAX_ARTIFACT_WEIGHT, Math.max(MIN_ARTIFACT_WEIGHT, value));
+}
+
+function readWorkbenchLayoutPreference(): WorkbenchLayoutPreference {
+  if (typeof window === "undefined") {
+    return { leftCollapsed: false, artifactWeight: DEFAULT_ARTIFACT_WEIGHT };
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) || "{}");
+    return {
+      leftCollapsed: Boolean(parsed.leftCollapsed),
+      artifactWeight: clampArtifactWeight(Number(parsed.artifactWeight) || DEFAULT_ARTIFACT_WEIGHT),
+    };
+  } catch {
+    return { leftCollapsed: false, artifactWeight: DEFAULT_ARTIFACT_WEIGHT };
+  }
+}
+
+function saveWorkbenchLayoutPreference(preference: WorkbenchLayoutPreference) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    WORKBENCH_LAYOUT_STORAGE_KEY,
+    JSON.stringify({
+      leftCollapsed: preference.leftCollapsed,
+      artifactWeight: clampArtifactWeight(preference.artifactWeight),
+    }),
+  );
+}
 
 function parseEvidence(raw: string): EvidenceItem[] {
   try {
@@ -334,7 +376,10 @@ export default function App() {
   const [documentImportMessage, setDocumentImportMessage] = useState("");
   const [artifactTab, setArtifactTab] = useState<"evidence" | "graph" | "audit">("evidence");
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+  const [workbenchLayout, setWorkbenchLayout] = useState<WorkbenchLayoutPreference>(() => readWorkbenchLayoutPreference());
+  const [isWorkbenchDragging, setIsWorkbenchDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const workbenchRef = useRef<HTMLElement | null>(null);
 
   const parsedMessages = useMemo(
     () => messages.map((message) => ({ message, parsed: parseMessageArtifacts(message.content) })),
@@ -376,10 +421,16 @@ export default function App() {
   const locked = runtimeStatus?.locked ?? true;
   const indexingStatus = runtimeStatus?.indexing?.status || "idle";
   const indexBusy = ["queued", "scanning", "indexing"].includes(indexingStatus);
+  const leftCollapsed = workbenchLayout.leftCollapsed;
+  const artifactWeight = workbenchLayout.artifactWeight;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    saveWorkbenchLayoutPreference(workbenchLayout);
+  }, [workbenchLayout]);
 
   useEffect(() => {
     setCollapsedNodeIds(new Set());
@@ -551,6 +602,36 @@ export default function App() {
     }
   }, [latestMindmap, latestEvidence.length]);
 
+  useEffect(() => {
+    if (!isWorkbenchDragging) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const workbench = workbenchRef.current;
+      if (!workbench) return;
+
+      const rect = workbench.getBoundingClientRect();
+      const leftWidth = leftCollapsed ? 72 : 300;
+      const usableWidth = Math.max(420, rect.width - leftWidth - 42);
+      const artifactShare = Math.min(0.74, Math.max(0.34, (rect.right - event.clientX) / usableWidth));
+      const nextWeight = artifactShare / Math.max(0.26, 1 - artifactShare);
+      setWorkbenchLayout((previous) => ({
+        ...previous,
+        artifactWeight: clampArtifactWeight(nextWeight),
+      }));
+    };
+
+    const stopDragging = () => setIsWorkbenchDragging(false);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+    window.addEventListener("pointercancel", stopDragging);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    };
+  }, [isWorkbenchDragging, leftCollapsed]);
+
   const toggleMindmapNode = (nodeId: string) => {
     setCollapsedNodeIds((previous) => {
       const next = new Set(previous);
@@ -561,6 +642,37 @@ export default function App() {
       }
       return next;
     });
+  };
+
+  const toggleLeftPanel = () => {
+    setWorkbenchLayout((previous) => ({
+      ...previous,
+      leftCollapsed: !previous.leftCollapsed,
+    }));
+  };
+
+  const useGraphPriorityLayout = () => {
+    setArtifactTab("graph");
+    setWorkbenchLayout((previous) => ({
+      ...previous,
+      leftCollapsed: true,
+      artifactWeight: GRAPH_PRIORITY_ARTIFACT_WEIGHT,
+    }));
+  };
+
+  const startWorkbenchResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    setIsWorkbenchDragging(true);
+  };
+
+  const handleSplitterKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    setWorkbenchLayout((previous) => ({
+      ...previous,
+      artifactWeight: clampArtifactWeight(previous.artifactWeight + (event.key === "ArrowLeft" ? 0.12 : -0.12)),
+    }));
   };
 
   const refreshSecurityAfterChange = async () => {
@@ -782,6 +894,11 @@ export default function App() {
     typeof gpuConfig?.n_gpu_layers === "number" && gpuConfig.n_gpu_layers > 0
       ? `GPU ${gpuConfig.n_gpu_layers}`
       : "CPU Edge";
+  const workbenchStyle = {
+    "--left-panel-width": leftCollapsed ? "72px" : "300px",
+    "--chat-panel-fr": "1fr",
+    "--artifact-panel-fr": `${artifactWeight}fr`,
+  } as CSSProperties & Record<string, string>;
 
   return (
     <div className="app-frame">
@@ -797,6 +914,15 @@ export default function App() {
         </div>
 
         <div className="run-status">
+          <button
+            type="button"
+            className="layout-icon-button"
+            title={leftCollapsed ? "展开信息栏" : "折叠信息栏"}
+            aria-label={leftCollapsed ? "展开信息栏" : "折叠信息栏"}
+            onClick={toggleLeftPanel}
+          >
+            {leftCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          </button>
           <span className={`status-token ${locked ? "" : "online"}`}>
             <ShieldCheck size={14} />
             {runtimeStatus ? runtimeStatus.auth_level : "BOOTING"}
@@ -808,7 +934,43 @@ export default function App() {
         </div>
       </header>
 
-      <section className="workbench">
+      <section
+        ref={workbenchRef}
+        className={`workbench ${leftCollapsed ? "left-collapsed" : ""} ${isWorkbenchDragging ? "resizing" : ""}`}
+        style={workbenchStyle}
+      >
+        {leftCollapsed ? (
+          <aside className="system-panel collapsed-rail" aria-label="工作区信息栏">
+            <button type="button" className="rail-button primary" title="展开信息栏" onClick={toggleLeftPanel}>
+              <ChevronRight size={17} />
+            </button>
+            <div className={`rail-status ${locked ? "" : "online"}`} title={locked ? "工作区锁定" : "工作区已就绪"}>
+              <ShieldCheck size={16} />
+              <span>{locked ? "LOCK" : "OK"}</span>
+            </div>
+            <button
+              type="button"
+              className="rail-button"
+              title={indexBusy ? "索引任务运行中" : "更新知识索引"}
+              disabled={locked || indexBusy || indexStartStatus === "starting"}
+              onClick={() => void startIndexing()}
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              type="button"
+              className="rail-button"
+              title="导入 PDF 文档"
+              disabled={locked || documentImportStatus === "selecting" || documentImportStatus === "importing"}
+              onClick={() => void importDocuments()}
+            >
+              <Upload size={16} />
+            </button>
+            <button type="button" className="rail-button" title="导图优先" onClick={useGraphPriorityLayout}>
+              <GitBranch size={16} />
+            </button>
+          </aside>
+        ) : (
         <aside className="system-panel">
           <div className="panel-block">
             <div className="panel-title">
@@ -1038,6 +1200,7 @@ export default function App() {
             {runtimeMetrics?.last_error && <p>{runtimeMetrics.last_error}</p>}
           </details>
         </aside>
+        )}
 
         <main className="dialog-panel">
           <div className="dialog-header">
@@ -1096,6 +1259,16 @@ export default function App() {
           </form>
         </main>
 
+        <button
+          type="button"
+          className="workbench-splitter"
+          title="拖拽调整聊天区与导图区宽度"
+          aria-label="调整聊天区与导图区宽度"
+          aria-orientation="vertical"
+          onPointerDown={startWorkbenchResize}
+          onKeyDown={handleSplitterKeyDown}
+        />
+
         <aside className="artifact-studio">
           <div className="studio-header">
             <div>
@@ -1106,6 +1279,10 @@ export default function App() {
               <h2>证据链与结构导图</h2>
             </div>
             <div className="artifact-tabs">
+              <button type="button" title="导图优先布局" onClick={useGraphPriorityLayout}>
+                <Layers3 size={14} />
+                优先
+              </button>
               <button type="button" className={artifactTab === "evidence" ? "active" : ""} onClick={() => setArtifactTab("evidence")}>
                 <ClipboardList size={14} />
                 证据

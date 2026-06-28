@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from core import mcp_server
 import core.runtime_state as runtime_state
+from core.security_context import get_workspace_keys
 from core.workspace import SoulDriveWorkspace
 from core.workspace_crypto import initialize_keystore
 
@@ -129,6 +130,62 @@ class McpServerSecurityTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         start_indexer.assert_not_called()
+
+    def test_security_lock_clears_workspace_keys(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = str(Path(temp_dir) / "runtime_state.json")
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            with patch.object(runtime_state, "STATE_PATH", state_path), patch.object(
+                mcp_server,
+                "current_workspace",
+                return_value=workspace,
+            ), patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False):
+                runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                client = TestClient(mcp_server.app)
+                init_response = client.post(
+                    "/security/init",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                    json={"passphrase": "secret-passphrase", "acknowledge_no_recovery": True},
+                )
+                self.assertEqual(init_response.status_code, 200)
+                self.assertIsNotNone(get_workspace_keys(workspace.root_path))
+
+                lock_response = client.post(
+                    "/security/lock",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                    json={},
+                )
+
+        self.assertEqual(lock_response.status_code, 200)
+        self.assertIsNone(get_workspace_keys(workspace.root_path))
+
+    def test_runtime_lock_clears_workspace_keys(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = str(Path(temp_dir) / "runtime_state.json")
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            with patch.object(runtime_state, "STATE_PATH", state_path), patch.object(
+                mcp_server,
+                "current_workspace",
+                return_value=workspace,
+            ), patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False):
+                runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                client = TestClient(mcp_server.app)
+                init_response = client.post(
+                    "/security/init",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                    json={"passphrase": "secret-passphrase", "acknowledge_no_recovery": True},
+                )
+                self.assertEqual(init_response.status_code, 200)
+                self.assertIsNotNone(get_workspace_keys(workspace.root_path))
+
+                lock_response = client.post(
+                    "/runtime/lock",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                    json={"reason": "storage device removed"},
+                )
+
+        self.assertEqual(lock_response.status_code, 200)
+        self.assertIsNone(get_workspace_keys(workspace.root_path))
 
     def test_security_status_requires_passphrase_when_memory_keys_are_missing(self):
         with tempfile.TemporaryDirectory() as temp_dir:

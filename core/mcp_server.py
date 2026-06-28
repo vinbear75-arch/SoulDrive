@@ -213,6 +213,14 @@ def cleanup_runtime():
     loaded_workspace_path = None
 
 
+def _cleanup_portable_session(workspace: SoulDriveWorkspace | None = None):
+    workspace = workspace or _workspace_from_state()
+    _stop_indexer_worker()
+    cleanup_runtime()
+    if workspace is not None:
+        clear_workspace_keys(workspace.root_path)
+
+
 def _indexer_worker_command(workspace: SoulDriveWorkspace, auth_level: str) -> list[str]:
     if getattr(sys, "frozen", False):
         return [
@@ -497,10 +505,8 @@ async def security_lock():
     mounted_response = require_workspace_mounted()
     if mounted_response is not None:
         return mounted_response
-    _stop_indexer_worker()
-    cleanup_runtime()
     workspace = current_workspace()
-    clear_workspace_keys(workspace.root_path)
+    _cleanup_portable_session(workspace)
     mark_software_locked()
     return {"software_unlocked": False, "state": public_runtime_state()}
 
@@ -729,8 +735,7 @@ async def audit_verify(limit: int | None = None):
 
 @app.post("/shutdown")
 async def shutdown():
-    _stop_indexer_worker()
-    cleanup_runtime()
+    _cleanup_portable_session()
     current_audit_logger().append_event("sidecar.shutdown_requested", {})
     handler = getattr(app.state, "shutdown_handler", None)
     if callable(handler):
@@ -740,8 +745,7 @@ async def shutdown():
 
 @app.post("/runtime/lock")
 async def runtime_lock(request: RuntimeRequest):
-    _stop_indexer_worker()
-    cleanup_runtime()
+    _cleanup_portable_session()
     return lock_runtime(request.reason)
 
 @app.post("/runtime/unlock")

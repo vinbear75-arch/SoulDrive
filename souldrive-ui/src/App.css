@@ -9,7 +9,6 @@ body,
 #root {
   margin: 0;
   width: 100%;
-  min-width: 1180px;
   height: 100%;
   overflow: hidden;
 }
@@ -31,9 +30,9 @@ button {
 
 .app-frame {
   height: 100vh;
-  min-width: 1180px;
   display: grid;
   grid-template-rows: 68px minmax(0, 1fr);
+  min-width: 760px;
   background:
     linear-gradient(90deg, rgba(35, 83, 78, 0.08) 1px, transparent 1px),
     linear-gradient(rgba(35, 83, 78, 0.07) 1px, transparent 1px),
@@ -117,13 +116,43 @@ button {
   color: #1f6f61;
 }
 
+.layout-icon-button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d3cbb8;
+  border-radius: 8px;
+  background: #f7f4eb;
+  color: #30352f;
+  padding: 0;
+}
+
+.layout-icon-button:hover {
+  border-color: rgba(34, 116, 101, 0.42);
+  background: #eef4ee;
+  color: #1f6f61;
+}
+
 .workbench {
+  --left-panel-width: 300px;
+  --chat-panel-fr: 1fr;
+  --artifact-panel-fr: 1.25fr;
   min-height: 0;
   display: grid;
-  grid-template-columns: 300px minmax(360px, 1fr) minmax(420px, 36vw);
-  gap: 14px;
+  grid-template-columns:
+    var(--left-panel-width)
+    minmax(300px, var(--chat-panel-fr))
+    10px
+    minmax(360px, var(--artifact-panel-fr));
+  gap: 10px;
   padding: 14px;
   overflow: hidden;
+}
+
+.workbench.resizing {
+  user-select: none;
+  cursor: col-resize;
 }
 
 .system-panel,
@@ -144,6 +173,101 @@ button {
   padding: 12px;
   background: #f2efe6;
   overflow-y: auto;
+}
+
+.collapsed-rail {
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.rail-button {
+  width: 44px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d7cfbd;
+  border-radius: 8px;
+  background: #f7f4eb;
+  color: #30352f;
+  padding: 0;
+}
+
+.rail-button.primary {
+  border-color: rgba(34, 116, 101, 0.36);
+  background: #173f3b;
+  color: #fffdf7;
+}
+
+.rail-button:hover:not(:disabled) {
+  border-color: rgba(34, 116, 101, 0.42);
+  background: #eef4ee;
+  color: #1f6f61;
+}
+
+.rail-button.primary:hover {
+  background: #23534e;
+  color: #fffdf7;
+}
+
+.rail-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.rail-status {
+  width: 44px;
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  border: 1px solid #d7cfbd;
+  border-radius: 8px;
+  background: #fffdf7;
+  color: #697064;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 9px;
+}
+
+.rail-status.online {
+  border-color: rgba(34, 116, 101, 0.28);
+  background: rgba(34, 116, 101, 0.1);
+  color: #1f6f61;
+}
+
+.workbench-splitter {
+  width: 10px;
+  min-height: 0;
+  align-self: stretch;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: col-resize;
+  padding: 0;
+  position: relative;
+}
+
+.workbench-splitter::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 4px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(34, 116, 101, 0.22);
+}
+
+.workbench-splitter:hover::before,
+.workbench.resizing .workbench-splitter::before,
+.workbench-splitter:focus-visible::before {
+  background: rgba(178, 122, 34, 0.72);
+}
+
+.workbench-splitter:focus-visible {
+  outline: 2px solid rgba(178, 122, 34, 0.56);
+  outline-offset: 2px;
 }
 
 .panel-block {
@@ -823,6 +947,8 @@ button {
   align-items: center;
   gap: 7px;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .artifact-tabs button {
@@ -1246,8 +1372,32 @@ button {
   white-space: nowrap;
 }
 
-@media (max-width: 1280px) {
-  body {
-    overflow-x: auto;
+@media (max-width: 980px) {
+  .app-frame {
+    min-width: 0;
+  }
+
+  .command-bar {
+    padding: 0 12px;
+  }
+
+  .brand-zone span {
+    display: none;
+  }
+
+  .workbench {
+    grid-template-columns:
+      var(--left-panel-width)
+      minmax(260px, var(--chat-panel-fr))
+      10px
+      minmax(300px, var(--artifact-panel-fr));
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .dialog-header,
+  .studio-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
