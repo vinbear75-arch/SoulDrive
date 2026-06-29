@@ -159,6 +159,28 @@ class McpServerSecurityTests(unittest.TestCase):
         self.assertEqual(lock_response.status_code, 200)
         self.assertIsNone(get_workspace_keys(workspace.root_path))
 
+    def test_security_lock_removes_secure_index_temp_dirs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = str(Path(temp_dir) / "runtime_state.json")
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            leftover = Path(workspace.runtime_path) / "secure-index-leftover"
+            leftover.mkdir(parents=True)
+            (leftover / "leak.pdf").write_bytes(b"%PDF leftover")
+            with patch.object(runtime_state, "STATE_PATH", state_path), patch.object(
+                mcp_server,
+                "current_workspace",
+                return_value=workspace,
+            ), patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False):
+                runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                client = TestClient(mcp_server.app)
+                response = client.post(
+                    "/security/lock",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                    json={},
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertFalse(leftover.exists())
+
     def test_runtime_lock_clears_workspace_keys(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = str(Path(temp_dir) / "runtime_state.json")

@@ -4,12 +4,135 @@ from pathlib import Path
 from unittest.mock import patch
 
 from core.knowledge_base import LocalKnowledgeBase
+from core.secure_vector_store import SecureVectorStore
 from core.security_context import clear_workspace_keys, set_workspace_keys
 from core.workspace import SoulDriveWorkspace
 from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class SecureVectorStoreTests(unittest.TestCase):
+    def test_dense_candidates_do_not_decrypt_chunk_text_until_loaded_by_id(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["alpha-child", "beta-child"],
+                    documents=["alpha private answer", "beta unrelated"],
+                    metadatas=[
+                        {"parent_id": "alpha-parent", "source_filename": "alpha.pdf"},
+                        {"parent_id": "beta-parent", "source_filename": "beta.pdf"},
+                    ],
+                    embeddings=[[1.0, 0.0], [0.0, 1.0]],
+                )
+                candidates = store.dense_candidates([1.0, 0.0], limit=1)
+                loaded = store.load_candidates([item.chunk_id for item in candidates])
+            finally:
+                store.close()
+
+        self.assertEqual([item.chunk_id for item in candidates], ["alpha-child"])
+        self.assertEqual(candidates[0].content, None)
+        self.assertEqual(loaded[0].content, "alpha private answer")
+        self.assertEqual(loaded[0].metadata["source_filename"], "alpha.pdf")
+
+    def test_load_candidates_preserves_requested_order_and_skips_missing_ids(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["first", "second"],
+                    documents=["first text", "second text"],
+                    metadatas=[{"parent_id": "p1"}, {"parent_id": "p2"}],
+                    embeddings=[[1.0], [0.5]],
+                )
+                loaded = store.load_candidates(["second", "missing", "first"])
+            finally:
+                store.close()
+
+        self.assertEqual([item.chunk_id for item in loaded], ["second", "first"])
+
+    def test_keyword_candidates_use_hmac_postings_without_plaintext_storage(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["policy-child", "other-child"],
+                    documents=["zero trust policy requires device verification", "lunch menu unrelated"],
+                    metadatas=[
+                        {"parent_id": "policy-parent", "source_filename": "policy.pdf"},
+                        {"parent_id": "other-parent", "source_filename": "other.pdf"},
+                    ],
+                    embeddings=[[1.0], [0.0]],
+                )
+                candidates = store.keyword_candidates("zero trust", limit=5)
+            finally:
+                store.close()
+
+            persisted = Path(workspace.secure_vector_store_path).read_bytes()
+
+        self.assertEqual(candidates[0].chunk_id, "policy-child")
+        self.assertNotIn(b"zero trust", persisted)
+        self.assertNotIn(b"policy requires", persisted)
+
+    def test_delete_by_document_hash_removes_only_deleted_keyword_postings(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.upsert_parent("deleted-parent", "deleted parent content", {"document_hash": "old-hash"})
+                store.upsert_parent("kept-parent", "kept parent content", {"document_hash": "kept-hash"})
+                store.add_chunks(
+                    ids=["deleted-child", "kept-child"],
+                    documents=["zero trust deleted", "zero trust kept"],
+                    metadatas=[
+                        {"parent_id": "deleted-parent", "document_hash": "old-hash"},
+                        {"parent_id": "kept-parent", "document_hash": "kept-hash"},
+                    ],
+                    embeddings=[[1.0], [1.0]],
+                )
+                store.delete_by_document_hash("old-hash")
+                candidates = store.keyword_candidates("zero trust", limit=5)
+                loaded = store.load_candidates(["kept-child", "deleted-child"])
+                kept_parent = store.get_parent("kept-parent")
+                deleted_parent = store.get_parent("deleted-parent")
+            finally:
+                store.close()
+
+        self.assertEqual([item.chunk_id for item in candidates], ["kept-child"])
+        self.assertEqual([item.chunk_id for item in loaded], ["kept-child"])
+        self.assertIsNotNone(kept_parent)
+        self.assertIsNone(deleted_parent)
+
+    def test_keyword_candidates_index_terms_beyond_short_token_prefix(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                long_prefix = " ".join(f"filler{i}" for i in range(300))
+                store.add_chunks(
+                    ids=["late-keyword-child"],
+                    documents=[f"{long_prefix} latekeyword"],
+                    metadatas=[{"parent_id": "late-parent", "source_filename": "late.pdf"}],
+                    embeddings=[[1.0]],
+                )
+                candidates = store.keyword_candidates("latekeyword", limit=5)
+            finally:
+                store.close()
+
+        self.assertEqual([item.chunk_id for item in candidates], ["late-keyword-child"])
+
     def test_secure_store_persists_chunks_without_plaintext_leak(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()

@@ -11,8 +11,10 @@ from core.paths import resolve_model_path
 from core.retrieval import SearchCandidate, build_citations, rank_hybrid_candidates
 from core.reranker import LocalReranker
 from core.security_context import get_workspace_keys
+from core.secure_graph_store import SecureGraphStore
 from core.secure_vector_store import SecureVectorStore
 from core.query_expansion import expand_query_variants
+from core.torch_device import resolve_torch_device
 from core.workspace import SoulDriveWorkspace
 
 logger = get_logger(__name__)
@@ -31,7 +33,7 @@ def _persistent_client(path: str):
 def _sentence_transformer(model_path: str):
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(model_path, local_files_only=True, device="cpu")
+    return SentenceTransformer(model_path, local_files_only=True, device=resolve_torch_device())
 
 
 class LocalKnowledgeBase:
@@ -100,7 +102,9 @@ class LocalKnowledgeBase:
                 self.parent_store.upsert_parent(parent_id, parent_content, parent_metadata)
 
             children = split_parent_document(parent_id, parent_content)
+            child_ids = []
             for child in children:
+                child_ids.append(child.child_id)
                 child_metadata = {
                     **parent_metadata,
                     "parent_id": parent_id,
@@ -115,6 +119,7 @@ class LocalKnowledgeBase:
                 ids.append(child.child_id)
                 if self.keyword_index is not None:
                     self.keyword_index.upsert_document(child.child_id, child.content, child_metadata)
+            chunk.metadata["child_ids"] = child_ids
 
         if not texts:
             return
@@ -134,11 +139,13 @@ class LocalKnowledgeBase:
 
         dense_candidates = []
         keyword_candidates = []
+        graph_candidates = self._graph_candidates(query, graph_db, limit=max(top_k * 12, 40))
         for variant in query_variants:
             query_vector = self.embedding_model.encode([variant], normalize_embeddings=True).tolist()
             dense_candidates.extend(self._dense_candidates(query_vector, dense_pool_size))
             keyword_candidates.extend(self._keyword_candidates(variant, dense_pool_size))
-        candidates = self._merge_candidates(dense_candidates, keyword_candidates)
+        candidates = self._merge_candidates(dense_candidates, keyword_candidates, graph_candidates)
+        candidates = self._hydrate_secure_candidates(candidates, limit=max(top_k * 40, 120))
 
         graph_context, matched_entities = self._build_graph_context(
             query=query,
@@ -148,9 +155,10 @@ class LocalKnowledgeBase:
 
         if matched_entities:
             for candidate in candidates:
-                candidate.graph_score = sum(
+                entity_graph_score = sum(
                     1 for entity in matched_entities if entity.lower() in candidate.content.lower()
                 )
+                candidate.graph_score = max(candidate.graph_score, float(entity_graph_score))
 
         if candidates and self.reranker.ready:
             scores = self.reranker.score(query, [candidate.content for candidate in candidates])
@@ -173,6 +181,19 @@ class LocalKnowledgeBase:
         return result["documents"], result["metadatas"], result["graph_context"]
 
     def _dense_candidates(self, query_vector: list[list[float]], n_results: int):
+        if self.secure_store is not None:
+            embedding = query_vector[0] if query_vector else []
+            return [
+                SearchCandidate(
+                    id=result.chunk_id,
+                    content="",
+                    metadata={},
+                    dense_rank=index + 1,
+                    vector_distance=1.0 - result.score,
+                )
+                for index, result in enumerate(self.secure_store.dense_candidates(embedding, limit=n_results))
+            ]
+
         try:
             vector_results = self.collection.query(
                 query_embeddings=query_vector,
@@ -205,7 +226,17 @@ class LocalKnowledgeBase:
 
     def _keyword_candidates(self, query: str, n_results: int):
         if self.secure_store is not None:
-            results = self.secure_store.keyword_search(query, limit=n_results)
+            candidates = self.secure_store.keyword_candidates(query, limit=n_results)
+            return [
+                SearchCandidate(
+                    id=result.chunk_id,
+                    content="",
+                    metadata={},
+                    sparse_rank=index + 1,
+                    keyword_score=result.score,
+                )
+                for index, result in enumerate(candidates)
+            ]
         else:
             results = self.keyword_index.search(query, limit=n_results)
         return [
@@ -217,6 +248,57 @@ class LocalKnowledgeBase:
                 keyword_score=result.score,
             )
             for index, result in enumerate(results)
+        ]
+
+    def _hydrate_secure_candidates(self, candidates: list[SearchCandidate], limit: int) -> list[SearchCandidate]:
+        if self.secure_store is None:
+            return candidates
+        ordered_ids = []
+        seen = set()
+        for candidate in candidates:
+            if candidate.id in seen:
+                continue
+            seen.add(candidate.id)
+            ordered_ids.append(candidate.id)
+            if len(ordered_ids) >= limit:
+                break
+        loaded = {item.chunk_id: item for item in self.secure_store.load_candidates(ordered_ids)}
+        hydrated = []
+        for candidate in candidates:
+            item = loaded.get(candidate.id)
+            if item is None:
+                continue
+            hydrated.append(
+                SearchCandidate(
+                    id=candidate.id,
+                    content=item.content or "",
+                    metadata=item.metadata or {},
+                    dense_rank=candidate.dense_rank,
+                    sparse_rank=candidate.sparse_rank,
+                    graph_score=candidate.graph_score,
+                    vector_distance=candidate.vector_distance,
+                    keyword_score=candidate.keyword_score,
+                )
+            )
+        return hydrated
+
+    def _graph_candidates(self, query: str, graph_db: GraphStore | None, limit: int) -> list[SearchCandidate]:
+        if not graph_db or not hasattr(graph_db, "recall_chunk_ids"):
+            return []
+        try:
+            chunk_ids = graph_db.recall_chunk_ids(query, limit=limit)
+        except Exception as exc:
+            runtime_metrics.record_error(f"graph recall failed: {exc}")
+            logger.warning("[VectorDB] Graph recall degraded: %s", exc)
+            return []
+        return [
+            SearchCandidate(
+                id=chunk_id,
+                content="",
+                metadata={},
+                graph_score=max(1.0, float(limit - index)),
+            )
+            for index, chunk_id in enumerate(chunk_ids)
         ]
 
     def _merge_candidates(self, *candidate_groups: list[SearchCandidate]):
@@ -232,6 +314,7 @@ class LocalKnowledgeBase:
                 if existing.sparse_rank is None:
                     existing.sparse_rank = candidate.sparse_rank
                 existing.keyword_score = max(existing.keyword_score, candidate.keyword_score)
+                existing.graph_score = max(existing.graph_score, candidate.graph_score)
                 if existing.vector_distance is None:
                     existing.vector_distance = candidate.vector_distance
         return list(merged.values())
@@ -311,10 +394,25 @@ class LocalKnowledgeBase:
 
     def delete_document_indexes(self, document_hash: str):
         if self.secure_store is not None:
+            existing = self.secure_store.collection.get(where={"document_hash": document_hash}, include=[])
+            child_ids = list(existing.get("ids") or [])
             self.secure_store.delete_by_document_hash(document_hash)
+            self._remove_secure_graph_provenance(child_ids)
             return
         self.parent_store.delete_by_document_hash(document_hash)
         self.keyword_index.delete_by_document_hash(document_hash)
+
+    def _remove_secure_graph_provenance(self, chunk_ids: list[str]) -> None:
+        if not chunk_ids:
+            return
+        workspace_keys = get_workspace_keys(self.workspace.root_path)
+        if workspace_keys is None:
+            return
+        graph_store = SecureGraphStore(self.workspace.secure_graph_store_path, workspace_keys)
+        try:
+            graph_store.remove_chunk_ids(chunk_ids)
+        finally:
+            graph_store.close()
 
     def close(self):
         if self.secure_store is not None:

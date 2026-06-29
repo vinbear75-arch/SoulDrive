@@ -17,6 +17,9 @@ from core.knowledge_base import LocalKnowledgeBase
 from core.logging_config import get_logger
 from core.model_runtime import llama_runtime_config, load_llama_with_gpu_fallback, resolve_chat_model_path
 from core.observability import runtime_metrics
+from core.security_context import get_workspace_keys
+from core.secure_graph_store import SecureGraphStore
+from core.workspace import SoulDriveWorkspace
 
 
 MAX_CONTEXT_CHARS_PER_EVIDENCE = 1800
@@ -37,7 +40,7 @@ class RAGEngine:
         self.audit_logger = audit_logger or default_audit_logger
         if not graph_db_path:
             raise ValueError("graph_db_path is required for RAGEngine")
-        self.graph_db = LocalGraphDB(db_path=graph_db_path)
+        self.graph_db = self._build_graph_store(graph_db_path, workspace_path)
         self.runtime_config = llama_runtime_config(workspace_path)
         model_path = resolve_chat_model_path(workspace_path, self.runtime_config)
         logger.info("[RAG Engine] Loading local GGUF model: %s", os.path.basename(model_path))
@@ -61,6 +64,14 @@ class RAGEngine:
         runtime_metrics.record_model_load(load_result.load_ms)
         if load_result.fallback_error:
             runtime_metrics.record_error(f"GPU fallback: {load_result.fallback_error}")
+
+    def _build_graph_store(self, graph_db_path: str, workspace_path: str | None = None):
+        if workspace_path:
+            keys = get_workspace_keys(workspace_path)
+            if keys is not None:
+                workspace = SoulDriveWorkspace(workspace_path)
+                return SecureGraphStore(workspace.secure_graph_store_path, keys)
+        return LocalGraphDB(db_path=graph_db_path)
 
     def close(self):
         if getattr(self, "graph_db", None) is not None:

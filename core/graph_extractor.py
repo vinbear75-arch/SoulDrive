@@ -87,7 +87,8 @@ class GraphExtractor:
                 text = f"文档来源：{source_filename}\n片段序号：{index}/{len(selected_chunks)}\n\n{text}"
 
             summary["attempted_chunks"] += 1
-            data = self.extract_and_store(text)
+            chunk_ids = list(getattr(chunk, "metadata", {}).get("child_ids") or [])
+            data = self.extract_and_store(text, chunk_ids=chunk_ids)
             if not data:
                 summary["failed_chunks"] += 1
                 continue
@@ -140,7 +141,7 @@ class GraphExtractor:
                 deduped.append(chunk)
         return deduped[:self.max_chunks_per_document]
 
-    def extract_and_store(self, text: str):
+    def extract_and_store(self, text: str, chunk_ids: list[str] | None = None):
         logger.info("[处理中] 正在让大模型咀嚼文本，提炼三元组 (实体与关系)...")
 
         # 架构师级 Prompt：强制进行 JSON 结构化输出
@@ -182,10 +183,10 @@ class GraphExtractor:
 
             # 开启数据库写入
             for ent in entities:
-                self.db.add_entity(ent["name"], ent["type"], ent["description"])
+                self.db.add_entity(ent["name"], ent["type"], ent["description"], chunk_ids=chunk_ids)
 
             for rel in relations:
-                self.db.add_relationship(rel["source"], rel["target"], rel["relation"])
+                self.db.add_relationship(rel["source"], rel["target"], rel["relation"], evidence_chunk_ids=chunk_ids)
 
             logger.info("[成功] 知识图谱落盘完成！入库 %s 个实体，%s 条关联边。", len(entities), len(relations))
             return data
