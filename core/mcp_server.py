@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import threading
+import shutil
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -217,8 +218,25 @@ def _cleanup_portable_session(workspace: SoulDriveWorkspace | None = None):
     workspace = workspace or _workspace_from_state()
     _stop_indexer_worker()
     cleanup_runtime()
+    _cleanup_workspace_temp_files(workspace)
     if workspace is not None:
         clear_workspace_keys(workspace.root_path)
+
+
+def _cleanup_workspace_temp_files(workspace: SoulDriveWorkspace | None = None):
+    if workspace is None:
+        return
+    runtime_path = Path(workspace.runtime_path)
+    if not runtime_path.exists():
+        return
+    for path in runtime_path.glob("secure-index-*"):
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        elif path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
 
 def _indexer_worker_command(workspace: SoulDriveWorkspace, auth_level: str) -> list[str]:
@@ -515,6 +533,9 @@ async def documents_list():
     mounted_response = require_workspace_mounted()
     if mounted_response is not None:
         return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
     return _document_library_payload(current_workspace())
 
 
@@ -528,6 +549,9 @@ async def papers_list():
     mounted_response = require_workspace_mounted()
     if mounted_response is not None:
         return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
     payload = _document_library_payload(current_workspace())
     payload["paper_count"] = payload["document_count"]
     payload["papers"] = payload["documents"]

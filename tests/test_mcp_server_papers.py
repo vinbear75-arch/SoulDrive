@@ -41,6 +41,7 @@ class McpServerPapersTests(unittest.TestCase):
                 clear=False,
             ):
                 runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                runtime_state.mark_software_unlocked()
                 response = TestClient(mcp_server.app).get(
                     "/documents/list",
                     headers={"X-SoulDrive-Token": "test-token"},
@@ -143,6 +144,44 @@ class McpServerPapersTests(unittest.TestCase):
         self.assertEqual(payload["indexed_count"], 1)
         self.assertTrue(payload["documents"][0]["indexed"])
 
+    def test_documents_list_rejects_before_software_unlock(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            source_pdf = Path(temp_dir) / "private.pdf"
+            source_pdf.write_bytes(b"%PDF private")
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+            try:
+                store = SecureDocumentStore(workspace, keys)
+                try:
+                    store.import_document(str(source_pdf))
+                finally:
+                    store.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
+            state_path = str(Path(temp_dir) / "runtime_state.json")
+            with patch.object(runtime_state, "STATE_PATH", state_path), patch(
+                "core.mcp_server.current_workspace",
+                return_value=workspace,
+            ), patch.dict(
+                "os.environ",
+                {"SOULDRIVE_API_TOKEN": "test-token"},
+                clear=False,
+            ):
+                runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                response = TestClient(mcp_server.app).get(
+                    "/documents/list",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                )
+
+        self.assertEqual(response.status_code, 423)
+        payload = response.json()
+        self.assertEqual(payload["status"], "locked")
+        self.assertNotIn("document_count", payload)
+        self.assertNotIn("documents", payload)
+
     def test_papers_list_keeps_legacy_response_shape(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -156,6 +195,7 @@ class McpServerPapersTests(unittest.TestCase):
                 clear=False,
             ):
                 runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                runtime_state.mark_software_unlocked()
                 response = TestClient(mcp_server.app).get(
                     "/papers/list",
                     headers={"X-SoulDrive-Token": "test-token"},

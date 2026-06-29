@@ -19,6 +19,7 @@ class _EntityRecord:
     name: str
     entity_type: str
     description: str
+    chunk_ids: list[str]
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class _RelationshipRecord:
     source: str
     relation: str
     target: str
+    chunk_ids: list[str]
 
 
 class SecureGraphStore:
@@ -58,12 +60,15 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
-    def add_entity(self, name: str, entity_type: str, description: str):
+    def add_entity(self, name: str, entity_type: str, description: str, chunk_ids: list[str] | None = None):
         entity_id = self._entity_id(name)
+        existing = self._entity_by_name(name)
+        merged_chunk_ids = _dedupe([*(existing.chunk_ids if existing else []), *(chunk_ids or [])])
         payload = {
             "name": name,
             "type": entity_type,
             "description": description,
+            "chunk_ids": merged_chunk_ids,
         }
         nonce, ciphertext = self._encrypt_json(payload, ENTITY_AAD + entity_id.encode("ascii"))
         self.conn.execute(
@@ -75,12 +80,15 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
-    def add_relationship(self, source: str, target: str, relation: str):
+    def add_relationship(self, source: str, target: str, relation: str, evidence_chunk_ids: list[str] | None = None):
         relationship_id = self._relationship_id(source, relation, target)
+        existing = self._relationship_by_parts(source, relation, target)
+        merged_chunk_ids = _dedupe([*(existing.chunk_ids if existing else []), *(evidence_chunk_ids or [])])
         payload = {
             "source": source,
             "target": target,
             "relation": relation,
+            "chunk_ids": merged_chunk_ids,
         }
         nonce, ciphertext = self._encrypt_json(
             payload,
@@ -162,10 +170,97 @@ class SecureGraphStore:
 
         return graph_context
 
+    def recall_chunk_ids(self, query: str, limit: int = 40) -> list[str]:
+        match_space = (query or "").lower()
+        matched = []
+        for entity in self._all_entities():
+            if entity.name and entity.name.lower() in match_space:
+                matched.append(entity.name)
+
+        chunk_ids = []
+        seen = set()
+        for entity_name in matched:
+            for chunk_id in self._entity_chunk_ids(entity_name):
+                if chunk_id not in seen:
+                    seen.add(chunk_id)
+                    chunk_ids.append(chunk_id)
+            for source, relation, target in self.get_subgraph(entity_name, depth=1):
+                for related_entity in (source, target):
+                    for chunk_id in self._entity_chunk_ids(related_entity):
+                        if chunk_id not in seen:
+                            seen.add(chunk_id)
+                            chunk_ids.append(chunk_id)
+                for chunk_id in self._relationship_chunk_ids(source, relation, target):
+                    if chunk_id not in seen:
+                        seen.add(chunk_id)
+                        chunk_ids.append(chunk_id)
+                if len(chunk_ids) >= limit:
+                    return chunk_ids[:limit]
+        return chunk_ids[:limit]
+
+    def remove_chunk_ids(self, chunk_ids: list[str]) -> None:
+        removed = {str(chunk_id) for chunk_id in chunk_ids if str(chunk_id)}
+        if not removed:
+            return
+
+        for entity_id, entity in self._entity_rows():
+            kept_chunk_ids = [chunk_id for chunk_id in entity.chunk_ids if chunk_id not in removed]
+            if kept_chunk_ids == entity.chunk_ids:
+                continue
+            if not kept_chunk_ids:
+                self.conn.execute("DELETE FROM entities WHERE entity_id = ?", (entity_id,))
+                continue
+            payload = {
+                "name": entity.name,
+                "type": entity.entity_type,
+                "description": entity.description,
+                "chunk_ids": kept_chunk_ids,
+            }
+            nonce, ciphertext = self._encrypt_json(payload, ENTITY_AAD + entity_id.encode("ascii"))
+            self.conn.execute(
+                """
+                UPDATE entities
+                SET payload_nonce = ?, payload_ciphertext = ?
+                WHERE entity_id = ?
+                """,
+                (nonce, ciphertext, entity_id),
+            )
+
+        for relationship_id, relationship in self._relationship_rows():
+            kept_chunk_ids = [chunk_id for chunk_id in relationship.chunk_ids if chunk_id not in removed]
+            if kept_chunk_ids == relationship.chunk_ids:
+                continue
+            if not kept_chunk_ids:
+                self.conn.execute("DELETE FROM relationships WHERE relationship_id = ?", (relationship_id,))
+                continue
+            payload = {
+                "source": relationship.source,
+                "target": relationship.target,
+                "relation": relationship.relation,
+                "chunk_ids": kept_chunk_ids,
+            }
+            nonce, ciphertext = self._encrypt_json(
+                payload,
+                RELATIONSHIP_AAD + relationship_id.encode("ascii"),
+            )
+            self.conn.execute(
+                """
+                UPDATE relationships
+                SET payload_nonce = ?, payload_ciphertext = ?
+                WHERE relationship_id = ?
+                """,
+                (nonce, ciphertext, relationship_id),
+            )
+
+        self.conn.commit()
+
     def close(self):
         self.conn.close()
 
     def _all_entities(self) -> list[_EntityRecord]:
+        return [record for _, record in self._entity_rows()]
+
+    def _entity_rows(self) -> list[tuple[str, _EntityRecord]]:
         rows = self.conn.execute(
             """
             SELECT entity_id, payload_nonce, payload_ciphertext
@@ -174,18 +269,23 @@ class SecureGraphStore:
             """
         ).fetchall()
         return [
-            _EntityRecord(
-                name=str(payload.get("name") or ""),
-                entity_type=str(payload.get("type") or ""),
-                description=str(payload.get("description") or ""),
+            (
+                row[0],
+                _EntityRecord(
+                    name=str(payload.get("name") or ""),
+                    entity_type=str(payload.get("type") or ""),
+                    description=str(payload.get("description") or ""),
+                    chunk_ids=[str(item) for item in payload.get("chunk_ids") or []],
+                ),
             )
-            for payload in (
-                self._decrypt_json(row[1], row[2], ENTITY_AAD + row[0].encode("ascii"))
-                for row in rows
-            )
+            for row in rows
+            for payload in [self._decrypt_json(row[1], row[2], ENTITY_AAD + row[0].encode("ascii"))]
         ]
 
     def _all_relationships(self) -> list[_RelationshipRecord]:
+        return [record for _, record in self._relationship_rows()]
+
+    def _relationship_rows(self) -> list[tuple[str, _RelationshipRecord]]:
         rows = self.conn.execute(
             """
             SELECT relationship_id, payload_nonce, payload_ciphertext
@@ -194,15 +294,17 @@ class SecureGraphStore:
             """
         ).fetchall()
         return [
-            _RelationshipRecord(
-                source=str(payload.get("source") or ""),
-                relation=str(payload.get("relation") or ""),
-                target=str(payload.get("target") or ""),
+            (
+                row[0],
+                _RelationshipRecord(
+                    source=str(payload.get("source") or ""),
+                    relation=str(payload.get("relation") or ""),
+                    target=str(payload.get("target") or ""),
+                    chunk_ids=[str(item) for item in payload.get("chunk_ids") or []],
+                ),
             )
-            for payload in (
-                self._decrypt_json(row[1], row[2], RELATIONSHIP_AAD + row[0].encode("ascii"))
-                for row in rows
-            )
+            for row in rows
+            for payload in [self._decrypt_json(row[1], row[2], RELATIONSHIP_AAD + row[0].encode("ascii"))]
         ]
 
     def _entity_id(self, name: str) -> str:
@@ -210,6 +312,54 @@ class SecureGraphStore:
 
     def _relationship_id(self, source: str, relation: str, target: str) -> str:
         return self._digest("rel:" + source + "\0" + relation + "\0" + target)
+
+    def _entity_by_name(self, name: str) -> _EntityRecord | None:
+        entity_id = self._entity_id(name)
+        row = self.conn.execute(
+            """
+            SELECT payload_nonce, payload_ciphertext
+            FROM entities
+            WHERE entity_id = ?
+            """,
+            (entity_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        payload = self._decrypt_json(row[0], row[1], ENTITY_AAD + entity_id.encode("ascii"))
+        return _EntityRecord(
+            name=str(payload.get("name") or ""),
+            entity_type=str(payload.get("type") or ""),
+            description=str(payload.get("description") or ""),
+            chunk_ids=[str(item) for item in payload.get("chunk_ids") or []],
+        )
+
+    def _relationship_by_parts(self, source: str, relation: str, target: str) -> _RelationshipRecord | None:
+        relationship_id = self._relationship_id(source, relation, target)
+        row = self.conn.execute(
+            """
+            SELECT payload_nonce, payload_ciphertext
+            FROM relationships
+            WHERE relationship_id = ?
+            """,
+            (relationship_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        payload = self._decrypt_json(row[0], row[1], RELATIONSHIP_AAD + relationship_id.encode("ascii"))
+        return _RelationshipRecord(
+            source=str(payload.get("source") or ""),
+            relation=str(payload.get("relation") or ""),
+            target=str(payload.get("target") or ""),
+            chunk_ids=[str(item) for item in payload.get("chunk_ids") or []],
+        )
+
+    def _entity_chunk_ids(self, name: str) -> list[str]:
+        record = self._entity_by_name(name)
+        return record.chunk_ids if record else []
+
+    def _relationship_chunk_ids(self, source: str, relation: str, target: str) -> list[str]:
+        record = self._relationship_by_parts(source, relation, target)
+        return record.chunk_ids if record else []
 
     def _digest(self, value: str) -> str:
         return hmac.new(self.keys.graph_key, value.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -234,3 +384,15 @@ def _b64(value: bytes) -> str:
 
 def _unb64(value: str) -> bytes:
     return base64.b64decode(value.encode("ascii"))
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        item = str(value)
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result

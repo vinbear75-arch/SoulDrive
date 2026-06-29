@@ -79,10 +79,11 @@ class LocalGraphDB:
         # 提交上述建表和索引操作到数据库
         self.conn.commit()
 
-    def add_entity(self, name: str, entity_type: str, description: str):
+    def add_entity(self, name: str, entity_type: str, description: str, chunk_ids: list[str] | None = None):
         """
         数据写入层：插入或更新实体节点
         """
+        _ = chunk_ids
         cursor = self.conn.cursor()
         # INSERT OR REPLACE (Upsert 机制)
         # 逻辑：如果 name（主键）不存在，则插入新行；如果已存在，则用新传入的 type 和 description 覆盖旧数据。
@@ -93,10 +94,11 @@ class LocalGraphDB:
         """, (name, entity_type, description))
         self.conn.commit()
 
-    def add_relationship(self, source: str, target: str, relation: str):
+    def add_relationship(self, source: str, target: str, relation: str, evidence_chunk_ids: list[str] | None = None):
         """
         数据写入层：插入实体间的连接关系
         """
+        _ = evidence_chunk_ids
         cursor = self.conn.cursor()
         # INSERT OR IGNORE
         # 逻辑：尝试插入新的关系。因为我们在建表时设置了 UNIQUE(source, target, relation)，
@@ -235,6 +237,11 @@ class LocalGraphDB:
                     return graph_context
 
         return graph_context
+
+    def recall_chunk_ids(self, query: str, limit: int = 40):
+        _ = query
+        _ = limit
+        return []
 
     def close(self):
         """释放资源，安全关闭数据库连接，防止连接池泄漏"""

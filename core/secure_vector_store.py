@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import hmac
 import json
 import math
 import os
@@ -10,6 +12,7 @@ from typing import Any
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from core.keyword_index import TOKEN_PATTERN
 from core.keyword_index import KeywordSearchResult
 from core.retrieval import bm25_scores
 
@@ -18,6 +21,8 @@ PARENT_AAD = b"SoulDrive secure parent v1"
 CHILD_CONTENT_AAD = b"SoulDrive secure child content v1"
 CHILD_METADATA_AAD = b"SoulDrive secure child metadata v1"
 CHILD_EMBEDDING_AAD = b"SoulDrive secure child embedding v1"
+KEYWORD_POSTING_AAD = b"SoulDrive secure keyword posting v1"
+MAX_KEYWORD_TOKENS = 1024
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,14 @@ class _ChildRecord:
     content: str
     metadata: dict[str, Any]
     embedding: list[float]
+
+
+@dataclass(frozen=True)
+class SecureCandidate:
+    chunk_id: str
+    score: float = 0.0
+    content: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class SecureVectorStore:
@@ -63,6 +76,15 @@ class SecureVectorStore:
                 metadata_ciphertext TEXT NOT NULL,
                 embedding_nonce TEXT NOT NULL,
                 embedding_ciphertext TEXT NOT NULL
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS keyword_postings (
+                token_id TEXT PRIMARY KEY,
+                posting_nonce TEXT NOT NULL,
+                posting_ciphertext TEXT NOT NULL
             )
             """
         )
@@ -166,6 +188,7 @@ class SecureVectorStore:
                     embedding_ciphertext,
                 ),
             )
+            self._upsert_keyword_postings(child_id, content)
         self.conn.commit()
 
     def query(self, query_embeddings: list[list[float]], n_results: int, include: list[str]):
@@ -195,6 +218,90 @@ class SecureVectorStore:
             "metadatas": [metadatas],
             "distances": [distances],
         }
+
+    def dense_candidates(self, query_embedding: list[float], limit: int = 80) -> list[SecureCandidate]:
+        rows = self.conn.execute(
+            """
+            SELECT child_id, embedding_nonce, embedding_ciphertext
+            FROM child_chunks
+            ORDER BY child_id ASC
+            """
+        ).fetchall()
+        ranked = []
+        for row in rows:
+            child_id = row[0]
+            embedding = self._decrypt_json(
+                self.keys.index_key,
+                row[1],
+                row[2],
+                CHILD_EMBEDDING_AAD + child_id.encode("utf-8"),
+            )
+            ranked.append(SecureCandidate(chunk_id=child_id, score=self._cosine_similarity(query_embedding, embedding)))
+        ranked.sort(key=lambda item: item.score, reverse=True)
+        return ranked[:limit]
+
+    def load_candidates(self, chunk_ids: list[str]) -> list[SecureCandidate]:
+        if not chunk_ids:
+            return []
+        placeholders = ",".join("?" for _ in chunk_ids)
+        rows = self.conn.execute(
+            f"""
+            SELECT child_id, content_nonce, content_ciphertext, metadata_nonce, metadata_ciphertext
+            FROM child_chunks
+            WHERE child_id IN ({placeholders})
+            """,
+            tuple(chunk_ids),
+        ).fetchall()
+        by_id = {row[0]: row for row in rows}
+        loaded = []
+        for chunk_id in chunk_ids:
+            row = by_id.get(chunk_id)
+            if row is None:
+                continue
+            loaded.append(
+                SecureCandidate(
+                    chunk_id=chunk_id,
+                    content=self._decrypt_text(
+                        self.keys.index_key,
+                        row[1],
+                        row[2],
+                        CHILD_CONTENT_AAD + chunk_id.encode("utf-8"),
+                    ),
+                    metadata=self._decrypt_json(
+                        self.keys.metadata_key,
+                        row[3],
+                        row[4],
+                        CHILD_METADATA_AAD + chunk_id.encode("utf-8"),
+                    ),
+                )
+            )
+        return loaded
+
+    def keyword_candidates(self, query: str, limit: int = 80) -> list[SecureCandidate]:
+        scores: dict[str, float] = {}
+        for token in self._tokens(query):
+            token_id = self._token_id(token)
+            row = self.conn.execute(
+                """
+                SELECT posting_nonce, posting_ciphertext
+                FROM keyword_postings
+                WHERE token_id = ?
+                """,
+                (token_id,),
+            ).fetchone()
+            if row is None:
+                continue
+            posting = self._decrypt_json(
+                self.keys.metadata_key,
+                row[0],
+                row[1],
+                KEYWORD_POSTING_AAD + token_id.encode("ascii"),
+            )
+            for chunk_id, count in posting.get("chunks", {}).items():
+                scores[chunk_id] = scores.get(chunk_id, 0.0) + float(count)
+        ranked = [SecureCandidate(chunk_id=chunk_id, score=score) for chunk_id, score in scores.items()]
+        ranked.sort(key=lambda item: (-item.score, item.chunk_id))
+        return ranked[:limit]
 
     def get(self, where: dict[str, Any] | None = None, include: list[str] | None = None, ids: list[str] | None = None):
         include = include or []
@@ -246,6 +353,12 @@ class SecureVectorStore:
         return results
 
     def delete_by_document_hash(self, document_hash: str):
+        rows = self.conn.execute(
+            "SELECT child_id FROM child_chunks WHERE document_hash = ?",
+            (document_hash,),
+        ).fetchall()
+        deleted_child_ids = [row[0] for row in rows]
+        self._remove_keyword_postings(deleted_child_ids)
         self.conn.execute("DELETE FROM child_chunks WHERE document_hash = ?", (document_hash,))
         self.conn.execute("DELETE FROM parent_documents WHERE document_hash = ?", (document_hash,))
         self.conn.commit()
@@ -294,6 +407,95 @@ class SecureVectorStore:
             if metadata.get(key) != value:
                 return False
         return True
+
+    def _upsert_keyword_postings(self, chunk_id: str, content: str) -> None:
+        counts: dict[str, int] = {}
+        for token in self._tokens(content):
+            token_id = self._token_id(token)
+            counts[token_id] = counts.get(token_id, 0) + 1
+        for token_id, count in counts.items():
+            existing = self._keyword_posting(token_id)
+            chunks = dict(existing.get("chunks") or {})
+            chunks[chunk_id] = count
+            nonce, ciphertext = self._encrypt_bytes(
+                self.keys.metadata_key,
+                json.dumps({"chunks": chunks}, ensure_ascii=False).encode("utf-8"),
+                KEYWORD_POSTING_AAD + token_id.encode("ascii"),
+            )
+            self.conn.execute(
+                """
+                INSERT OR REPLACE INTO keyword_postings (token_id, posting_nonce, posting_ciphertext)
+                VALUES (?, ?, ?)
+                """,
+                (token_id, nonce, ciphertext),
+            )
+
+    def _keyword_posting(self, token_id: str) -> dict[str, Any]:
+        row = self.conn.execute(
+            """
+            SELECT posting_nonce, posting_ciphertext
+            FROM keyword_postings
+            WHERE token_id = ?
+            """,
+            (token_id,),
+        ).fetchone()
+        if row is None:
+            return {"chunks": {}}
+        return self._decrypt_json(
+            self.keys.metadata_key,
+            row[0],
+            row[1],
+            KEYWORD_POSTING_AAD + token_id.encode("ascii"),
+        )
+
+    def _remove_keyword_postings(self, chunk_ids: list[str]) -> None:
+        if not chunk_ids:
+            return
+        deleted = set(chunk_ids)
+        rows = self.conn.execute(
+            """
+            SELECT token_id, posting_nonce, posting_ciphertext
+            FROM keyword_postings
+            ORDER BY token_id ASC
+            """
+        ).fetchall()
+        for token_id, nonce, ciphertext in rows:
+            posting = self._decrypt_json(
+                self.keys.metadata_key,
+                nonce,
+                ciphertext,
+                KEYWORD_POSTING_AAD + token_id.encode("ascii"),
+            )
+            chunks = dict(posting.get("chunks") or {})
+            changed = False
+            for chunk_id in list(chunks):
+                if chunk_id in deleted:
+                    del chunks[chunk_id]
+                    changed = True
+            if not changed:
+                continue
+            if chunks:
+                new_nonce, new_ciphertext = self._encrypt_bytes(
+                    self.keys.metadata_key,
+                    json.dumps({"chunks": chunks}, ensure_ascii=False).encode("utf-8"),
+                    KEYWORD_POSTING_AAD + token_id.encode("ascii"),
+                )
+                self.conn.execute(
+                    """
+                    UPDATE keyword_postings
+                    SET posting_nonce = ?, posting_ciphertext = ?
+                    WHERE token_id = ?
+                    """,
+                    (new_nonce, new_ciphertext, token_id),
+                )
+            else:
+                self.conn.execute("DELETE FROM keyword_postings WHERE token_id = ?", (token_id,))
+
+    def _tokens(self, text: str) -> list[str]:
+        return TOKEN_PATTERN.findall((text or "").lower())[:MAX_KEYWORD_TOKENS]
+
+    def _token_id(self, token: str) -> str:
+        return hmac.new(self.keys.metadata_key, token.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def _encrypt_bytes(self, key: bytes, payload: bytes, aad: bytes) -> tuple[str, str]:
         nonce = os.urandom(12)
