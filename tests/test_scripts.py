@@ -1,5 +1,8 @@
+import json
 import unittest
 from pathlib import Path
+
+from scripts import check_rag_eval_workspace, import_rag_eval_corpus
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -52,6 +55,87 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("SOULDRIVE_DEV_USE_PACKAGED_SIDECAR", source)
         self.assertIn('"conda"', source)
         self.assertIn('"souldrive"', source)
+
+    def test_rag_eval_runner_targets_blind_v03_dataset_and_results(self):
+        script_path = ROOT / "scripts" / "run-rag-eval.ps1"
+
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("eval/retrieval_quality_blind_v0.3.jsonl", script)
+        self.assertIn("eval/results/retrieval_baseline_v0.3.jsonl", script)
+        self.assertIn("--workspace", script)
+        self.assertIn("--save-results", script)
+        self.assertIn("--top-k", script)
+        self.assertIn("conda", script)
+        self.assertIn("souldrive", script)
+        self.assertIn("scripts/eval_rag.py", script)
+        self.assertIn("[int]$TopK = 6", script)
+
+    def test_frontend_chat_uses_six_evidence_items_by_default(self):
+        source = (ROOT / "souldrive-ui" / "src" / "App.tsx").read_text(encoding="utf-8")
+
+        self.assertIn("top_k: 6", source)
+
+    def test_rag_eval_runner_avoids_conda_stdout_capture_on_windows(self):
+        script = (ROOT / "scripts" / "run-rag-eval.ps1").read_text(encoding="utf-8")
+
+        self.assertEqual(script.count("--no-capture-output"), 2)
+        self.assertIn('"run", "--no-capture-output", "-n", "souldrive"', script)
+
+    def test_rag_eval_runner_forces_utf8_console_output_on_windows(self):
+        script = (ROOT / "scripts" / "run-rag-eval.ps1").read_text(encoding="utf-8")
+
+        self.assertIn("[Console]::OutputEncoding", script)
+        self.assertIn("UTF8Encoding", script)
+        self.assertIn('PYTHONIOENCODING = "utf-8"', script)
+
+    def test_rag_miss_analyzer_defaults_to_blind_v03_dataset(self):
+        source = (ROOT / "scripts" / "analyze_rag_eval_misses.py").read_text(encoding="utf-8")
+
+        self.assertIn("retrieval_quality_blind_v0.3.jsonl", source)
+        self.assertIn("retrieval_baseline_v0.3.jsonl", source)
+
+    def test_rag_eval_workspace_preflight_checks_manifest_documents(self):
+        script_path = ROOT / "scripts" / "check_rag_eval_workspace.py"
+
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("corpus_manifest_v0.2.json", script)
+        self.assertIn("SecureDocumentStore", script)
+        self.assertIn("missing_documents", script)
+        self.assertIn("present_documents", script)
+        self.assertIn("expected_documents", script)
+
+    def test_rag_eval_corpus_import_script_uses_manifest_and_optional_indexing(self):
+        script_path = ROOT / "scripts" / "import_rag_eval_corpus.py"
+
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("corpus_manifest_v0.2.json", script)
+        self.assertIn("import_paper_into_workspace", script)
+        self.assertIn("SOULDRIVE_EVAL_CORPUS_DIR", script)
+        self.assertIn("--dry-run", script)
+        self.assertIn("--index", script)
+        self.assertIn("--skip-graph", script)
+        self.assertIn("DriveIndexer", script)
+
+    def test_rag_eval_json_output_flags_do_not_collide_with_conda_run_json(self):
+        check_script = (ROOT / "scripts" / "check_rag_eval_workspace.py").read_text(encoding="utf-8")
+        import_script = (ROOT / "scripts" / "import_rag_eval_corpus.py").read_text(encoding="utf-8")
+
+        self.assertIn("--json-output", check_script)
+        self.assertIn("--json-output", import_script)
+
+    def test_rag_eval_json_output_is_ascii_safe_for_conda_run(self):
+        payload = {"name": "城市+AI", "replacement": "\ufffd"}
+
+        import_json = import_rag_eval_corpus.format_json_report(payload)
+        check_json = check_rag_eval_workspace.format_json_report(payload)
+
+        self.assertEqual(json.loads(import_json), payload)
+        self.assertEqual(json.loads(check_json), payload)
+        self.assertTrue(all(ord(character) < 128 for character in import_json))
+        self.assertTrue(all(ord(character) < 128 for character in check_json))
 
 
 if __name__ == "__main__":

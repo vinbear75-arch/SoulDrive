@@ -131,7 +131,20 @@ def rank_hybrid_candidates(
         for ranked_candidate in keyword_ranked
         if ranked_candidate.score > 0
     ]
-    rrf_scores = reciprocal_rank_fusion([dense_ranking, sparse_ranking])
+    source_scores = {
+        candidate.id: _source_match_score(query, candidate.metadata)
+        for candidate in candidates
+    }
+    source_ranking = [
+        candidate.id
+        for candidate in sorted(
+            candidates,
+            key=lambda item: source_scores.get(item.id, 0.0),
+            reverse=True,
+        )
+        if source_scores.get(candidate.id, 0.0) >= 0.55
+    ]
+    rrf_scores = reciprocal_rank_fusion([dense_ranking, sparse_ranking, source_ranking])
     max_graph_score = max((candidate.graph_score for candidate in candidates), default=0.0)
 
     for candidate in candidates:
@@ -139,13 +152,14 @@ def rank_hybrid_candidates(
         lexical_score = lexical_rerank_score(query, candidate.content)
         semantic_score = max(candidate.rerank_score, 0.0)
         combined_rerank = max(lexical_score, semantic_score)
+        source_score = source_scores.get(candidate.id, 0.0)
         candidate.rrf_score = rrf_scores.get(candidate.id, 0.0)
         candidate.rerank_score = combined_rerank
         candidate.final_score = (
-            0.52 * candidate.rrf_score
-            + 0.28 * candidate.rerank_score
-            + 0.15 * graph_norm
-            + 0.05 * _source_match_score(query, candidate.metadata)
+            0.36 * candidate.rrf_score
+            + 0.24 * candidate.rerank_score
+            + 0.10 * graph_norm
+            + 0.30 * source_score
         )
         candidate.score_breakdown = {
             "rrf": round(candidate.rrf_score, 6),
@@ -153,10 +167,11 @@ def rank_hybrid_candidates(
             "semantic_rerank": round(semantic_score, 6),
             "graph": round(graph_norm, 6),
             "keyword": round(candidate.keyword_score, 6),
+            "source": round(source_score, 6),
             "final": round(candidate.final_score, 6),
         }
 
-    return sorted(
+    ranked = sorted(
         candidates,
         key=lambda candidate: (
             candidate.final_score,
@@ -164,7 +179,8 @@ def rank_hybrid_candidates(
             -1 * (candidate.vector_distance or 0.0),
         ),
         reverse=True,
-    )[:top_k]
+    )
+    return _select_diverse_sources(ranked, top_k=top_k)
 
 
 def build_citations(
@@ -197,13 +213,78 @@ def build_citations(
 
 
 def _source_match_score(query: str, metadata: dict[str, Any]) -> float:
-    source = str(metadata.get("source_filename") or metadata.get("source_path") or "").lower()
+    source = str(
+        metadata.get("source_filename")
+        or metadata.get("title")
+        or metadata.get("document_title")
+        or metadata.get("source_path")
+        or ""
+    ).lower()
     if not source:
         return 0.0
+
+    source_compact = _compact_source_text(source)
+    query_compact = _compact_source_text(query)
+    if not source_compact or not query_compact:
+        return 0.0
+
+    for title_hint in re.findall(r"《([^》]+)》", query or ""):
+        hint_compact = _compact_source_text(title_hint)
+        if hint_compact and (hint_compact in source_compact or source_compact in hint_compact):
+            return 1.0
+
+    if source_compact in query_compact:
+        return 1.0
 
     query_tokens = set(tokenize(query))
     source_tokens = set(tokenize(source))
     if not query_tokens or not source_tokens:
         return 0.0
 
-    return min(1.0, len(query_tokens & source_tokens) / max(len(query_tokens), 1))
+    return min(1.0, len(query_tokens & source_tokens) / max(min(len(query_tokens), len(source_tokens)), 1))
+
+
+def _compact_source_text(value: str) -> str:
+    lowered = (value or "").lower()
+    for suffix in (".pdf", ".docx", ".md", ".html", ".txt"):
+        if lowered.endswith(suffix):
+            lowered = lowered[: -len(suffix)]
+            break
+    return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", lowered)
+
+
+def _select_diverse_sources(candidates: list[SearchCandidate], top_k: int) -> list[SearchCandidate]:
+    if top_k <= 1 or len(candidates) <= top_k:
+        return candidates[:top_k]
+
+    def source_key(candidate: SearchCandidate) -> str:
+        return str((candidate.metadata or {}).get("source_filename") or candidate.id)
+
+    selected: list[SearchCandidate] = []
+    deferred: list[SearchCandidate] = []
+    seen_sources: set[str] = set()
+
+    for candidate in candidates:
+        if candidate.score_breakdown.get("source", 0.0) < 0.99:
+            continue
+        source = source_key(candidate)
+        if source in seen_sources:
+            continue
+        selected.append(candidate)
+        seen_sources.add(source)
+        if len(selected) >= top_k:
+            return selected
+
+    for candidate in candidates:
+        if candidate in selected:
+            continue
+        source = source_key(candidate)
+        if source not in seen_sources:
+            selected.append(candidate)
+            seen_sources.add(source)
+        else:
+            deferred.append(candidate)
+        if len(selected) >= top_k:
+            return selected
+
+    return (selected + deferred)[:top_k]

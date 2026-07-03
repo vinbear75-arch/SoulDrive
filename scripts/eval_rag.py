@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.runtime_state import get_runtime_state
+from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.security_context import WORKSPACE_DATA_KEY_ENV, get_workspace_keys, restore_workspace_keys, set_workspace_keys
 from core.workspace import WORKSPACE_MANIFEST, SoulDriveWorkspace
 from core.workspace_crypto import unlock_keystore
@@ -48,6 +49,15 @@ SOURCE_ALIASES = {
 }
 
 
+def configure_utf8_stdio():
+    if os.name != "nt":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            reconfigure(encoding="utf-8")
+
+
 @dataclass(frozen=True)
 class EvalRecord:
     id: str
@@ -78,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate SoulDrive retrieval and citation quality.")
     parser.add_argument("--dataset", default="eval/enterprise_zh_v0.2.jsonl", help="JSONL evaluation dataset path.")
     parser.add_argument("--workspace", default=None, help="SoulDrive workspace root. Defaults to current runtime workspace.")
-    parser.add_argument("--top-k", type=int, default=3, help="Evidence count to retrieve.")
+    parser.add_argument("--top-k", type=int, default=DEFAULT_RAG_TOP_K, help="Evidence count to retrieve.")
     parser.add_argument("--include-answers", action="store_true", help="Run full RAG answer generation, not retrieval only.")
     parser.add_argument("--chat-model", default=None, help="Temporarily set SOULDRIVE_CHAT_MODEL for this evaluation run.")
     parser.add_argument("--from-results", default=None, help="Read prior JSONL results instead of running retrieval.")
@@ -602,7 +612,20 @@ def print_comparison_report(
     print(f"对比报告: {baseline_label} -> {candidate_label}")
     if baseline_report.get("model_name") or candidate_report.get("model_name"):
         print(f"模型: {baseline_report.get('model_name') or baseline_label} -> {candidate_report.get('model_name') or candidate_label}")
+    top_k = candidate_report.get("top_k") or baseline_report.get("top_k")
+    latency_label = (
+        "平均端到端耗时"
+        if baseline_report.get("answer_sample_count") or candidate_report.get("answer_sample_count")
+        else "平均检索耗时"
+    )
     comparison_items = [
+        (f"检索全命中率@{top_k}", "retrieval_all_hit_rate", "higher"),
+        (f"检索任一命中率@{top_k}", "retrieval_any_hit_rate", "higher"),
+        ("首条命中率@1", "first_hit_rate", "higher"),
+        ("MRR", "mean_reciprocal_rank", "higher_decimal"),
+        (f"平均来源覆盖率@{top_k}", "average_source_coverage", "higher"),
+        (f"跨文档全命中率@{top_k}", "multi_doc_all_hit_rate", "higher"),
+        (f"图谱相关题命中率@{top_k}", "graph_context_hit_rate", "higher"),
         ("综合可靠率", "overall_reliability_rate", "higher"),
         ("可回答题达标率", "answerable_pass_rate", "higher"),
         ("拒答正确率", "refusal_accuracy", "higher"),
@@ -611,7 +634,8 @@ def print_comparison_report(
         ("引用合法率", "citation_valid_rate", "higher"),
         ("引用异常率", "invalid_citation_rate", "lower"),
         ("答案关键词覆盖率", "answer_keyword_coverage", "higher"),
-        ("平均端到端耗时", "avg_latency_ms", "lower_ms"),
+        (latency_label, "avg_latency_ms", "lower_ms"),
+        ("平均检索阶段耗时", "avg_retrieval_ms", "lower_ms"),
         ("平均答案生成耗时", "avg_generation_ms", "lower_ms"),
     ]
     for label, key, direction in comparison_items:
@@ -661,6 +685,8 @@ def _format_metric(value: float | int | None, direction: str) -> str:
         return "无样本"
     if direction.endswith("_ms"):
         return f"{int(value)} ms"
+    if direction.endswith("_decimal"):
+        return _decimal(float(value))
     return _percent(float(value))
 
 
@@ -671,9 +697,13 @@ def _format_delta(before: float | int | None, after: float | int | None, directi
     if direction.endswith("_ms"):
         sign = "+" if delta >= 0 else ""
         return f"{sign}{int(delta)} ms"
+    if direction.endswith("_decimal"):
+        sign = "+" if delta >= 0 else ""
+        return f"{sign}{delta:.3f}"
     sign = "+" if delta >= 0 else ""
     return f"{sign}{delta * 100:.1f}百分点"
 
 
 if __name__ == "__main__":
+    configure_utf8_stdio()
     raise SystemExit(main(sys.argv[1:]))

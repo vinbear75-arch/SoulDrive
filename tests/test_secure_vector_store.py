@@ -127,6 +127,48 @@ class SecureVectorStoreTests(unittest.TestCase):
         self.assertEqual(result["metadatas"][0]["source_filename"], "privacy.pdf")
         self.assertIn("隐私保护", result["documents"][0])
 
+    def test_search_with_evidence_uses_source_title_signal_for_named_documents(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            self._prepare_embedding_model(workspace)
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+
+            try:
+                with patch("core.knowledge_base._sentence_transformer", return_value=_TitleEmbeddingModel()):
+                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                    try:
+                        kb.ingest_chunks(
+                            "doc-hash-generic-private",
+                            [
+                                _FakeChunk(
+                                    "私有化 权限 本地化 知识库 问答 RAG 检索增强生成",
+                                    {"source_filename": "知识库问答场景中大语言模型私有化研究与应用实践.pdf", "page": 1},
+                                )
+                            ],
+                        )
+                        kb.ingest_chunks(
+                            "doc-hash-maxkb",
+                            [
+                                _FakeChunk(
+                                    "系统介绍本地化知识库问答流程。",
+                                    {"source_filename": "基于大模型和RAG的知识库问答系统.pdf", "page": 2},
+                                )
+                            ],
+                        )
+
+                        result = kb.search_with_evidence(
+                            "关于《基于大模型和RAG的知识库问答系统》里的私有化 权限 本地化问题",
+                            top_k=1,
+                        )
+                    finally:
+                        kb.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
+        self.assertEqual(result["metadatas"][0]["source_filename"], "基于大模型和RAG的知识库问答系统.pdf")
+
     def _prepare_embedding_model(self, workspace: SoulDriveWorkspace):
         embedding_model_path = Path(workspace.models_path) / "bge-small-zh-v1.5"
         embedding_model_path.mkdir(parents=True, exist_ok=True)
@@ -188,6 +230,24 @@ class _FakeReranker:
     def score(self, query, passages):
         _ = query
         return [0.95 if "隐私保护" in passage else 0.05 for passage in passages]
+
+
+class _TitleEmbeddingModel:
+    def encode(self, texts, normalize_embeddings=True):
+        if isinstance(texts, str):
+            texts = [texts]
+        vectors = []
+        for text in texts:
+            vector = [
+                float("私有化" in text or "权限" in text or "本地化" in text),
+                float("基于大模型和RAG的知识库问答系统" in text),
+            ]
+            if normalize_embeddings:
+                norm = sum(component * component for component in vector) ** 0.5
+                if norm > 0:
+                    vector = [component / norm for component in vector]
+            vectors.append(vector)
+        return _EmbeddingResult(vectors)
 
 
 if __name__ == "__main__":

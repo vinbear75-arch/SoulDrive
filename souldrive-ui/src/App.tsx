@@ -603,7 +603,7 @@ export default function App() {
           "Content-Type": "application/json",
           ...(apiToken ? { "X-SoulDrive-Token": apiToken } : {}),
         },
-        body: JSON.stringify({ query: userQuery, top_k: 3 }),
+        body: JSON.stringify({ query: userQuery, top_k: 6 }),
       });
 
       if (!response.ok) throw new Error("后端拒绝请求");

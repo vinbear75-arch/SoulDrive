@@ -25,6 +25,10 @@ class EnterpriseSecurityTests(unittest.TestCase):
         self.assertEqual(clamp_chat_top_k(4), 4)
         self.assertEqual(clamp_chat_top_k(99), 5)
 
+    def test_chat_top_k_defaults_to_six_evidence_items(self):
+        self.assertEqual(clamp_chat_top_k(None), 6)
+        self.assertEqual(clamp_chat_top_k("not-a-number"), 6)
+
     def test_chat_top_k_env_override_cannot_exceed_product_ceiling(self):
         os.environ["SOULDRIVE_MAX_CHAT_TOP_K"] = "999"
 

@@ -179,6 +179,23 @@ class RagPromptingTests(unittest.TestCase):
         self.assertIn("模型生成的 Transformer 回答 [E1]", output)
         self.assertEqual(engine.llm.call_count, 1)
 
+    def test_generate_response_stream_defaults_to_six_evidence_items(self):
+        engine = _build_engine(
+            llm=_FakeStreamingLlm(["answer [E1]"]),
+            evidence=[
+                {
+                    "id": "E1",
+                    "score": 0.2,
+                    "source_filename": "privacy.pdf",
+                    "snippet": "The system uses local encrypted storage.",
+                }
+            ],
+        )
+
+        "".join(engine.generate_response_stream("privacy?"))
+
+        self.assertEqual(engine.kb.last_top_k, 6)
+
 
 def _build_engine(llm, evidence):
     engine = RAGEngine.__new__(RAGEngine)
@@ -198,11 +215,12 @@ def _build_engine(llm, evidence):
 class _FakeKnowledgeBase:
     def __init__(self, evidence):
         self.evidence = evidence
+        self.last_top_k = None
 
     def search_with_evidence(self, query, graph_db=None, top_k=3):
         _ = query
         _ = graph_db
-        _ = top_k
+        self.last_top_k = top_k
         return {
             "documents": ["该方案使用本地加密存储。"],
             "metadatas": [{"source_filename": "privacy.pdf", "page": 1, "chunk_index": 0}],

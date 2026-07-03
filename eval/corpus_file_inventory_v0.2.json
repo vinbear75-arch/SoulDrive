@@ -1,0 +1,376 @@
+{
+  "version": "v0.2",
+  "manifest_version": "v0.2",
+  "generated_at_epoch": 1782567784,
+  "source_directory_hint": "C:\\Users\\13423\\Desktop\\souldrive_docs",
+  "summary": {
+    "document_count": 36,
+    "missing_count": 0,
+    "bad_pdf_header_count": 0,
+    "total_size_bytes": 76821373,
+    "total_pages": 1229,
+    "total_text_chars": 1520952
+  },
+  "files": [
+    {
+      "doc_id": "SDOC-001",
+      "local_filename": "LazyLLM企业级RAG方案-私有化部署与权限安全.pdf",
+      "exists": true,
+      "size_bytes": 9495046,
+      "sha256": "c954caf7628464a8dfac732cb7a682b438ea8dca0dbcdad21e1a63ac5402beaf",
+      "pdf_header_ok": true,
+      "page_count": 37,
+      "text_chars": 33104
+    },
+    {
+      "doc_id": "SDOC-002",
+      "local_filename": "“城市+AI”应用场景清单（第五批）.pdf",
+      "exists": true,
+      "size_bytes": 457032,
+      "sha256": "ed2696e03fa57744b0e606c59a4b43db8423a59a84ccb34cccd34f20abfce4aa",
+      "pdf_header_ok": true,
+      "page_count": 39,
+      "text_chars": 34974
+    },
+    {
+      "doc_id": "SDOC-003",
+      "local_filename": "人工智能安全治理蓝皮书.pdf",
+      "exists": true,
+      "size_bytes": 3977963,
+      "sha256": "78565d56492ccff584af8edb1f0527a25bf34128376554bb9de647fe82fdc1fa",
+      "pdf_header_ok": true,
+      "page_count": 51,
+      "text_chars": 34785
+    },
+    {
+      "doc_id": "SDOC-004",
+      "local_filename": "基于大模型和RAG的知识库问答系统.pdf",
+      "exists": true,
+      "size_bytes": 4993252,
+      "sha256": "f5eba0f97d75b1d70613674cfe929c4bfc4d6b0a43bd331bc52fa7536ee94d2f",
+      "pdf_header_ok": true,
+      "page_count": 35,
+      "text_chars": 5546
+    },
+    {
+      "doc_id": "SDOC-005",
+      "local_filename": "大模型基准测试体系研究报告.pdf",
+      "exists": true,
+      "size_bytes": 1949572,
+      "sha256": "e551e2e0956c314507ab240b3ca19ce47aed88640a98e6c316bd4efc6bbc131c",
+      "pdf_header_ok": true,
+      "page_count": 52,
+      "text_chars": 34524
+    },
+    {
+      "doc_id": "SDOC-006",
+      "local_filename": "大模型知识管理系统.pdf",
+      "exists": true,
+      "size_bytes": 2103112,
+      "sha256": "9caf5e84cc74064eda880becfd3cf242ebce9e77c16c57c3a5fd8d1d5fa0052e",
+      "pdf_header_ok": true,
+      "page_count": 9,
+      "text_chars": 17830
+    },
+    {
+      "doc_id": "SDOC-007",
+      "local_filename": "大模型私有部署与基础应用落地.pdf",
+      "exists": true,
+      "size_bytes": 3871093,
+      "sha256": "34a901381d28a870e6e4a7a4e6534a4caf380ff38099cbd77f8bbcaa1ab78843",
+      "pdf_header_ok": true,
+      "page_count": 30,
+      "text_chars": 6575
+    },
+    {
+      "doc_id": "SDOC-008",
+      "local_filename": "数据安全技术 数据分类分级规则.pdf",
+      "exists": true,
+      "size_bytes": 532354,
+      "sha256": "56f4253b4ea6bfea3201dfd9fa5942df52fe19bad200ba1452e15ae6a8dfbc94",
+      "pdf_header_ok": true,
+      "page_count": 31,
+      "text_chars": 24559
+    },
+    {
+      "doc_id": "SDOC-009",
+      "local_filename": "数据要素发展报告.pdf",
+      "exists": true,
+      "size_bytes": 1489584,
+      "sha256": "ec281b38b790bc8f36ebfecb3a7ce5c5870a3e3ca099f7aa5ec845291d2386b7",
+      "pdf_header_ok": true,
+      "page_count": 51,
+      "text_chars": 32247
+    },
+    {
+      "doc_id": "SDOC-010",
+      "local_filename": "生成式人工智能服务安全基本要求.pdf",
+      "exists": true,
+      "size_bytes": 327385,
+      "sha256": "6c681bb7e5bf0a5c9c37ab1a66ee20662f37c1ee3efd98034c9742405488f0e4",
+      "pdf_header_ok": true,
+      "page_count": 14,
+      "text_chars": 11909
+    },
+    {
+      "doc_id": "SDOC-011",
+      "local_filename": "知识库问答场景中大语言模型私有化研究与应用实践.pdf",
+      "exists": true,
+      "size_bytes": 1102752,
+      "sha256": "d07de9bb70efb82d8f9883783d65f2c79927075a89e917a47a7a417106be76db",
+      "pdf_header_ok": true,
+      "page_count": 7,
+      "text_chars": 15648
+    },
+    {
+      "doc_id": "SDOC-012",
+      "local_filename": "综合交通运输大模型智能体创新应用.pdf",
+      "exists": true,
+      "size_bytes": 549793,
+      "sha256": "92c40c7b41de4a8479a669df196e948b18efec2a5bc957928ca63b0485cb6579",
+      "pdf_header_ok": true,
+      "page_count": 58,
+      "text_chars": 33524
+    },
+    {
+      "doc_id": "SDOC-013",
+      "local_filename": "大模型落地路线图研究报告.pdf",
+      "exists": true,
+      "size_bytes": 6558798,
+      "sha256": "53bf1f0770abf8fd13d88f6f8ba0f43e8603972d9f19c95ba447f863bb83e309",
+      "pdf_header_ok": true,
+      "page_count": 54,
+      "text_chars": 30071
+    },
+    {
+      "doc_id": "SDOC-014",
+      "local_filename": "大模型一体机应用研究报告.pdf",
+      "exists": true,
+      "size_bytes": 1705984,
+      "sha256": "a84b24987ae0a411e9eb276800cba8a3fe3cfe7bcef2010912ca23b18467fc47",
+      "pdf_header_ok": true,
+      "page_count": 48,
+      "text_chars": 27517
+    },
+    {
+      "doc_id": "SDOC-015",
+      "local_filename": "人工智能产业发展研究报告.pdf",
+      "exists": true,
+      "size_bytes": 7231012,
+      "sha256": "1ee62830171eedb97df78045cd238fcd9ff7fe9327743ac760fe4578c5f1486d",
+      "pdf_header_ok": true,
+      "page_count": 75,
+      "text_chars": 46176
+    },
+    {
+      "doc_id": "SDOC-016",
+      "local_filename": "政府数智化转型发展研究报告.pdf",
+      "exists": true,
+      "size_bytes": 5452661,
+      "sha256": "fb0b11f635a7dcb585cb3070fba36a0fe839092372e52474bf8ff1580a85455c",
+      "pdf_header_ok": true,
+      "page_count": 82,
+      "text_chars": 47973
+    },
+    {
+      "doc_id": "SDOC-017",
+      "local_filename": "大模型治理蓝皮报告.pdf",
+      "exists": true,
+      "size_bytes": 1386103,
+      "sha256": "b9060bd2ca56be7916a391ebf92ce48705b32e84869e3aaa9095bbac606bb989",
+      "pdf_header_ok": true,
+      "page_count": 72,
+      "text_chars": 51396
+    },
+    {
+      "doc_id": "SDOC-018",
+      "local_filename": "人工智能安全标准体系.pdf",
+      "exists": true,
+      "size_bytes": 553096,
+      "sha256": "240450a2cb321f1df85c307c3801e265c7c92e7afdbcc3619810b089bb1c98f9",
+      "pdf_header_ok": true,
+      "page_count": 37,
+      "text_chars": 16665
+    },
+    {
+      "doc_id": "SDOC-019",
+      "local_filename": "人工智能安全治理框架.pdf",
+      "exists": true,
+      "size_bytes": 3327010,
+      "sha256": "5e16d652fd701c39cb15453c0d428285f87cb1190f4cb9e663e07deba13d5cea",
+      "pdf_header_ok": true,
+      "page_count": 19,
+      "text_chars": 10967
+    },
+    {
+      "doc_id": "SDOC-020",
+      "local_filename": "人工智能安全标准化白皮书.pdf",
+      "exists": true,
+      "size_bytes": 1142905,
+      "sha256": "5a526b60e0a23077f3ef0106653423e9dc51ce80a645180fd9e636c73f9e1f85",
+      "pdf_header_ok": true,
+      "page_count": 32,
+      "text_chars": 18078
+    },
+    {
+      "doc_id": "SDOC-021",
+      "local_filename": "生成式人工智能服务安全应急响应指南.pdf",
+      "exists": true,
+      "size_bytes": 978662,
+      "sha256": "f7fc2f919eda7ac45680bf42df074aed808a8f6d6df75711f38a83e28c8d1c9d",
+      "pdf_header_ok": true,
+      "page_count": 33,
+      "text_chars": 15903
+    },
+    {
+      "doc_id": "SDOC-022",
+      "local_filename": "个人信息保护国家标准体系（2025版）.pdf",
+      "exists": true,
+      "size_bytes": 1762671,
+      "sha256": "25a8d50f099f7d50a8572919345adc1dd19756611bbd735849861027d2262e5a",
+      "pdf_header_ok": true,
+      "page_count": 22,
+      "text_chars": 12020
+    },
+    {
+      "doc_id": "SDOC-023",
+      "local_filename": "数据安全技术 敏感个人信息处理安全要求.pdf",
+      "exists": true,
+      "size_bytes": 476712,
+      "sha256": "b9cd3577320319663e4fbf3b00487a08b6ebbd7eee644a7e9b699e4bcb208ae2",
+      "pdf_header_ok": true,
+      "page_count": 19,
+      "text_chars": 12830
+    },
+    {
+      "doc_id": "SDOC-024",
+      "local_filename": "数据安全国家标准体系（2025版）.pdf",
+      "exists": true,
+      "size_bytes": 1952333,
+      "sha256": "e731f752adba472eb71658099090d179d47835ae78501b9f4923d6e649be8418",
+      "pdf_header_ok": true,
+      "page_count": 22,
+      "text_chars": 12128
+    },
+    {
+      "doc_id": "SDOC-025",
+      "local_filename": "国家数据基础设施建设指引.pdf",
+      "exists": true,
+      "size_bytes": 1044730,
+      "sha256": "9d3abc1845014973a9dbaacd2fdfef122d0518aaca112447e23bb04e1aa43558",
+      "pdf_header_ok": true,
+      "page_count": 22,
+      "text_chars": 11568
+    },
+    {
+      "doc_id": "SDOC-026",
+      "local_filename": "数据价值化与数据要素市场发展报告.pdf",
+      "exists": true,
+      "size_bytes": 1369367,
+      "sha256": "512012191492883a2b01cbf6ca57e7373e0f049870c2b02f3ebf5d48bc283898",
+      "pdf_header_ok": true,
+      "page_count": 46,
+      "text_chars": 27399
+    },
+    {
+      "doc_id": "SDOC-027",
+      "local_filename": "Retrieval-Augmented Generation for Large Language Models - A Survey.pdf",
+      "exists": true,
+      "size_bytes": 1662567,
+      "sha256": "396a0fadeb4cd40f5c8ccc36b73a0815f6cb4d7f6bfa53b6c48c1f9aba7c7e02",
+      "pdf_header_ok": true,
+      "page_count": 21,
+      "text_chars": 109697
+    },
+    {
+      "doc_id": "SDOC-028",
+      "local_filename": "Evaluation of Retrieval-Augmented Generation - A Survey.pdf",
+      "exists": true,
+      "size_bytes": 573447,
+      "sha256": "9ec643765eb079660cad9cf2bf7dcd3371e9ab9e05b1f94573cc101fb4a25374",
+      "pdf_header_ok": true,
+      "page_count": 21,
+      "text_chars": 65342
+    },
+    {
+      "doc_id": "SDOC-029",
+      "local_filename": "CRUD-RAG - A Comprehensive Chinese Benchmark.pdf",
+      "exists": true,
+      "size_bytes": 2115072,
+      "sha256": "2e4ae0cb708fdca9d96bcf8d1c0713dae121195a0a31b78e3132e9ef4fa7db8a",
+      "pdf_header_ok": true,
+      "page_count": 31,
+      "text_chars": 115082
+    },
+    {
+      "doc_id": "SDOC-030",
+      "local_filename": "DomainRAG - Chinese Domain-specific RAG Benchmark.pdf",
+      "exists": true,
+      "size_bytes": 721644,
+      "sha256": "0316a09416c658eb424965c814a32a3a7326a7502add8fe876d496b4cec9c866",
+      "pdf_header_ok": true,
+      "page_count": 11,
+      "text_chars": 49690
+    },
+    {
+      "doc_id": "SDOC-031",
+      "local_filename": "RAGBench - Explainable Benchmark for RAG Systems.pdf",
+      "exists": true,
+      "size_bytes": 546364,
+      "sha256": "16aace98845b357ad8285d88e2277b4f878b44a7498817454230a114a2d71d92",
+      "pdf_header_ok": true,
+      "page_count": 21,
+      "text_chars": 69783
+    },
+    {
+      "doc_id": "SDOC-032",
+      "local_filename": "Graph Retrieval-Augmented Generation - A Survey.pdf",
+      "exists": true,
+      "size_bytes": 1725790,
+      "sha256": "345fa9030560d7f9ec1f97e8a847ea0e5b361f97c630a927ba017c7906b6b533",
+      "pdf_header_ok": true,
+      "page_count": 41,
+      "text_chars": 174096
+    },
+    {
+      "doc_id": "SDOC-033",
+      "local_filename": "Searching for Best Practices in Retrieval-Augmented Generation.pdf",
+      "exists": true,
+      "size_bytes": 914162,
+      "sha256": "f39143713115935afbe8620a47261dc6ae37a80a88c236dfa3d15d97e7abb1fb",
+      "pdf_header_ok": true,
+      "page_count": 22,
+      "text_chars": 77849
+    },
+    {
+      "doc_id": "SDOC-034",
+      "local_filename": "RankRAG - Unifying Context Ranking with RAG.pdf",
+      "exists": true,
+      "size_bytes": 941254,
+      "sha256": "4409f1314e13be7c1f65df33936078b54831c9ae4a5ddc61ffff4ab0a8ea17d3",
+      "pdf_header_ok": true,
+      "page_count": 23,
+      "text_chars": 86654
+    },
+    {
+      "doc_id": "SDOC-035",
+      "local_filename": "Self-RAG - Learning to Retrieve Generate and Critique.pdf",
+      "exists": true,
+      "size_bytes": 1405127,
+      "sha256": "d9eaa1398abac0df67a9d0933a5bf8b6d9d83d2e72da2a486073cd842dd52978",
+      "pdf_header_ok": true,
+      "page_count": 30,
+      "text_chars": 105690
+    },
+    {
+      "doc_id": "SDOC-036",
+      "local_filename": "HyDE - Precise Zero-Shot Dense Retrieval without Relevance Labels.pdf",
+      "exists": true,
+      "size_bytes": 424964,
+      "sha256": "dc0ae3c5584ed146beee122e6a9ad9c48547dde048d53e9be8435d8f1d354531",
+      "pdf_header_ok": true,
+      "page_count": 11,
+      "text_chars": 41153
+    }
+  ]
+}

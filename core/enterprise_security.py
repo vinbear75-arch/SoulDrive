@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from ipaddress import ip_address
 from typing import Any
 
+from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.enterprise_policy import load_policy
 
 
@@ -45,9 +46,9 @@ def max_chat_top_k() -> int:
 
 def clamp_chat_top_k(value: int | None) -> int:
     try:
-        parsed = int(value) if value is not None else 3
+        parsed = int(value) if value is not None else DEFAULT_RAG_TOP_K
     except (TypeError, ValueError):
-        parsed = 3
+        parsed = DEFAULT_RAG_TOP_K
     return max(1, min(parsed, max_chat_top_k()))
 
 
