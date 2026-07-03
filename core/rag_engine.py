@@ -17,6 +17,7 @@ from core.knowledge_base import LocalKnowledgeBase
 from core.logging_config import get_logger
 from core.model_runtime import llama_runtime_config, load_llama_with_gpu_fallback, resolve_chat_model_path
 from core.observability import runtime_metrics
+from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.security_context import get_workspace_keys
 from core.secure_graph_store import SecureGraphStore
 from core.workspace import SoulDriveWorkspace
@@ -92,7 +93,7 @@ class RAGEngine:
         except Exception:
             pass
 
-    def generate_response_stream(self, query: str, top_k: int = 3, trace_id: str | None = None):
+    def generate_response_stream(self, query: str, top_k: int = DEFAULT_RAG_TOP_K, trace_id: str | None = None):
         trace_id = trace_id or str(uuid.uuid4())
         started_at = time.time()
 

@@ -8,7 +8,8 @@ from core.observability import runtime_metrics
 from core.parent_child_index import split_parent_document
 from core.parent_doc_store import ParentDocumentStore
 from core.paths import resolve_model_path
-from core.retrieval import SearchCandidate, build_citations, rank_hybrid_candidates
+from core.rag_defaults import DEFAULT_RAG_TOP_K
+from core.retrieval import SearchCandidate, _source_match_score, build_citations, rank_hybrid_candidates
 from core.reranker import LocalReranker
 from core.security_context import get_workspace_keys
 from core.secure_graph_store import SecureGraphStore
@@ -58,6 +59,7 @@ class LocalKnowledgeBase:
         self.secure_store = None
         self.parent_store = None
         self.keyword_index = None
+        self._source_candidate_cache = None
         workspace_keys = get_workspace_keys(self.workspace.root_path)
         if workspace_keys is not None:
             logger.info("[VectorDB] Loading encrypted local index: %s", self.workspace.secure_vector_store_path)
@@ -131,9 +133,10 @@ class LocalKnowledgeBase:
             metadatas=metadatas,
             ids=ids,
         )
+        self._source_candidate_cache = None
         logger.info("[VectorDB] %s indexed.", document_id)
 
-    def search_with_evidence(self, query: str, graph_db: GraphStore | None = None, top_k: int = 3):
+    def search_with_evidence(self, query: str, graph_db: GraphStore | None = None, top_k: int = DEFAULT_RAG_TOP_K):
         dense_pool_size = max(top_k * 6, 18)
         query_variants = expand_query_variants(query)
 
@@ -144,7 +147,13 @@ class LocalKnowledgeBase:
             query_vector = self.embedding_model.encode([variant], normalize_embeddings=True).tolist()
             dense_candidates.extend(self._dense_candidates(query_vector, dense_pool_size))
             keyword_candidates.extend(self._keyword_candidates(variant, dense_pool_size))
-        candidates = self._merge_candidates(dense_candidates, keyword_candidates, graph_candidates)
+        source_title_candidates = self._source_title_candidates(query, limit=max(top_k * 4, 12))
+        candidates = self._merge_candidates(
+            dense_candidates,
+            keyword_candidates,
+            graph_candidates,
+            source_title_candidates,
+        )
         candidates = self._hydrate_secure_candidates(candidates, limit=max(top_k * 40, 120))
 
         graph_context, matched_entities = self._build_graph_context(
@@ -176,7 +185,7 @@ class LocalKnowledgeBase:
             "retrieval_mode": "parent_child_hybrid_dense_fts_graph_rrf",
         }
 
-    def search(self, query: str, graph_db: GraphStore | None = None, top_k: int = 3):
+    def search(self, query: str, graph_db: GraphStore | None = None, top_k: int = DEFAULT_RAG_TOP_K):
         result = self.search_with_evidence(query=query, graph_db=graph_db, top_k=top_k)
         return result["documents"], result["metadatas"], result["graph_context"]
 
@@ -256,6 +265,8 @@ class LocalKnowledgeBase:
         ordered_ids = []
         seen = set()
         for candidate in candidates:
+            if candidate.content and candidate.metadata:
+                continue
             if candidate.id in seen:
                 continue
             seen.add(candidate.id)
@@ -267,6 +278,8 @@ class LocalKnowledgeBase:
         for candidate in candidates:
             item = loaded.get(candidate.id)
             if item is None:
+                if candidate.content and candidate.metadata:
+                    hydrated.append(candidate)
                 continue
             hydrated.append(
                 SearchCandidate(
@@ -301,22 +314,85 @@ class LocalKnowledgeBase:
             for index, chunk_id in enumerate(chunk_ids)
         ]
 
+    def _source_title_candidates(self, query: str, limit: int = 12):
+        scored: dict[str, tuple[float, SearchCandidate]] = {}
+        for record_id, document, metadata in self._source_candidate_records():
+            score = _source_match_score(query, metadata)
+            if score < 0.72:
+                continue
+            key = str(metadata.get("source_filename") or metadata.get("parent_id") or record_id)
+            candidate = SearchCandidate(
+                id=f"source_title:{record_id}",
+                content=document,
+                metadata=metadata,
+                keyword_score=score,
+            )
+            previous = scored.get(key)
+            if previous is None or score > previous[0]:
+                scored[key] = (score, candidate)
+
+        return [
+            candidate
+            for _, candidate in sorted(
+                scored.values(),
+                key=lambda item: (
+                    item[0],
+                    str((item[1].metadata or {}).get("source_filename") or ""),
+                    item[1].id,
+                ),
+                reverse=True,
+            )[:limit]
+        ]
+
+    def _source_candidate_records(self):
+        if self._source_candidate_cache is not None:
+            return self._source_candidate_cache
+
+        try:
+            payload = self.collection.get(include=["documents", "metadatas"])
+        except Exception as exc:
+            runtime_metrics.record_error(f"source title retrieval failed: {exc}")
+            logger.warning("[VectorDB] Source title retrieval degraded: %s", exc)
+            self._source_candidate_cache = []
+            return self._source_candidate_cache
+
+        ids = payload.get("ids", []) or []
+        documents = payload.get("documents", []) or []
+        metadatas = payload.get("metadatas", []) or []
+        self._source_candidate_cache = [
+            (str(record_id), str(document or ""), metadata or {})
+            for record_id, document, metadata in zip(ids, documents, metadatas)
+            if metadata
+        ]
+        return self._source_candidate_cache
+
     def _merge_candidates(self, *candidate_groups: list[SearchCandidate]):
         merged: dict[str, SearchCandidate] = {}
         for group in candidate_groups:
             for candidate in group:
-                if candidate.id not in merged:
-                    merged[candidate.id] = candidate
+                merge_key = str(candidate.metadata.get("parent_id") or candidate.id)
+                if merge_key not in merged:
+                    merged[merge_key] = candidate
                     continue
-                existing = merged[candidate.id]
-                if existing.dense_rank is None:
+                existing = merged[merge_key]
+                if existing.dense_rank is None or (
+                    candidate.dense_rank is not None and candidate.dense_rank < existing.dense_rank
+                ):
                     existing.dense_rank = candidate.dense_rank
-                if existing.sparse_rank is None:
+                if existing.sparse_rank is None or (
+                    candidate.sparse_rank is not None and candidate.sparse_rank < existing.sparse_rank
+                ):
                     existing.sparse_rank = candidate.sparse_rank
-                existing.keyword_score = max(existing.keyword_score, candidate.keyword_score)
-                existing.graph_score = max(existing.graph_score, candidate.graph_score)
-                if existing.vector_distance is None:
+                if candidate.keyword_score > existing.keyword_score:
+                    existing.content = candidate.content
+                    existing.metadata = {**existing.metadata, **candidate.metadata}
+                    existing.keyword_score = candidate.keyword_score
+                if existing.vector_distance is None or (
+                    candidate.vector_distance is not None and candidate.vector_distance < existing.vector_distance
+                ):
                     existing.vector_distance = candidate.vector_distance
+                existing.graph_score = max(existing.graph_score, candidate.graph_score)
+                existing.rerank_score = max(existing.rerank_score, candidate.rerank_score)
         return list(merged.values())
 
     def _expand_parent_context(self, candidates: list[SearchCandidate], top_k: int):
@@ -398,9 +474,11 @@ class LocalKnowledgeBase:
             child_ids = list(existing.get("ids") or [])
             self.secure_store.delete_by_document_hash(document_hash)
             self._remove_secure_graph_provenance(child_ids)
+            self._source_candidate_cache = None
             return
         self.parent_store.delete_by_document_hash(document_hash)
         self.keyword_index.delete_by_document_hash(document_hash)
+        self._source_candidate_cache = None
 
     def _remove_secure_graph_provenance(self, chunk_ids: list[str]) -> None:
         if not chunk_ids:

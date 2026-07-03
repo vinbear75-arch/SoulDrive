@@ -1,0 +1,1 @@
+DEFAULT_RAG_TOP_K = 6

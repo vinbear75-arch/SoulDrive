@@ -6,7 +6,7 @@ param(
 
     [string]$ResultPath = "eval/results/retrieval_baseline_v0.3.jsonl",
 
-    [int]$TopK = 3,
+    [int]$TopK = 6,
 
     [string]$Passphrase = "",
 

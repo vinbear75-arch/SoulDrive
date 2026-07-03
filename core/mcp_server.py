@@ -30,6 +30,7 @@ from core.enterprise_security import (
 from core.observability import runtime_metrics
 from core.paper_importer import import_paper_into_workspace
 from core.paths import app_root
+from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.runtime_state import (
     get_runtime_state,
     lock_runtime,
@@ -363,7 +364,7 @@ def require_software_unlock():
 # =====================================================================
 class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=6000)
-    top_k: int = Field(default=3, ge=1, le=20)
+    top_k: int = Field(default=DEFAULT_RAG_TOP_K, ge=1, le=20)
 
 class RuntimeRequest(BaseModel):
     reason: str = Field(default="manual runtime update", max_length=200)

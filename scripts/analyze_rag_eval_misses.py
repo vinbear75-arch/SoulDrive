@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts import eval_rag
+from core.rag_defaults import DEFAULT_RAG_TOP_K
 
 
 DEFAULT_DATASET = PROJECT_ROOT / "eval" / "retrieval_quality_blind_v0.3.jsonl"
@@ -21,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Analyze missed sources in a saved SoulDrive retrieval evaluation.")
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET), help="Evaluation dataset JSONL path.")
     parser.add_argument("--results", default=str(DEFAULT_RESULTS), help="Saved retrieval results JSONL path.")
-    parser.add_argument("--top-k", type=int, default=3, help="Evidence depth to inspect.")
+    parser.add_argument("--top-k", type=int, default=DEFAULT_RAG_TOP_K, help="Evidence depth to inspect.")
     parser.add_argument("--limit", type=int, default=20, help="Maximum sample misses to print.")
     parser.add_argument("--json-output", action="store_true", help="Print machine-readable JSON.")
     args = parser.parse_args(argv)
@@ -34,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def analyze_result_files(dataset_path: Path, results_path: Path, top_k: int = 3) -> dict[str, Any]:
+def analyze_result_files(dataset_path: Path, results_path: Path, top_k: int = DEFAULT_RAG_TOP_K) -> dict[str, Any]:
     records = eval_rag.load_dataset(dataset_path)
     results = eval_rag.load_results(results_path, records)
     results_by_id = {result.id: result for result in results}

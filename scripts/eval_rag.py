@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.runtime_state import get_runtime_state
+from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.security_context import WORKSPACE_DATA_KEY_ENV, get_workspace_keys, restore_workspace_keys, set_workspace_keys
 from core.workspace import WORKSPACE_MANIFEST, SoulDriveWorkspace
 from core.workspace_crypto import unlock_keystore
@@ -87,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate SoulDrive retrieval and citation quality.")
     parser.add_argument("--dataset", default="eval/enterprise_zh_v0.2.jsonl", help="JSONL evaluation dataset path.")
     parser.add_argument("--workspace", default=None, help="SoulDrive workspace root. Defaults to current runtime workspace.")
-    parser.add_argument("--top-k", type=int, default=3, help="Evidence count to retrieve.")
+    parser.add_argument("--top-k", type=int, default=DEFAULT_RAG_TOP_K, help="Evidence count to retrieve.")
     parser.add_argument("--include-answers", action="store_true", help="Run full RAG answer generation, not retrieval only.")
     parser.add_argument("--chat-model", default=None, help="Temporarily set SOULDRIVE_CHAT_MODEL for this evaluation run.")
     parser.add_argument("--from-results", default=None, help="Read prior JSONL results instead of running retrieval.")

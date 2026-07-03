@@ -16,6 +16,11 @@ from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class McpServerPapersTests(unittest.TestCase):
+    def test_chat_request_defaults_to_six_evidence_items(self):
+        request = mcp_server.ChatRequest(query="hello")
+
+        self.assertEqual(request.top_k, 6)
+
     def test_documents_list_reads_only_workspace_documents_directory(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
