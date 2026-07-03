@@ -1,0 +1,412 @@
+{
+  "version": "v0.2",
+  "purpose": "RAG retrieval quality strict evaluation corpus for query rewrite, retrieval fusion, rerank, and citation filtering experiments.",
+  "target_sample_count": {
+    "min": 300,
+    "max": 500,
+    "planned": 360
+  },
+  "notes": [
+    "Local existing documents are already present under the user's souldrive_docs directory.",
+    "Download candidates are verified PDF URLs, but remain to_download until the files are placed in the local corpus directory.",
+    "This corpus is for query-time retrieval quality work first; ingestion and chunking experiments must use a separate branch and rebuilt index."
+  ],
+  "documents": [
+    {
+      "doc_id": "SDOC-001",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "LazyLLM企业级RAG方案：私有化部署与权限安全",
+      "local_filename": "LazyLLM企业级RAG方案-私有化部署与权限安全.pdf",
+      "source_url": "",
+      "topic_tags": ["rag", "private_deployment", "access_control", "data_security"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-002",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "“城市+AI”应用场景清单（第五批）",
+      "local_filename": "“城市+AI”应用场景清单（第五批）.pdf",
+      "source_url": "",
+      "topic_tags": ["industry_scenario", "ai_application", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-003",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "人工智能安全治理蓝皮书",
+      "local_filename": "人工智能安全治理蓝皮书.pdf",
+      "source_url": "",
+      "topic_tags": ["ai_safety", "governance", "risk_management"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-004",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "基于大模型和RAG的知识库问答系统",
+      "local_filename": "基于大模型和RAG的知识库问答系统.pdf",
+      "source_url": "",
+      "topic_tags": ["rag", "knowledge_base", "private_deployment"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-005",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "大模型基准测试体系研究报告",
+      "local_filename": "大模型基准测试体系研究报告.pdf",
+      "source_url": "",
+      "topic_tags": ["evaluation", "benchmark", "llm"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-006",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "大模型知识管理系统",
+      "local_filename": "大模型知识管理系统.pdf",
+      "source_url": "",
+      "topic_tags": ["rag", "knowledge_management", "enterprise"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-007",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "大模型私有部署与基础应用落地",
+      "local_filename": "大模型私有部署与基础应用落地.pdf",
+      "source_url": "",
+      "topic_tags": ["private_deployment", "llm_ops", "enterprise"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-008",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "数据安全技术 数据分类分级规则",
+      "local_filename": "数据安全技术 数据分类分级规则.pdf",
+      "source_url": "",
+      "topic_tags": ["data_security", "data_classification", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-009",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "数据要素发展报告",
+      "local_filename": "数据要素发展报告.pdf",
+      "source_url": "",
+      "topic_tags": ["data_elements", "data_market", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-010",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "生成式人工智能服务安全基本要求",
+      "local_filename": "生成式人工智能服务安全基本要求.pdf",
+      "source_url": "",
+      "topic_tags": ["ai_safety", "data_security", "generative_ai"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-011",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "知识库问答场景中大语言模型私有化研究与应用实践",
+      "local_filename": "知识库问答场景中大语言模型私有化研究与应用实践.pdf",
+      "source_url": "",
+      "topic_tags": ["rag", "private_deployment", "knowledge_base"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-012",
+      "origin": "local_existing",
+      "status": "present",
+      "language": "zh",
+      "title": "综合交通运输大模型智能体创新应用",
+      "local_filename": "综合交通运输大模型智能体创新应用.pdf",
+      "source_url": "",
+      "topic_tags": ["industry_scenario", "agent", "transportation"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-013",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "大模型落地路线图研究报告",
+      "local_filename": "大模型落地路线图研究报告.pdf",
+      "source_url": "https://www.caict.ac.cn/kxyj/qwfb/ztbg/202409/P020240904538515747964.pdf",
+      "topic_tags": ["llm_ops", "private_deployment", "enterprise"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-014",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "大模型一体机应用研究报告",
+      "local_filename": "大模型一体机应用研究报告.pdf",
+      "source_url": "https://www.caict.ac.cn/kxyj/qwfb/ztbg/202510/P020251031405764520571.pdf",
+      "topic_tags": ["private_deployment", "llm_ops", "enterprise"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-015",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "人工智能产业发展研究报告",
+      "local_filename": "人工智能产业发展研究报告.pdf",
+      "source_url": "https://www.caict.ac.cn/kxyj/qwfb/bps/202602/P020260202487301304903.pdf",
+      "topic_tags": ["industry_scenario", "ai_application", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-016",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "政府数智化转型发展研究报告",
+      "local_filename": "政府数智化转型发展研究报告.pdf",
+      "source_url": "https://www.caict.ac.cn/kxyj/qwfb/ztbg/202603/P020260309362062809415.pdf",
+      "topic_tags": ["industry_scenario", "data_elements", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-017",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "大模型治理蓝皮报告",
+      "local_filename": "大模型治理蓝皮报告.pdf",
+      "source_url": "https://www.caict.ac.cn/kxyj/qwfb/ztbg/202311/P020231124526622371194.pdf",
+      "topic_tags": ["ai_safety", "governance", "risk_management"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-018",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "人工智能安全标准体系",
+      "local_filename": "人工智能安全标准体系.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2025-01-24/1737709785951070331.pdf",
+      "topic_tags": ["ai_safety", "governance", "standard"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-019",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "人工智能安全治理框架",
+      "local_filename": "人工智能安全治理框架.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2024-09-09/1725849142029046390.pdf",
+      "topic_tags": ["ai_safety", "governance", "risk_management"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-020",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "人工智能安全标准化白皮书",
+      "local_filename": "人工智能安全标准化白皮书.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2023-05-31/1685501487351066337.pdf",
+      "topic_tags": ["ai_safety", "governance", "standard"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-021",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "生成式人工智能服务安全应急响应指南",
+      "local_filename": "生成式人工智能服务安全应急响应指南.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2024-12-18/1734483139154029117.pdf",
+      "topic_tags": ["ai_safety", "generative_ai", "risk_management"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-022",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "个人信息保护国家标准体系（2025版）",
+      "local_filename": "个人信息保护国家标准体系（2025版）.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2025-09-16/1757991247699056052.pdf",
+      "topic_tags": ["data_security", "privacy", "standard"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-023",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "数据安全技术 敏感个人信息处理安全要求",
+      "local_filename": "数据安全技术 敏感个人信息处理安全要求.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2025-06-17/1750126302878095198.pdf",
+      "topic_tags": ["data_security", "privacy", "data_classification"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-024",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "数据安全国家标准体系（2025版）",
+      "local_filename": "数据安全国家标准体系（2025版）.pdf",
+      "source_url": "https://www.tc260.org.cn/upload/2025-09-16/1757991172917070462.pdf",
+      "topic_tags": ["data_security", "governance", "standard"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-025",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "国家数据基础设施建设指引",
+      "local_filename": "国家数据基础设施建设指引.pdf",
+      "source_url": "https://www.ndrc.gov.cn/xxgk/zcfb/tz/202501/P020250106319424108511.pdf",
+      "topic_tags": ["data_elements", "data_infrastructure", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-026",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "zh",
+      "title": "数据价值化与数据要素市场发展报告",
+      "local_filename": "数据价值化与数据要素市场发展报告.pdf",
+      "source_url": "https://www.caict.ac.cn/kxyj/qwfb/ztbg/202409/P020240926365684089988.pdf",
+      "topic_tags": ["data_elements", "data_market", "governance"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-027",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "Retrieval-Augmented Generation for Large Language Models: A Survey",
+      "local_filename": "Retrieval-Augmented Generation for Large Language Models - A Survey.pdf",
+      "source_url": "https://arxiv.org/pdf/2312.10997",
+      "topic_tags": ["rag", "evaluation", "retrieval"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-028",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "Evaluation of Retrieval-Augmented Generation: A Survey",
+      "local_filename": "Evaluation of Retrieval-Augmented Generation - A Survey.pdf",
+      "source_url": "https://arxiv.org/pdf/2405.07437",
+      "topic_tags": ["rag", "evaluation", "benchmark"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-029",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "CRUD-RAG: A Comprehensive Chinese Benchmark for Retrieval-Augmented Generation of Large Language Models",
+      "local_filename": "CRUD-RAG - A Comprehensive Chinese Benchmark.pdf",
+      "source_url": "https://arxiv.org/pdf/2401.17043",
+      "topic_tags": ["rag", "evaluation", "benchmark"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-030",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "DomainRAG: A Chinese Benchmark for Evaluating Domain-specific Retrieval-Augmented Generation",
+      "local_filename": "DomainRAG - Chinese Domain-specific RAG Benchmark.pdf",
+      "source_url": "https://arxiv.org/pdf/2406.05654",
+      "topic_tags": ["rag", "evaluation", "benchmark"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-031",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "RAGBench: Explainable Benchmark for Retrieval-Augmented Generation Systems",
+      "local_filename": "RAGBench - Explainable Benchmark for RAG Systems.pdf",
+      "source_url": "https://arxiv.org/pdf/2407.11005",
+      "topic_tags": ["rag", "evaluation", "benchmark"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-032",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "Graph Retrieval-Augmented Generation: A Survey",
+      "local_filename": "Graph Retrieval-Augmented Generation - A Survey.pdf",
+      "source_url": "https://arxiv.org/pdf/2408.08921",
+      "topic_tags": ["rag", "graph", "retrieval"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-033",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "Searching for Best Practices in Retrieval-Augmented Generation",
+      "local_filename": "Searching for Best Practices in Retrieval-Augmented Generation.pdf",
+      "source_url": "https://arxiv.org/pdf/2407.01219",
+      "topic_tags": ["rag", "retrieval", "rerank"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-034",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs",
+      "local_filename": "RankRAG - Unifying Context Ranking with RAG.pdf",
+      "source_url": "https://arxiv.org/pdf/2407.02485",
+      "topic_tags": ["rag", "rerank", "retrieval"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-035",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection",
+      "local_filename": "Self-RAG - Learning to Retrieve Generate and Critique.pdf",
+      "source_url": "https://arxiv.org/pdf/2310.11511",
+      "topic_tags": ["rag", "retrieval", "answer_quality"],
+      "question_budget": 10
+    },
+    {
+      "doc_id": "SDOC-036",
+      "origin": "download_candidate",
+      "status": "to_download",
+      "language": "en",
+      "title": "Precise Zero-Shot Dense Retrieval without Relevance Labels",
+      "local_filename": "HyDE - Precise Zero-Shot Dense Retrieval without Relevance Labels.pdf",
+      "source_url": "https://arxiv.org/pdf/2212.10496",
+      "topic_tags": ["rag", "query_rewrite", "retrieval"],
+      "question_budget": 10
+    }
+  ]
+}

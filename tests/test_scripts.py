@@ -53,6 +53,59 @@ class ScriptTests(unittest.TestCase):
         self.assertIn('"conda"', source)
         self.assertIn('"souldrive"', source)
 
+    def test_rag_eval_runner_targets_blind_v03_dataset_and_results(self):
+        script_path = ROOT / "scripts" / "run-rag-eval.ps1"
+
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("eval/retrieval_quality_blind_v0.3.jsonl", script)
+        self.assertIn("eval/results/retrieval_baseline_v0.3.jsonl", script)
+        self.assertIn("--workspace", script)
+        self.assertIn("--save-results", script)
+        self.assertIn("scripts/eval_rag.py", script)
+        self.assertIn("scripts/check_rag_eval_workspace.py", script)
+        self.assertIn("corpus_manifest_v0.2.json", script)
+
+    def test_rag_eval_runner_forces_utf8_console_output_on_windows(self):
+        script = (ROOT / "scripts" / "run-rag-eval.ps1").read_text(encoding="utf-8")
+
+        self.assertIn("[Console]::OutputEncoding", script)
+        self.assertIn("UTF8Encoding", script)
+        self.assertIn('PYTHONIOENCODING = "utf-8"', script)
+
+    def test_rag_miss_analyzer_defaults_to_blind_v03_dataset(self):
+        script_path = ROOT / "scripts" / "analyze_rag_eval_misses.py"
+
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("retrieval_quality_blind_v0.3.jsonl", script)
+        self.assertIn("retrieval_baseline_v0.3.jsonl", script)
+
+    def test_rag_eval_workspace_preflight_checks_manifest_documents(self):
+        script_path = ROOT / "scripts" / "check_rag_eval_workspace.py"
+        manifest_path = ROOT / "eval" / "corpus_manifest_v0.2.json"
+
+        self.assertTrue(script_path.exists())
+        self.assertTrue(manifest_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("corpus_manifest_v0.2.json", script)
+        self.assertIn("SecureDocumentStore", script)
+        self.assertIn("missing_documents", script)
+        self.assertIn("missing_indexed_documents", script)
+
+    def test_rag_eval_corpus_import_script_uses_manifest_and_optional_indexing(self):
+        script_path = ROOT / "scripts" / "import_rag_eval_corpus.py"
+        inventory_path = ROOT / "eval" / "corpus_file_inventory_v0.2.json"
+
+        self.assertTrue(script_path.exists())
+        self.assertTrue(inventory_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("corpus_manifest_v0.2.json", script)
+        self.assertIn("import_paper_into_workspace", script)
+        self.assertIn("--dry-run", script)
+        self.assertIn("--index", script)
+        self.assertIn("--skip-graph", script)
+
 
 if __name__ == "__main__":
     unittest.main()

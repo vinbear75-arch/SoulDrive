@@ -12,6 +12,7 @@ from scripts import eval_rag
 
 ROOT = Path(__file__).resolve().parent.parent
 DATASET_PATH = ROOT / "eval" / "enterprise_zh_v0.2.jsonl"
+BLIND_RETRIEVAL_V3_DATASET_PATH = ROOT / "eval" / "retrieval_quality_blind_v0.3.jsonl"
 SCRIPT_PATH = ROOT / "scripts" / "eval_rag.py"
 ALLOWED_SOURCE_HINTS = {
     "大模型知识管理系统",
@@ -66,6 +67,37 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertTrue(any(record.get("requires_multi_doc") for record in records))
         self.assertTrue(any(record.get("graph_relevant") for record in records))
         self.assertTrue(any(record.get("should_refuse") for record in records))
+
+    def test_blind_retrieval_v03_limits_known_title_questions(self):
+        records = _load_jsonl(BLIND_RETRIEVAL_V3_DATASET_PATH)
+
+        self.assertEqual(len(records), 360)
+        self.assertEqual(len({record["id"] for record in records}), 360)
+        self.assertTrue(all(record["id"].startswith("SRQ3-") for record in records))
+
+        known_title_records = [
+            record
+            for record in records
+            if record.get("allows_title_reference")
+        ]
+        self.assertEqual(len(known_title_records), 60)
+        self.assertEqual(len(records) - len(known_title_records), 300)
+
+        for record in records:
+            self.assertIn(record["type"], {"single_doc", "cross_doc", "negative", "safety"})
+            self.assertIsInstance(record.get("allows_title_reference"), bool)
+            self.assertIsInstance(record.get("doc_ids", []), list)
+            self.assertGreaterEqual(len(record.get("focus", [])), 1)
+            if record.get("should_refuse"):
+                self.assertEqual(record["type"], "negative")
+                self.assertEqual(record["expected_sources"], [])
+                self.assertEqual(record["expected_keywords"], [])
+            else:
+                self.assertGreaterEqual(len(record["expected_sources"]), 1)
+                self.assertGreaterEqual(len(record["expected_keywords"]), 3)
+            if record.get("requires_multi_doc"):
+                self.assertEqual(record["type"], "cross_doc")
+                self.assertGreaterEqual(len(record["expected_sources"]), 2)
 
     def test_eval_script_prints_plain_chinese_metrics_from_fixture(self):
         fixture = [
@@ -360,8 +392,29 @@ class EvalAssetsTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertEqual(return_code, 0)
         self.assertIn("对比报告: 3B -> 7B", output)
+        self.assertIn("检索全命中率@3", output)
+        self.assertIn("MRR", output)
         self.assertIn("答案关键词覆盖率", output)
         self.assertIn("+50.0百分点", output)
+
+    def test_eval_script_can_force_utf8_stdio_on_windows(self):
+        class FakeStream:
+            def __init__(self):
+                self.reconfigure_calls = []
+
+            def reconfigure(self, **kwargs):
+                self.reconfigure_calls.append(kwargs)
+
+        stdout = FakeStream()
+        stderr = FakeStream()
+
+        with patch.object(eval_rag.os, "name", "nt"), patch.object(eval_rag.sys, "stdout", stdout), patch.object(
+            eval_rag.sys, "stderr", stderr
+        ):
+            eval_rag.configure_utf8_stdio()
+
+        self.assertEqual(stdout.reconfigure_calls, [{"encoding": "utf-8"}])
+        self.assertEqual(stderr.reconfigure_calls, [{"encoding": "utf-8"}])
 
     def test_source_matching_accepts_local_filename_aliases(self):
         self.assertTrue(eval_rag.source_matches("“城市+AI”应用场景清单（第五批）.pdf", "城市+AI应用场景清单"))
@@ -469,6 +522,14 @@ class EvalAssetsTests(unittest.TestCase):
 def _load_dataset():
     records = []
     for line in DATASET_PATH.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            records.append(json.loads(line))
+    return records
+
+
+def _load_jsonl(path: Path):
+    records = []
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
             records.append(json.loads(line))
     return records

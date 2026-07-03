@@ -56,6 +56,29 @@ class RerankerTests(unittest.TestCase):
 
         self.assertEqual(scores, [0.91])
 
+    def test_local_reranker_uses_resolved_torch_device(self):
+        captured = {}
+
+        class FakeCrossEncoder:
+            def __init__(self, model_path, max_length=None, device="cpu", local_files_only=True):
+                captured["device"] = device
+
+            def predict(self, pairs):
+                return [0.5 for _ in pairs]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            model_dir = Path(temp_dir)
+            reranker_dir = model_dir / "mmarco-mMiniLMv2-L6-H384-v1"
+            reranker_dir.mkdir(parents=True)
+            with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
+                "sentence_transformers.CrossEncoder",
+                FakeCrossEncoder,
+            ), patch("core.reranker.resolve_torch_device", return_value="cuda"):
+                reranker = LocalReranker()
+                self.assertTrue(reranker.ready)
+
+        self.assertEqual(captured["device"], "cuda")
+
 
 if __name__ == "__main__":
     unittest.main()

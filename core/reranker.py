@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from core.paths import model_search_dirs
+from core.torch_device import resolve_torch_device
 
 
 PREFERRED_RERANKER_MODELS = (
@@ -60,7 +61,7 @@ class LocalReranker:
             self.encoder = CrossEncoder(
                 self.model_path,
                 max_length=512,
-                device="cpu",
+                device=resolve_torch_device(),
                 local_files_only=True,
             )
 

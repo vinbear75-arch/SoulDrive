@@ -311,13 +311,13 @@
       <p class="subtitle">
         这份说明基于当前源码结构整理，目标是帮助你快速建立项目全局图景：SoulDrive 是一个面向私有资产的端侧知识引擎，
         当前测试与演示仍以论文作为第一切入口，但底层能力已覆盖更广泛的本地知识文档场景，重点在文档解析、增量索引、
-        混合检索、证据链、知识图谱、本地 GGUF 推理、Tauri 桌面打包和可移动存储授权。
+        混合检索、证据链、知识图谱、本地 GGUF 推理、Tauri 桌面打包、可移动存储授权和口令加密工作区。
       </p>
       <div class="meta-row">
         <span class="pill">后端：Python + FastAPI + Chroma + SQLite + llama.cpp</span>
         <span class="pill">桌面：React + Vite + Tauri 2 + Rust sidecar 管理</span>
-        <span class="pill">核心数据：PDF、向量库、父子切片、FTS、图谱、审计日志</span>
-        <span class="pill">阅读日期：2026-06-15</span>
+        <span class="pill">核心数据：PDF、加密对象、向量/FTS、父子切片、图谱、审计日志</span>
+        <span class="pill">阅读日期：2026-06-26</span>
       </div>
     </header>
 
@@ -334,7 +334,7 @@
         </article>
         <article class="card">
           <strong>运行边界</strong>
-          <p>模型、索引、图谱和审计日志都优先落本地，API 只接受 loopback 请求。</p>
+          <p>模型、索引、图谱和审计日志都优先落本地；API 只接受 loopback 请求，并默认要求随机 token。</p>
         </article>
         <article class="card">
           <strong>核心差异</strong>
@@ -342,7 +342,7 @@
         </article>
         <article class="card">
           <strong>产品化方向</strong>
-          <p>桌面端自动启动 sidecar，支持随机端口/token、健康监控和便携 U 盘形态。</p>
+          <p>桌面端自动启动 sidecar，支持随机端口/token、健康监控、便携 U 盘形态和口令解锁。</p>
         </article>
       </div>
     </section>
@@ -392,7 +392,7 @@
 
           <rect class="box box-violet" x="345" y="258" width="230" height="78"></rect>
           <text class="title" x="365" y="286">运行态闸门</text>
-          <text class="small" x="365" y="309">locked / auth_level / workspace</text>
+          <text class="small" x="365" y="309">locked / software_unlocked / workspace</text>
           <text class="tiny" x="365" y="328">core/runtime_state.py</text>
 
           <rect class="box box-green" x="635" y="258" width="230" height="78"></rect>
@@ -438,8 +438,8 @@
           <text class="lane-title" x="42" y="540">本地工作区与模型层：所有关键产物落盘</text>
 
           <rect class="box box-white" x="55" y="565" width="200" height="72"></rect>
-          <text class="title" x="75" y="592">PDF 知识文档</text>
-          <text class="small" x="75" y="615">data/papers/</text>
+          <text class="title" x="75" y="592">知识文档库</text>
+          <text class="small" x="75" y="615">data/documents + legacy papers</text>
 
           <rect class="box box-white" x="300" y="565" width="220" height="72"></rect>
           <text class="title" x="320" y="592">向量与切片索引</text>
@@ -467,7 +467,86 @@
     </section>
 
     <section>
-      <h2>三、核心业务流程图</h2>
+      <h2>三、安全与加密工作区架构图</h2>
+      <p>
+        当前实现不是只做“插上 U 盘就能用”的物理门禁，而是叠加了口令解锁。U 盘挂载后系统进入
+        <code>HARDWARE_ONLY</code> 状态，敏感接口仍被 <code>require_software_unlock()</code> 拦住；只有口令解开
+        <code>keystore.json</code> 里的工作区主密钥后，文档导入、索引和问答才真正放行。
+      </p>
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 1220 560" role="img" aria-label="SoulDrive 安全与加密工作区架构图">
+          <defs>
+            <marker id="arrow-sec" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#52635d"></path>
+            </marker>
+          </defs>
+
+          <text class="lane-title" x="35" y="42">A. 解锁状态机：物理在场 + 软件口令</text>
+
+          <rect class="box box-gold" x="35" y="70" width="180" height="76"></rect>
+          <text class="title" x="55" y="99">默认锁定</text>
+          <text class="tiny" x="55" y="122">storage device required</text>
+
+          <rect class="box box-blue" x="265" y="70" width="190" height="76"></rect>
+          <text class="title" x="285" y="99">U 盘挂载</text>
+          <text class="tiny" x="285" y="122">hardware_mounted=true</text>
+
+          <rect class="box box-red" x="505" y="70" width="210" height="76"></rect>
+          <text class="title" x="525" y="99">等待口令</text>
+          <text class="tiny" x="525" y="122">locked + HARDWARE_ONLY</text>
+
+          <rect class="box box-violet" x="765" y="70" width="205" height="76"></rect>
+          <text class="title" x="785" y="99">解开 keystore</text>
+          <text class="tiny" x="785" y="122">Argon2id + AES-256-GCM</text>
+
+          <rect class="box box-green" x="1020" y="70" width="165" height="76"></rect>
+          <text class="title" x="1040" y="99">工作区可用</text>
+          <text class="tiny" x="1040" y="122">HARDWARE_PLUS_PASSWORD</text>
+
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M215 108 L265 108"></path>
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M455 108 L505 108"></path>
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M715 108 L765 108"></path>
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M970 108 L1020 108"></path>
+
+          <rect class="box box-white" x="265" y="180" width="700" height="72"></rect>
+          <text class="title" x="285" y="208">敏感接口闸门</text>
+          <text class="small" x="285" y="232">/chat、/documents/import、/index/run 会在未解锁时返回 423，并写入 security.password_required 审计事件。</text>
+
+          <text class="lane-title" x="35" y="315">B. 密钥与加密存储：口令不直接加密文档</text>
+
+          <rect class="box box-blue" x="35" y="345" width="190" height="80"></rect>
+          <text class="title" x="55" y="374">用户口令</text>
+          <text class="tiny" x="55" y="397">不落盘，不可找回</text>
+
+          <rect class="box box-violet" x="275" y="345" width="190" height="80"></rect>
+          <text class="title" x="295" y="374">password_key</text>
+          <text class="tiny" x="295" y="397">Argon2id 派生</text>
+
+          <rect class="box box-gold" x="515" y="345" width="210" height="80"></rect>
+          <text class="title" x="535" y="374">workspace_data_key</text>
+          <text class="tiny" x="535" y="397">随机 32 字节，被 AES-GCM 包裹</text>
+
+          <rect class="box box-green" x="775" y="345" width="190" height="80"></rect>
+          <text class="title" x="795" y="374">用途密钥</text>
+          <text class="tiny" x="795" y="397">document / metadata / index / graph / audit</text>
+
+          <rect class="box box-white" x="1015" y="345" width="170" height="80"></rect>
+          <text class="title" x="1035" y="374">加密落盘</text>
+          <text class="tiny" x="1035" y="397">sdoc / secure_vectors / secure_graph</text>
+
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M225 385 L275 385"></path>
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M465 385 L515 385"></path>
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M725 385 L775 385"></path>
+          <path class="arrow" marker-end="url(#arrow-sec)" d="M965 385 L1015 385"></path>
+
+          <rect class="box box-white" x="275" y="465" width="690" height="56"></rect>
+          <text class="small" x="295" y="490">关键代码：workspace_crypto.py 管 keystore；security_context.py 管内存密钥；secure_document_store.py / secure_vector_store.py / secure_graph_store.py 管加密数据。</text>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <h2>四、核心业务流程图</h2>
       <p>
         项目有两条最重要的链路：一条是知识文档入库/索引链路，另一条是用户提问后的 Hybrid RAG 链路。
         理解这两条链路，基本就能看懂项目大部分代码。
@@ -571,7 +650,7 @@
     </section>
 
     <section>
-      <h2>四、模块拆解：每块在系统里做什么</h2>
+      <h2>五、模块拆解：每块在系统里做什么</h2>
       <div class="three-col">
         <article class="card">
           <strong>1. 桌面壳与进程守护</strong>
@@ -586,42 +665,46 @@
           <p><code>core/workspace.py</code> 把知识文档、索引、模型、审计和运行态统一放到可移动盘 <code>SoulDrive/</code> 下；未挂载工作区时保持锁定，不回退到本机库。</p>
         </article>
         <article class="card">
-          <strong>4. 文档解析与索引</strong>
+          <strong>4. 口令解锁与加密存储</strong>
+          <p><code>core/workspace_crypto.py</code> 用 Argon2id + AES-GCM 解开工作区主密钥；解锁后 <code>security_context.py</code> 将用途密钥放在内存里，供加密文档、加密索引和加密图谱使用。</p>
+        </article>
+        <article class="card">
+          <strong>5. 文档解析与索引</strong>
           <p><code>core/indexer.py</code> 管理增量索引；<code>core/document_parser.py</code> 用 Docling 做版面感知解析；入库时写 Chroma、父文档 SQLite 和 FTS5 关键词索引。</p>
         </article>
         <article class="card">
-          <strong>5. Hybrid Retrieval</strong>
+          <strong>6. Hybrid Retrieval</strong>
           <p><code>core/knowledge_base.py</code> 先做 dense 向量召回和关键词召回，再用 <code>core/retrieval.py</code> 的 RRF、词法重排和图谱分数合成最终证据。</p>
         </article>
         <article class="card">
-          <strong>6. 本地图谱</strong>
+          <strong>7. 本地图谱</strong>
           <p><code>core/graph_extractor.py</code> 使用本地 LLM 从片段抽取实体关系；<code>core/graph_db.py</code> 用 SQLite 存节点和边，问答时取一跳子图补充逻辑链。</p>
         </article>
         <article class="card">
-          <strong>7. RAG 推理引擎</strong>
+          <strong>8. RAG 推理引擎</strong>
           <p><code>core/rag_engine.py</code> 做证据门槛、Prompt 组装、本地 GGUF 流式生成、引用覆盖审计，并在回答末尾附加 evidence/mindmap 代码块。</p>
         </article>
         <article class="card">
-          <strong>8. 审计与诊断</strong>
+          <strong>9. 审计与诊断</strong>
           <p><code>core/audit_log.py</code> 用 previous_hash + event_hash 构造 hash-chain；<code>core/diagnostics.py</code> 汇总策略、模型、工作区、审计链和授权状态。</p>
         </article>
         <article class="card">
-          <strong>9. React 工作台</strong>
+          <strong>10. React 工作台</strong>
           <p><code>souldrive-ui/src/App.tsx</code> 轮询运行态、指标、知识文档和审计；解析 <code>souldrive-evidence</code> 与 <code>souldrive-mindmap</code>，渲染证据卡片和可缩放导图。</p>
         </article>
       </div>
     </section>
 
     <section>
-      <h2>五、设计思路与意图</h2>
+      <h2>六、设计思路与意图</h2>
       <div class="two-col">
         <div class="note">
           <h3>本地优先，而不是云端 SaaS</h3>
           <p>项目把知识文档、索引、图谱、审计和模型都放在本地目录。这样牺牲的是初次解析和模型加载速度，换来的是隐私边界清楚、离线可运行和更容易做企业内网部署。</p>
         </div>
         <div class="note">
-          <h3>硬件和工作区是运行闸门</h3>
-          <p>可移动存储不仅是数据入口，也是授权/运行态触发器。U 盘插入时解锁并索引，拔出时锁定、停 worker、释放推理资源，意图是把“数据在不在场”变成系统级状态。</p>
+          <h3>硬件和口令共同构成运行闸门</h3>
+          <p>可移动存储负责“数据是否在场”，口令负责“当前用户是否能打开工作区”。U 盘插入后仍要求软件解锁，拔出时锁定、停 worker、释放推理资源，意图是把物理在场和软件授权都变成系统级状态。</p>
         </div>
         <div class="note">
           <h3>检索不是单一路线</h3>
@@ -643,7 +726,7 @@
     </section>
 
     <section>
-      <h2>六、这个项目的亮点和出彩之处</h2>
+      <h2>七、这个项目的亮点和出彩之处</h2>
       <table>
         <thead>
           <tr>
@@ -679,6 +762,11 @@
             <td><code>core/workspace.py</code>、<code>core/hardware_watcher.py</code></td>
           </tr>
           <tr>
+            <td><strong>工作区密钥生命周期完整</strong></td>
+            <td>口令只用于解开随机工作区主密钥，主密钥再派生文档、metadata、索引、图谱、审计用途密钥；敏感接口未解锁直接拒绝。</td>
+            <td><code>core/workspace_crypto.py</code>、<code>core/security_context.py</code>、<code>core/secure_*_store.py</code></td>
+          </tr>
+          <tr>
             <td><strong>桌面 sidecar 工程化</strong></td>
             <td>Tauri 管随机 token、随机端口、健康检查、重启和退出清理；这比“前端假设 localhost:8000 永远存在”可靠得多。</td>
             <td><code>souldrive-ui/src-tauri/src/lib.rs</code></td>
@@ -698,7 +786,7 @@
     </section>
 
     <section>
-      <h2>七、建议你按这个顺序快速浏览代码</h2>
+      <h2>八、建议你按这个顺序快速浏览代码</h2>
       <div class="read-path">
         <div class="step">
           <div>
@@ -726,6 +814,12 @@
         </div>
         <div class="step">
           <div>
+            <strong><code>core/workspace_crypto.py</code>、<code>core/security_context.py</code>、<code>core/secure_document_store.py</code></strong>
+            <p>理解口令如何解开工作区主密钥，内存密钥如何传给文档导入、索引 worker 和加密存储。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
             <strong><code>core/indexer.py</code>、<code>core/document_parser.py</code>、<code>core/knowledge_base.py</code></strong>
             <p>这是知识文档入库主线。重点看 MD5 增量、Docling 解析、父子切片、Chroma/FTS/parent docs 写入。</p>
           </div>
@@ -746,7 +840,7 @@
     </section>
 
     <section>
-      <h2>八、关键文件速查表</h2>
+      <h2>九、关键文件速查表</h2>
       <table class="file-list">
         <thead>
           <tr>
@@ -768,8 +862,28 @@
           </tr>
           <tr>
             <td>core/workspace.py</td>
-            <td>工作区路径规范，统一 data/papers、index、audit、models、runtime；其中 data/papers 当前仍承载 PDF 知识文档。</td>
+            <td>工作区路径规范，统一 data/documents、data/papers、index、audit、models、runtime；data/documents 是当前加密导入文档库，data/papers 是旧版兼容入口。</td>
             <td>看 <code>SoulDriveWorkspace.ensure()</code> 和 <code>resolve_workspace()</code>。</td>
+          </tr>
+          <tr>
+            <td>core/workspace_crypto.py</td>
+            <td>工作区 keystore、Argon2id/PBKDF2 兼容、AES-GCM 包裹主密钥、HKDF 派生用途密钥。</td>
+            <td>看 <code>initialize_keystore()</code>、<code>unlock_keystore()</code>、<code>_workspace_keys()</code>。</td>
+          </tr>
+          <tr>
+            <td>core/security_context.py</td>
+            <td>保存当前进程内已解锁的工作区密钥，并支持把主密钥传给独立索引 worker。</td>
+            <td>看 <code>set_workspace_keys()</code>、<code>export_workspace_data_key()</code>、<code>restore_workspace_keys()</code>。</td>
+          </tr>
+          <tr>
+            <td>core/secure_document_store.py</td>
+            <td>加密导入 PDF，使用 HMAC 生成对象标识，文档内容落成 <code>.sdoc</code>，metadata 也加密。</td>
+            <td>看 <code>import_document()</code>、<code>iter_documents()</code>。</td>
+          </tr>
+          <tr>
+            <td>core/secure_vector_store.py</td>
+            <td>解锁后的加密向量/父子切片存储，用 SQLite + AES-GCM 保存 child、parent、embedding 和 metadata。</td>
+            <td>看 <code>add_chunks()</code>、<code>query()</code>、<code>keyword_search()</code>。</td>
           </tr>
           <tr>
             <td>core/hardware_watcher.py</td>
@@ -841,7 +955,7 @@
     </section>
 
     <section>
-      <h2>九、当前实现边界和需要注意的地方</h2>
+      <h2>十、当前实现边界和需要注意的地方</h2>
       <div class="two-col">
         <div class="note warning">
           <h3>本地模型是硬依赖</h3>
@@ -859,14 +973,22 @@
           <h3>开发脚本依赖本机环境变量</h3>
           <p>运行脚本时建议显式设置 <code>SOULDRIVE_PYTHON</code>，并使用名为 <code>souldrive</code> 的 Conda 环境；不要把个人机器解释器路径写入公开文档或业务代码。</p>
         </div>
+        <div class="note warning">
+          <h3>口令没有找回能力</h3>
+          <p><code>/security/init</code> 要求用户确认 no recovery；如果忘记口令，工作区主密钥无法解开，加密文档、索引和图谱也无法恢复。</p>
+        </div>
+        <div class="note warning">
+          <h3>旧版明文目录仍用于兼容</h3>
+          <p><code>data/papers/</code> 仍被索引器读取，以兼容历史 PDF；新导入路径在解锁后优先走 <code>data/documents/</code> 的加密对象存储。</p>
+        </div>
       </div>
     </section>
 
     <section>
-      <h2>十、最短理解路线</h2>
+      <h2>十一、最短理解路线</h2>
       <ol>
         <li>先把它理解成“面向私有资产的本地知识引擎”，不是联网聊天应用；论文是当前默认演示入口。</li>
-        <li>再记住三件事：<code>workspace</code> 管数据位置，<code>mcp_server</code> 管接口，<code>RAGEngine</code> 管问答。</li>
+        <li>再记住四件事：<code>workspace</code> 管数据位置，<code>workspace_crypto</code> 管口令解锁，<code>mcp_server</code> 管接口，<code>RAGEngine</code> 管问答。</li>
         <li>入库看 <code>indexer.py</code>，问答看 <code>rag_engine.py</code>，桌面启动看 <code>src-tauri/src/lib.rs</code>。</li>
         <li>项目最出彩的地方是“工程闭环”：本地模型、工作区、索引、证据、图谱、审计、桌面 sidecar 都已经有明确边界。</li>
       </ol>
