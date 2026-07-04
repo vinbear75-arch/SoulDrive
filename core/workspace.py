@@ -37,6 +37,10 @@ class SoulDriveWorkspace:
         return str(Path(self.documents_path) / "manifest.sqlite")
 
     @property
+    def learning_store_path(self):
+        return str(Path(self.root_path) / "data" / "learning.sqlite")
+
+    @property
     def index_path(self):
         return str(Path(self.root_path) / "index")
 

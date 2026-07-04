@@ -34,6 +34,72 @@ class RagPromptingTests(unittest.TestCase):
         self.assertIn("回答用户问题", prompt_text)
         self.assertIn("传统企业知识管理系统主要存在哪些问题？", prompt_text)
 
+    def test_build_answer_messages_includes_learning_context_outside_document_evidence(self):
+        messages = build_answer_messages(
+            query="以后什么时候保存记忆？",
+            vector_context="未检索到直接相关的文献片段。",
+            graph_context="",
+            learning_context={
+                "memories": [
+                    {
+                        "title": "关闭前集中审核记忆",
+                        "content": "用户希望关闭前集中审核候选记忆，不希望每轮问答后都弹窗。",
+                        "score": 0.9,
+                    }
+                ],
+                "skills": [
+                    {
+                        "title": "实现前测试",
+                        "content": "先写失败测试，再实现最小代码。",
+                        "score": 0.8,
+                    }
+                ],
+            },
+        )
+
+        system_prompt = messages[0]["content"]
+        prompt = messages[-1]["content"]
+        self.assertIn("长期记忆", system_prompt)
+        self.assertIn("不要把长期记忆或技能当作文档证据引用", system_prompt)
+        self.assertIn("【已确认长期记忆】", prompt)
+        self.assertIn("关闭前集中审核记忆", prompt)
+        self.assertIn("【已确认可复用技能】", prompt)
+        self.assertIn("实现前测试", prompt)
+        self.assertLess(prompt.index("【已确认长期记忆】"), prompt.index("【私有文献详情】"))
+        document_section = prompt.split("【私有文献详情】", 1)[1]
+        self.assertNotIn("关闭前集中审核记忆", document_section)
+
+    def test_build_answer_messages_includes_memory_capsule_and_skill_execution(self):
+        messages = build_answer_messages(
+            query="Please implement this feature with tests first",
+            vector_context="No direct document evidence.",
+            graph_context="",
+            learning_context={
+                "memory_capsule": {
+                    "text": "- Review before saving: User wants human review before long-term memory writes.",
+                    "items": [{"memory_id": "mem_pref"}],
+                },
+                "memories": [],
+                "skills": [],
+                "skill_execution": {
+                    "skill_title": "TDD workflow",
+                    "steps": [
+                        {"index": 1, "instruction": "Write a failing test"},
+                        {"index": 2, "instruction": "Implement minimal code"},
+                    ],
+                    "output_contract": "Return implementation summary and verification.",
+                    "success_criteria": ["Tests pass"],
+                },
+            },
+        )
+
+        prompt = messages[-1]["content"]
+        self.assertIn("Review before saving", prompt)
+        self.assertIn("TDD workflow", prompt)
+        self.assertIn("Write a failing test", prompt)
+        self.assertIn("Return implementation summary and verification", prompt)
+        self.assertLess(prompt.index("Review before saving"), prompt.index("No direct document evidence."))
+
     def test_generate_response_stream_retries_once_for_unsupported_citation(self):
         engine = _build_engine(
             llm=_FakeStreamingLlm(

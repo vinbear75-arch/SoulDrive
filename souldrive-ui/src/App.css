@@ -627,6 +627,47 @@ button {
   font-size: 12px;
 }
 
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.memory-action {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(178, 122, 34, 0.36);
+  border-radius: 8px;
+  background: #b27a22;
+  color: #fffdf7;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.memory-action:hover:not(:disabled) {
+  background: #945f15;
+}
+
+.memory-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.learning-review-message {
+  margin: 6px 0 0;
+  color: #1f6f61;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.learning-review-message.error {
+  color: #8b5d14;
+}
+
 .message-list {
   min-height: 0;
   overflow-y: auto;
@@ -1244,6 +1285,163 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.learning-review-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(20, 22, 19, 0.38);
+}
+
+.learning-review-dialog {
+  width: min(760px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #cfc8b7;
+  border-radius: 8px;
+  background: #fbf8ef;
+  box-shadow: 0 24px 62px rgba(45, 48, 38, 0.24);
+}
+
+.learning-review-head,
+.learning-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.learning-review-head {
+  border-bottom: 1px solid #d8d0be;
+}
+
+.learning-review-head span {
+  color: #717266;
+  font-size: 12px;
+}
+
+.learning-review-head h2 {
+  margin: 4px 0 0;
+  color: #20261f;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.learning-review-head button,
+.learning-review-actions button {
+  min-height: 32px;
+  border: 1px solid #d7cfbd;
+  border-radius: 8px;
+  background: #f7f4eb;
+  color: #30352f;
+  padding: 0 10px;
+}
+
+.learning-review-head button {
+  width: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.learning-review-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: #f6f3ea;
+}
+
+.learning-review-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d8d0be;
+  border-radius: 8px;
+  background: #fffdf7;
+}
+
+.learning-review-card.selected {
+  border-color: rgba(34, 116, 101, 0.36);
+  background: #f4faf5;
+}
+
+.learning-review-select {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: #1d3d39;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.learning-review-card input:not([type]),
+.learning-review-card textarea {
+  width: 100%;
+  border: 1px solid #d6cebd;
+  border-radius: 8px;
+  background: #fffdf7;
+  color: #232821;
+  outline: none;
+  padding: 9px 10px;
+  font-size: 13px;
+}
+
+.learning-review-card textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.learning-review-card input:not([type]):focus,
+.learning-review-card textarea:focus {
+  border-color: rgba(34, 116, 101, 0.52);
+  box-shadow: 0 0 0 3px rgba(34, 116, 101, 0.1);
+}
+
+.learning-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: #697064;
+  font-size: 11px;
+}
+
+.learning-review-meta span {
+  min-height: 23px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d7cfbd;
+  border-radius: 999px;
+  background: #f7f4eb;
+  padding: 0 8px;
+}
+
+.learning-review-card p {
+  margin: 0;
+  color: #4a4f45;
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.learning-review-actions {
+  border-top: 1px solid #d8d0be;
+}
+
+.learning-review-actions button:last-child {
+  border-color: rgba(34, 116, 101, 0.36);
+  background: #173f3b;
+  color: #fffdf7;
 }
 
 @media (max-width: 1280px) {

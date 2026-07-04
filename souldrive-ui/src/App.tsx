@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import {
   Activity,
@@ -213,6 +214,33 @@ interface ParsedMessage {
   evidence: EvidenceItem[];
 }
 
+interface ReflectionCandidate {
+  candidate_id: string;
+  asset_type: "memory" | "skill";
+  subtype: string;
+  title: string;
+  content: string;
+  evidence: string[];
+  rationale: string;
+  confidence: number;
+  selected_by_default: boolean;
+}
+
+interface ReflectionReview {
+  review_id: string;
+  status: "pending" | "completed" | "discarded";
+  candidates: ReflectionCandidate[];
+}
+
+interface ReviewDraftState {
+  review: ReflectionReview | null;
+  selectedIds: Set<string>;
+  edits: Record<string, { title: string; content: string }>;
+  mode: "idle" | "drafting" | "reviewing" | "submitting" | "done" | "error";
+  message: string;
+  closeAfterSubmit: boolean;
+}
+
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 const MINDMAP_BLOCK_PATTERN = /```souldrive-mindmap\s*([\s\S]*?)```/g;
 const EVIDENCE_BLOCK_PATTERN = /```souldrive-evidence\s*([\s\S]*?)```/g;
@@ -334,7 +362,16 @@ export default function App() {
   const [documentImportMessage, setDocumentImportMessage] = useState("");
   const [artifactTab, setArtifactTab] = useState<"evidence" | "graph" | "audit">("evidence");
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+  const [reviewState, setReviewState] = useState<ReviewDraftState>({
+    review: null,
+    selectedIds: new Set(),
+    edits: {},
+    mode: "idle",
+    message: "",
+    closeAfterSubmit: false,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const closeBypassRef = useRef(false);
 
   const parsedMessages = useMemo(
     () => messages.map((message) => ({ message, parsed: parseMessageArtifacts(message.content) })),
@@ -551,6 +588,30 @@ export default function App() {
     }
   }, [latestMindmap, latestEvidence.length]);
 
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    const setupCloseHandler = async () => {
+      try {
+        const appWindow = getCurrentWindow();
+        unlisten = await appWindow.onCloseRequested(async (event) => {
+          if (closeBypassRef.current) return;
+          if (!messages.length || locked || isGenerating) return;
+          event.preventDefault();
+          await requestReflectionDraft("close", true);
+        });
+      } catch {
+        // Browser preview mode does not expose Tauri window APIs.
+      }
+    };
+
+    void setupCloseHandler();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [messages, locked, isGenerating, apiBaseUrl, apiToken]);
+
   const toggleMindmapNode = (nodeId: string) => {
     setCollapsedNodeIds((previous) => {
       const next = new Set(previous);
@@ -575,6 +636,156 @@ export default function App() {
       if (securityResponse.ok) setSecurityStatus(await securityResponse.json());
     } catch {
       // Polling will retry shortly; keep the UI responsive after submit.
+    }
+  };
+
+  const authHeaders = (): Record<string, string> => (apiToken ? { "X-SoulDrive-Token": apiToken } : {});
+
+  const closeWindowAfterReview = (delayMs = 0) => {
+    window.setTimeout(() => {
+      closeBypassRef.current = true;
+      try {
+        void getCurrentWindow().close();
+      } catch {
+        // Browser preview mode has no native window to close.
+      }
+    }, delayMs);
+  };
+
+  const updateReviewEdit = (candidateId: string, field: "title" | "content", value: string) => {
+    setReviewState((previous) => {
+      const currentEdit = previous.edits[candidateId] || { title: "", content: "" };
+      return {
+        ...previous,
+        edits: {
+          ...previous.edits,
+          [candidateId]: {
+            ...currentEdit,
+            [field]: value,
+          },
+        },
+      };
+    });
+  };
+
+  const requestReflectionDraft = async (trigger: "manual" | "close", closeAfterSubmit = false) => {
+    if (!messages.length || locked) {
+      setReviewState((previous) => ({
+        ...previous,
+        review: null,
+        mode: "done",
+        message: locked ? "工作区未解锁，无法生成记忆候选。" : "当前会话没有可沉淀内容。",
+        closeAfterSubmit,
+      }));
+      return null;
+    }
+
+    setReviewState((previous) => ({
+      ...previous,
+      mode: "drafting",
+      message: "正在生成候选记忆...",
+      closeAfterSubmit,
+    }));
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/reflection/draft`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ trigger, messages }),
+      });
+      if (!response.ok) throw new Error("reflection draft failed");
+
+      const review = await response.json() as ReflectionReview;
+      const selectedIds = new Set(
+        review.candidates.filter((candidate) => candidate.selected_by_default).map((candidate) => candidate.candidate_id),
+      );
+      const edits = Object.fromEntries(
+        review.candidates.map((candidate) => [
+          candidate.candidate_id,
+          { title: candidate.title, content: candidate.content },
+        ]),
+      );
+
+      setReviewState({
+        review,
+        selectedIds,
+        edits,
+        mode: review.candidates.length ? "reviewing" : "done",
+        message: review.candidates.length ? "" : "本轮没有可沉淀内容。",
+        closeAfterSubmit,
+      });
+      if (!review.candidates.length && closeAfterSubmit) {
+        closeWindowAfterReview(300);
+      }
+      return review;
+    } catch {
+      setReviewState((previous) => ({
+        ...previous,
+        review: null,
+        mode: "error",
+        message: "候选记忆生成失败。",
+        closeAfterSubmit,
+      }));
+      return null;
+    }
+  };
+
+  const submitReflectionDecisions = async () => {
+    const activeReview = reviewState.review;
+    if (!activeReview) return;
+
+    setReviewState((previous) => ({
+      ...previous,
+      mode: "submitting",
+      message: "正在写入长期记忆...",
+    }));
+
+    const decisions = activeReview.candidates.map((candidate) => {
+      const accepted = reviewState.selectedIds.has(candidate.candidate_id);
+      const edit = reviewState.edits[candidate.candidate_id] || {
+        title: candidate.title,
+        content: candidate.content,
+      };
+      return accepted
+        ? {
+            candidate_id: candidate.candidate_id,
+            action: "accept",
+            edited_title: edit.title,
+            edited_content: edit.content,
+          }
+        : {
+            candidate_id: candidate.candidate_id,
+            action: "reject",
+          };
+    });
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/reflection/reviews/${activeReview.review_id}/decide`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ decisions }),
+      });
+      if (!response.ok) throw new Error("reflection decide failed");
+      setReviewState((previous) => ({
+        ...previous,
+        mode: "done",
+        message: previous.closeAfterSubmit ? "记忆已完成，将自动关闭程序。" : "记忆已完成。",
+      }));
+      if (reviewState.closeAfterSubmit) {
+        closeWindowAfterReview(900);
+      }
+    } catch {
+      setReviewState((previous) => ({
+        ...previous,
+        mode: "error",
+        message: "记忆写入失败，请重试或放弃本次记忆。",
+      }));
     }
   };
 
@@ -1047,10 +1258,27 @@ export default function App() {
                 Local Knowledge Engine
               </span>
               <h2>私有知识问答与分析</h2>
+              {reviewState.message && reviewState.mode !== "reviewing" && (
+                <p className={`learning-review-message ${reviewState.mode === "error" ? "error" : ""}`}>
+                  {reviewState.message}
+                </p>
+              )}
             </div>
-            <div className="model-badge">
-              <KeyRound size={14} />
-              {selectedChatModel}
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="memory-action"
+                disabled={locked || isGenerating || reviewState.mode === "drafting" || reviewState.mode === "submitting"}
+                onClick={() => void requestReflectionDraft("manual")}
+                title="审核并保存本轮可复用记忆"
+              >
+                <BrainCircuit size={15} />
+                记忆
+              </button>
+              <div className="model-badge">
+                <KeyRound size={14} />
+                {selectedChatModel}
+              </div>
             </div>
           </div>
 
@@ -1136,6 +1364,89 @@ export default function App() {
           </div>
         </aside>
       </section>
+
+      {reviewState.mode === "reviewing" && reviewState.review && (
+        <section className="learning-review-backdrop" role="presentation">
+          <div className="learning-review-dialog" role="dialog" aria-modal="true" aria-labelledby="learning-review-title">
+            <div className="learning-review-head">
+              <div>
+                <span>Learning Review</span>
+                <h2 id="learning-review-title">审核候选记忆</h2>
+              </div>
+              <button
+                type="button"
+                title="关闭审核"
+                onClick={() => setReviewState((previous) => ({ ...previous, mode: "idle", review: null, message: "" }))}
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="learning-review-list">
+              {reviewState.review.candidates.map((candidate) => {
+                const edit = reviewState.edits[candidate.candidate_id] || {
+                  title: candidate.title,
+                  content: candidate.content,
+                };
+                const selected = reviewState.selectedIds.has(candidate.candidate_id);
+
+                return (
+                  <article key={candidate.candidate_id} className={`learning-review-card ${selected ? "selected" : ""}`}>
+                    <label className="learning-review-select">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => {
+                          setReviewState((previous) => {
+                            const selectedIds = new Set(previous.selectedIds);
+                            if (event.target.checked) {
+                              selectedIds.add(candidate.candidate_id);
+                            } else {
+                              selectedIds.delete(candidate.candidate_id);
+                            }
+                            return { ...previous, selectedIds };
+                          });
+                        }}
+                      />
+                      <span>{candidate.asset_type.toUpperCase()} · {candidate.subtype}</span>
+                    </label>
+                    <input
+                      value={edit.title}
+                      onChange={(event) => updateReviewEdit(candidate.candidate_id, "title", event.target.value)}
+                      aria-label="候选标题"
+                    />
+                    <textarea
+                      value={edit.content}
+                      onChange={(event) => updateReviewEdit(candidate.candidate_id, "content", event.target.value)}
+                      aria-label="候选内容"
+                    />
+                    <div className="learning-review-meta">
+                      <span>{Math.round(candidate.confidence * 100)}%</span>
+                      <span>{candidate.rationale}</span>
+                    </div>
+                    {candidate.evidence.length > 0 && <p>{candidate.evidence[0]}</p>}
+                  </article>
+                );
+              })}
+            </div>
+            <div className="learning-review-actions">
+              <button
+                type="button"
+                onClick={() => setReviewState((previous) => ({ ...previous, mode: "idle", review: null, message: "" }))}
+              >
+                {reviewState.closeAfterSubmit ? "取消关闭" : "取消"}
+              </button>
+              {reviewState.closeAfterSubmit && (
+                <button type="button" onClick={() => closeWindowAfterReview()}>
+                  不记忆并关闭
+                </button>
+              )}
+              <button type="button" onClick={() => void submitReflectionDecisions()}>
+                {reviewState.closeAfterSubmit ? "确认记忆并关闭" : "确认记忆"}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

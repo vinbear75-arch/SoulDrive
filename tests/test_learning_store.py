@@ -1,0 +1,713 @@
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+
+from core.learning_store import LearningStore
+from core.workspace import SoulDriveWorkspace
+from core.workspace_crypto import initialize_keystore, unlock_keystore
+
+
+class LearningStoreTests(unittest.TestCase):
+    def _store(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        workspace = SoulDriveWorkspace.from_drive(temp_dir.name).ensure()
+        initialize_keystore(workspace, "correct horse battery staple")
+        keys = unlock_keystore(workspace, "correct horse battery staple")
+        store = LearningStore(workspace, keys)
+        self.addCleanup(store.close)
+        return workspace, store
+
+    def test_workspace_exposes_learning_store_path(self):
+        workspace, _store = self._store()
+        normalized = workspace.learning_store_path.replace("\\", "/")
+        self.assertTrue(normalized.endswith("data/learning.sqlite"))
+
+    def test_new_store_lists_no_pending_reviews_or_assets(self):
+        _workspace, store = self._store()
+        self.assertEqual(store.list_pending_reviews(), [])
+        self.assertEqual(store.list_memories(), [])
+        self.assertEqual(store.list_skills(), [])
+
+    def test_memory_payload_is_encrypted_and_readable(self):
+        workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = store._encrypt_payload(
+            {"title": "关闭前审核", "content": "保存可复用记忆"},
+            table="memories",
+            pk_name="memory_id",
+            pk_value="mem_1",
+            asset_type="memory",
+        )
+
+        self._insert_memory(store, "mem_1", candidate_id, nonce, ciphertext)
+
+        self.assertEqual(
+            store.list_memories(),
+            [
+                {
+                    "memory_id": "mem_1",
+                    "subtype": "user_preference",
+                    "status": "active",
+                    "source_candidate_id": candidate_id,
+                    "created_at": 1.0,
+                    "updated_at": 2.0,
+                    "title": "关闭前审核",
+                    "content": "保存可复用记忆",
+                }
+            ],
+        )
+        raw_database = Path(workspace.learning_store_path).read_bytes()
+        self.assertNotIn("关闭前审核".encode("utf-8"), raw_database)
+        self.assertNotIn("保存可复用记忆".encode("utf-8"), raw_database)
+
+    def test_memory_payload_is_bound_to_memory_id(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = store._encrypt_payload(
+            {"title": "源记忆", "content": "不能移植到其他行"},
+            table="memories",
+            pk_name="memory_id",
+            pk_value="mem_source",
+            asset_type="memory",
+        )
+
+        self._insert_memory(store, "mem_source", candidate_id, nonce, ciphertext)
+        self._insert_memory(store, "mem_tampered", candidate_id, nonce, ciphertext, updated_at=3.0)
+
+        with self.assertRaises(ValueError):
+            store.list_memories()
+
+    def test_memory_payload_reserved_keys_do_not_override_row_fields(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = store._encrypt_payload(
+            {
+                "memory_id": "forged",
+                "status": "archived",
+                "source_candidate_id": "cand_forged",
+                "title": "真实标题",
+            },
+            table="memories",
+            pk_name="memory_id",
+            pk_value="mem_canonical",
+            asset_type="memory",
+        )
+
+        self._insert_memory(store, "mem_canonical", candidate_id, nonce, ciphertext)
+
+        [memory] = store.list_memories()
+        self.assertEqual(memory["memory_id"], "mem_canonical")
+        self.assertEqual(memory["status"], "active")
+        self.assertEqual(memory["source_candidate_id"], candidate_id)
+        self.assertEqual(memory["title"], "真实标题")
+
+    def test_skill_payload_reserved_keys_do_not_override_row_fields(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="skill")
+        nonce, ciphertext = store._encrypt_payload(
+            {
+                "skill_id": "forged",
+                "category": "forged-category",
+                "status": "archived",
+                "version": 99,
+                "source_candidate_id": "cand_forged",
+                "title": "真实技能",
+            },
+            table="skills",
+            pk_name="skill_id",
+            pk_value="skill_canonical",
+            asset_type="skill",
+        )
+
+        self._insert_skill(store, "skill_canonical", candidate_id, nonce, ciphertext)
+
+        [skill] = store.list_skills()
+        self.assertEqual(skill["skill_id"], "skill_canonical")
+        self.assertEqual(skill["category"], "workflow")
+        self.assertEqual(skill["status"], "active")
+        self.assertEqual(skill["version"], 1)
+        self.assertEqual(skill["source_candidate_id"], candidate_id)
+        self.assertEqual(skill["title"], "真实技能")
+
+    def test_schema_rejects_orphan_candidate_and_invalid_values(self):
+        _workspace, store = self._store()
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_candidate(store, review_id="missing_review")
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_review(store, review_id="rev_negative", candidate_count=-1)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_review(store, review_id="rev_negative_accepted", accepted_count=-1)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_review(store, review_id="rev_negative_rejected", rejected_count=-1)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_review(
+                store,
+                review_id="rev_overcount",
+                candidate_count=1,
+                accepted_count=1,
+                rejected_count=1,
+            )
+
+        review_id = self._insert_review(store)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_candidate(store, review_id=review_id, confidence=1.5)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_candidate(store, review_id=review_id, status="queued")
+
+        candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = store._encrypt_payload(
+            {"title": "状态约束", "content": "非法状态不应写入"},
+            table="memories",
+            pk_name="memory_id",
+            pk_value="mem_bad_status",
+            asset_type="memory",
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_memory(store, "mem_bad_status", candidate_id, nonce, ciphertext, status="pending")
+
+    def test_candidate_payload_is_bound_to_asset_type(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="memory")
+
+        store.conn.execute(
+            "UPDATE reflection_candidates SET asset_type = 'skill' WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+        row = store.conn.execute(
+            "SELECT * FROM reflection_candidates WHERE candidate_id = ?",
+            (candidate_id,),
+        ).fetchone()
+
+        with self.assertRaises(ValueError):
+            self._candidate_payload_from_row(store, row)
+
+    def test_memory_requires_accepted_memory_candidate(self):
+        _workspace, store = self._store()
+        skill_candidate_id = self._seed_candidate(store, asset_type="skill")
+        nonce, ciphertext = self._memory_payload(store, "mem_from_skill")
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_memory(store, "mem_from_skill", skill_candidate_id, nonce, ciphertext)
+
+        pending_candidate_id = self._seed_candidate(store, asset_type="memory", status="pending")
+        nonce, ciphertext = self._memory_payload(store, "mem_from_pending")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_memory(store, "mem_from_pending", pending_candidate_id, nonce, ciphertext)
+
+        rejected_candidate_id = self._seed_candidate(store, asset_type="memory", status="rejected")
+        nonce, ciphertext = self._memory_payload(store, "mem_from_rejected")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_memory(store, "mem_from_rejected", rejected_candidate_id, nonce, ciphertext)
+
+    def test_learning_chunk_requires_active_matching_asset(self):
+        _workspace, store = self._store()
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_learning_chunk(store, "chunk_orphan", "missing_memory", "memory")
+
+        memory_candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = self._memory_payload(store, "mem_chunk_source")
+        self._insert_memory(store, "mem_chunk_source", memory_candidate_id, nonce, ciphertext)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self._insert_learning_chunk(store, "chunk_wrong_type", "mem_chunk_source", "skill")
+
+        self._insert_learning_chunk(store, "chunk_memory", "mem_chunk_source", "memory")
+
+    def test_skill_payload_is_bound_to_skill_id(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="skill")
+        nonce, ciphertext = store._encrypt_payload(
+            {"title": "source skill", "content": "cannot move"},
+            table="skills",
+            pk_name="skill_id",
+            pk_value="skill_source",
+            asset_type="skill",
+        )
+
+        self._insert_skill(store, "skill_source", candidate_id, nonce, ciphertext)
+        self._insert_skill(store, "skill_tampered", candidate_id, nonce, ciphertext, updated_at=3.0)
+
+        with self.assertRaises(ValueError):
+            store.list_skills()
+
+    def test_referenced_memory_candidate_cannot_be_made_unaccepted(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = self._memory_payload(store, "mem_candidate_guard")
+        self._insert_memory(store, "mem_candidate_guard", candidate_id, nonce, ciphertext)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute(
+                "UPDATE reflection_candidates SET status = 'rejected' WHERE candidate_id = ?",
+                (candidate_id,),
+            )
+
+    def test_referenced_skill_candidate_cannot_change_type_or_status(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="skill")
+        nonce, ciphertext = self._skill_payload(store, "skill_candidate_guard")
+        self._insert_skill(store, "skill_candidate_guard", candidate_id, nonce, ciphertext)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute(
+                "UPDATE reflection_candidates SET asset_type = 'memory' WHERE candidate_id = ?",
+                (candidate_id,),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute(
+                "UPDATE reflection_candidates SET status = 'rejected' WHERE candidate_id = ?",
+                (candidate_id,),
+            )
+
+    def test_active_chunks_prevent_asset_archive_or_delete(self):
+        _workspace, store = self._store()
+        memory_candidate_id = self._seed_candidate(store, asset_type="memory")
+        nonce, ciphertext = self._memory_payload(store, "mem_with_chunk")
+        self._insert_memory(store, "mem_with_chunk", memory_candidate_id, nonce, ciphertext)
+        self._insert_learning_chunk(store, "chunk_for_memory", "mem_with_chunk", "memory")
+
+        skill_candidate_id = self._seed_candidate(store, asset_type="skill")
+        nonce, ciphertext = self._skill_payload(store, "skill_with_chunk")
+        self._insert_skill(store, "skill_with_chunk", skill_candidate_id, nonce, ciphertext)
+        self._insert_learning_chunk(store, "chunk_for_skill", "skill_with_chunk", "skill")
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute("UPDATE memories SET status = 'archived' WHERE memory_id = 'mem_with_chunk'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute("DELETE FROM memories WHERE memory_id = 'mem_with_chunk'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute("UPDATE skills SET status = 'archived' WHERE skill_id = 'skill_with_chunk'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.conn.execute("DELETE FROM skills WHERE skill_id = 'skill_with_chunk'")
+
+    def test_candidate_changes_maintain_review_counts(self):
+        _workspace, store = self._store()
+        review_id = self._insert_review(store, review_id="rev_counts")
+
+        self._insert_candidate(store, candidate_id="cand_pending", review_id=review_id, status="pending")
+        self.assertEqual(self._review_counts(store, review_id), (1, 0, 0))
+
+        self._insert_candidate(store, candidate_id="cand_accepted", review_id=review_id, status="accepted")
+        self.assertEqual(self._review_counts(store, review_id), (2, 1, 0))
+
+        self._insert_candidate(store, candidate_id="cand_rejected", review_id=review_id, status="rejected")
+        self.assertEqual(self._review_counts(store, review_id), (3, 1, 1))
+
+        store.conn.execute("UPDATE reflection_candidates SET status = 'accepted' WHERE candidate_id = 'cand_pending'")
+        self.assertEqual(self._review_counts(store, review_id), (3, 2, 1))
+
+        store.conn.execute("UPDATE reflection_candidates SET status = 'rejected' WHERE candidate_id = 'cand_accepted'")
+        self.assertEqual(self._review_counts(store, review_id), (3, 1, 2))
+
+        store.conn.execute("DELETE FROM reflection_candidates WHERE candidate_id = 'cand_rejected'")
+        self.assertEqual(self._review_counts(store, review_id), (2, 1, 1))
+
+    def test_create_review_persists_pending_candidates(self):
+        _workspace, store = self._store()
+
+        review = store.create_review(
+            trigger="manual",
+            candidates=[
+                {
+                    "asset_type": "memory",
+                    "subtype": "user_preference",
+                    "title": "关闭前集中审核记忆",
+                    "content": "用户希望在关闭程序前集中审核候选记忆。",
+                    "evidence": ["用户明确说明不要每轮弹窗。"],
+                    "rationale": "这是长期交互偏好。",
+                    "confidence": 0.91,
+                    "selected_by_default": True,
+                    "source_message_indexes": [0],
+                    "tags": ["preference"],
+                },
+                {
+                    "asset_type": "skill",
+                    "subtype": "sop",
+                    "title": "TDD 流程",
+                    "content": "先写失败测试，再写最小实现。",
+                    "evidence": ["用户要求先写测试。"],
+                    "rationale": "可复用流程。",
+                    "confidence": 0.83,
+                    "selected_by_default": False,
+                    "source_message_indexes": [1],
+                    "tags": ["workflow"],
+                },
+            ],
+        )
+
+        self.assertEqual(review["status"], "pending")
+        self.assertEqual(len(review["candidates"]), 2)
+        self.assertEqual(self._review_counts(store, review["review_id"]), (2, 0, 0))
+        pending = store.list_pending_reviews()
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["candidate_count"], 2)
+        self.assertEqual(pending[0]["accepted_count"], 0)
+        self.assertEqual(pending[0]["rejected_count"], 0)
+
+    def test_accepting_memory_candidate_creates_memory_and_chunk(self):
+        _workspace, store = self._store()
+        review = store.create_review(
+            trigger="manual",
+            candidates=[
+                {
+                    "asset_type": "memory",
+                    "subtype": "user_preference",
+                    "title": "关闭前集中审核记忆",
+                    "content": "用户希望在关闭程序前集中审核候选记忆。",
+                    "evidence": ["用户明确说明不要每轮弹窗。"],
+                    "rationale": "这是长期交互偏好。",
+                    "confidence": 0.91,
+                    "selected_by_default": True,
+                    "source_message_indexes": [0],
+                    "tags": ["preference"],
+                }
+            ],
+        )
+        candidate_id = review["candidates"][0]["candidate_id"]
+
+        result = store.decide_review(
+            review["review_id"],
+            [
+                {
+                    "candidate_id": candidate_id,
+                    "action": "accept",
+                    "edited_title": "关闭前集中审核记忆",
+                    "edited_content": "关闭前集中审核候选记忆。",
+                }
+            ],
+        )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(store.list_pending_reviews(), [])
+        self.assertEqual(self._review_counts(store, review["review_id"]), (1, 1, 0))
+        memories = store.list_memories()
+        self.assertEqual(len(memories), 1)
+        self.assertEqual(memories[0]["title"], "关闭前集中审核记忆")
+        self.assertEqual(memories[0]["content"], "关闭前集中审核候选记忆。")
+        chunk = store.conn.execute(
+            "SELECT asset_id, asset_type, subtype, status FROM learning_chunks WHERE asset_id = ?",
+            (memories[0]["memory_id"],),
+        ).fetchone()
+        self.assertEqual(chunk["asset_type"], "memory")
+        self.assertEqual(chunk["subtype"], "user_preference")
+        self.assertEqual(chunk["status"], "active")
+
+    def test_rejecting_skill_candidate_does_not_create_skill(self):
+        _workspace, store = self._store()
+        review = store.create_review(
+            trigger="manual",
+            candidates=[
+                {
+                    "asset_type": "skill",
+                    "subtype": "sop",
+                    "title": "TDD 流程",
+                    "content": "先写失败测试，再写最小实现。",
+                    "evidence": ["用户要求先写测试。"],
+                    "rationale": "可复用流程。",
+                    "confidence": 0.83,
+                    "selected_by_default": False,
+                    "source_message_indexes": [1],
+                    "tags": ["workflow"],
+                }
+            ],
+        )
+        candidate_id = review["candidates"][0]["candidate_id"]
+
+        result = store.decide_review(
+            review["review_id"],
+            [{"candidate_id": candidate_id, "action": "reject"}],
+        )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(store.list_skills(), [])
+        self.assertEqual(self._review_counts(store, review["review_id"]), (1, 0, 1))
+
+    def test_accepting_skill_candidate_creates_structured_skill(self):
+        _workspace, store = self._store()
+        review = store.create_review(
+            trigger="manual",
+            candidates=[
+                {
+                    "asset_type": "skill",
+                    "subtype": "sop",
+                    "title": "TDD workflow",
+                    "content": "1. Write a failing test\n2. Implement minimal code\n3. Run verification",
+                    "evidence": ["Use tests first when implementing features."],
+                    "rationale": "Reusable implementation workflow.",
+                    "confidence": 0.86,
+                    "selected_by_default": True,
+                    "source_message_indexes": [1],
+                    "tags": ["tdd"],
+                }
+            ],
+        )
+        candidate_id = review["candidates"][0]["candidate_id"]
+
+        store.decide_review(review["review_id"], [{"candidate_id": candidate_id, "action": "accept"}])
+
+        [skill] = store.list_skills()
+        self.assertEqual(skill["title"], "TDD workflow")
+        self.assertEqual(skill["intent"], "TDD workflow")
+        self.assertGreaterEqual(len(skill["steps"]), 3)
+        self.assertEqual(skill["tool_permissions"], [])
+        self.assertTrue(skill["output_contract"])
+
+        search = store.search("implement feature tests first", top_k_memory=0, top_k_skill=2)
+        self.assertEqual(search["skills"][0]["title"], "TDD workflow")
+        self.assertTrue(search["skills"][0]["steps"])
+
+    def test_record_skill_run_persists_encrypted_guided_plan(self):
+        workspace, store = self._store()
+        review = store.create_review(
+            trigger="manual",
+            candidates=[
+                {
+                    "asset_type": "skill",
+                    "subtype": "sop",
+                    "title": "TDD workflow",
+                    "content": "Write a failing test. Implement minimal code. Run verification.",
+                    "evidence": ["Use tests first when implementing features."],
+                    "rationale": "Reusable implementation workflow.",
+                    "confidence": 0.86,
+                    "selected_by_default": True,
+                    "source_message_indexes": [1],
+                    "tags": ["tdd"],
+                }
+            ],
+        )
+        candidate_id = review["candidates"][0]["candidate_id"]
+        store.decide_review(review["review_id"], [{"candidate_id": candidate_id, "action": "accept"}])
+        [skill] = store.list_skills()
+
+        run = store.record_skill_run(
+            skill["skill_id"],
+            query="Implement learning validator",
+            plan={"steps": [{"index": 1, "instruction": "Write a failing test"}]},
+            matched_score=0.82,
+        )
+
+        self.assertEqual(run["status"], "planned")
+        [stored_run] = store.list_skill_runs()
+        self.assertEqual(stored_run["run_id"], run["run_id"])
+        self.assertEqual(stored_run["skill_id"], skill["skill_id"])
+        self.assertEqual(stored_run["query"], "Implement learning validator")
+        raw_database = Path(workspace.learning_store_path).read_bytes()
+        self.assertNotIn(b"Implement learning validator", raw_database)
+
+    def test_search_recalls_memory_and_skill(self):
+        _workspace, store = self._store()
+        review = store.create_review(
+            trigger="manual",
+            candidates=[
+                {
+                    "asset_type": "memory",
+                    "subtype": "user_preference",
+                    "title": "关闭前集中审核记忆",
+                    "content": "用户希望在关闭程序前集中审核候选记忆。",
+                    "evidence": ["用户明确说明不要每轮弹窗。"],
+                    "rationale": "这是长期交互偏好。",
+                    "confidence": 0.91,
+                    "selected_by_default": True,
+                    "source_message_indexes": [0],
+                    "tags": ["preference"],
+                },
+                {
+                    "asset_type": "skill",
+                    "subtype": "sop",
+                    "title": "TDD 流程",
+                    "content": "先写失败测试，再写最小实现。",
+                    "evidence": ["用户要求先写测试。"],
+                    "rationale": "可复用流程。",
+                    "confidence": 0.83,
+                    "selected_by_default": False,
+                    "source_message_indexes": [1],
+                    "tags": ["workflow"],
+                },
+            ],
+        )
+        decisions = [
+            {"candidate_id": review["candidates"][0]["candidate_id"], "action": "accept"},
+            {"candidate_id": review["candidates"][1]["candidate_id"], "action": "accept"},
+        ]
+        store.decide_review(review["review_id"], decisions)
+
+        result = store.search("关闭前应该怎么做测试", top_k_memory=3, top_k_skill=3)
+        self.assertEqual(len(result["memories"]), 1)
+        self.assertEqual(len(result["skills"]), 1)
+        self.assertEqual(result["memories"][0]["title"], "关闭前集中审核记忆")
+        self.assertEqual(result["memories"][0]["subtype"], "user_preference")
+        self.assertEqual(result["skills"][0]["title"], "TDD 流程")
+        self.assertEqual(result["skills"][0]["subtype"], "sop")
+
+    def _seed_candidate(self, store, *, asset_type: str, status="accepted"):
+        review_id = self._insert_review(store, review_id=f"rev_{asset_type}_{status}")
+        candidate_id = f"cand_{asset_type}_{status}"
+        self._insert_candidate(
+            store,
+            candidate_id=candidate_id,
+            review_id=review_id,
+            asset_type=asset_type,
+            status=status,
+        )
+        return candidate_id
+
+    def _insert_review(
+        self,
+        store,
+        *,
+        review_id="rev_1",
+        status="pending",
+        candidate_count=0,
+        accepted_count=0,
+        rejected_count=0,
+    ):
+        store.conn.execute(
+            """
+            INSERT INTO reflection_reviews (
+                review_id, trigger, status, created_at, updated_at,
+                candidate_count, accepted_count, rejected_count
+            )
+            VALUES (?, 'manual', ?, 1.0, 2.0, ?, ?, ?)
+            """,
+            (review_id, status, candidate_count, accepted_count, rejected_count),
+        )
+        store.conn.commit()
+        return review_id
+
+    def _insert_candidate(
+        self,
+        store,
+        *,
+        candidate_id="cand_1",
+        review_id="rev_1",
+        asset_type="memory",
+        status="accepted",
+        confidence=0.75,
+        selected_by_default=1,
+    ):
+        nonce, ciphertext = store._encrypt_payload(
+            {"title": "候选", "content": "候选内容"},
+            table="reflection_candidates",
+            pk_name="candidate_id",
+            pk_value=candidate_id,
+            asset_type=asset_type,
+        )
+        store.conn.execute(
+            """
+            INSERT INTO reflection_candidates (
+                candidate_id, review_id, asset_type, subtype, status,
+                confidence, selected_by_default, duplicate_of,
+                source_message_indexes, created_at, updated_at,
+                payload_nonce, payload_ciphertext
+            )
+            VALUES (?, ?, ?, 'user_preference', ?, ?, ?, NULL, '[]', 1.0, 2.0, ?, ?)
+            """,
+            (candidate_id, review_id, asset_type, status, confidence, selected_by_default, nonce, ciphertext),
+        )
+        store.conn.commit()
+        return candidate_id
+
+    def _insert_memory(
+        self,
+        store,
+        memory_id,
+        candidate_id,
+        nonce,
+        ciphertext,
+        *,
+        status="active",
+        updated_at=2.0,
+    ):
+        store.conn.execute(
+            """
+            INSERT INTO memories (
+                memory_id, subtype, status, source_candidate_id,
+                created_at, updated_at, payload_nonce, payload_ciphertext
+            )
+            VALUES (?, 'user_preference', ?, ?, 1.0, ?, ?, ?)
+            """,
+            (memory_id, status, candidate_id, updated_at, nonce, ciphertext),
+        )
+        store.conn.commit()
+
+    def _insert_skill(self, store, skill_id, candidate_id, nonce, ciphertext, *, updated_at=2.0):
+        store.conn.execute(
+            """
+            INSERT INTO skills (
+                skill_id, category, status, version, source_candidate_id,
+                created_at, updated_at, payload_nonce, payload_ciphertext
+            )
+            VALUES (?, 'workflow', 'active', 1, ?, 1.0, ?, ?, ?)
+            """,
+            (skill_id, candidate_id, updated_at, nonce, ciphertext),
+        )
+        store.conn.commit()
+
+    def _candidate_payload_from_row(self, store, row):
+        return store._decrypt_payload(
+            row["payload_nonce"],
+            row["payload_ciphertext"],
+            table="reflection_candidates",
+            pk_name="candidate_id",
+            pk_value=row["candidate_id"],
+            asset_type=row["asset_type"],
+        )
+
+    def _memory_payload(self, store, memory_id):
+        return store._encrypt_payload(
+            {"title": memory_id, "content": "memory content"},
+            table="memories",
+            pk_name="memory_id",
+            pk_value=memory_id,
+            asset_type="memory",
+        )
+
+    def _skill_payload(self, store, skill_id):
+        return store._encrypt_payload(
+            {"title": skill_id, "content": "skill content"},
+            table="skills",
+            pk_name="skill_id",
+            pk_value=skill_id,
+            asset_type="skill",
+        )
+
+    def _insert_learning_chunk(self, store, chunk_id, asset_id, asset_type):
+        nonce, ciphertext = store._encrypt_payload(
+            {"text": "learning chunk"},
+            table="learning_chunks",
+            pk_name="chunk_id",
+            pk_value=chunk_id,
+            asset_type=asset_type,
+        )
+        store.conn.execute(
+            """
+            INSERT INTO learning_chunks (
+                chunk_id, asset_id, asset_type, subtype, status,
+                text_digest, embedding_json, created_at, updated_at,
+                payload_nonce, payload_ciphertext
+            )
+            VALUES (?, ?, ?, 'user_preference', 'active', 'digest', NULL, 1.0, 2.0, ?, ?)
+            """,
+            (chunk_id, asset_id, asset_type, nonce, ciphertext),
+        )
+        store.conn.commit()
+
+    def _review_counts(self, store, review_id):
+        row = store.conn.execute(
+            """
+            SELECT candidate_count, accepted_count, rejected_count
+            FROM reflection_reviews
+            WHERE review_id = ?
+            """,
+            (review_id,),
+        ).fetchone()
+        return (row["candidate_count"], row["accepted_count"], row["rejected_count"])
+
+
+if __name__ == "__main__":
+    unittest.main()
