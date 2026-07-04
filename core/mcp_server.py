@@ -27,6 +27,9 @@ from core.enterprise_security import (
     max_body_bytes,
     rate_limit_per_minute,
 )
+from core.learning_store import LearningStore
+from core.learning_validator import validate_learning_candidates
+from core.memory_runtime import build_memory_capsule
 from core.observability import runtime_metrics
 from core.paper_importer import import_paper_into_workspace
 from core.paths import app_root
@@ -48,6 +51,8 @@ from core.security_context import (
 )
 from core.secure_document_store import SecureDocumentStore
 from core.secure_vector_store import SecureVectorStore
+from core.reflection import build_reflection_candidates, build_reflection_prompt, parse_reflection_response
+from core.skill_runtime import create_skill_execution_plan, match_skills
 from core.tool_registry import build_default_tool_registry
 from core.workspace import SoulDriveWorkspace, is_souldrive_workspace, resolve_workspace
 from core.workspace_crypto import (
@@ -343,6 +348,14 @@ def _workspace_from_state(state: dict | None = None):
     return None
 
 
+def current_learning_store() -> LearningStore:
+    workspace = current_workspace()
+    keys = get_workspace_keys(workspace.root_path)
+    if keys is None:
+        raise RuntimeError("workspace keys are not available")
+    return LearningStore(workspace, keys)
+
+
 def require_software_unlock():
     state = effective_runtime_state()
     if state.get("locked") or not state.get("software_unlocked"):
@@ -365,6 +378,45 @@ def require_software_unlock():
 class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=6000)
     top_k: int = Field(default=DEFAULT_RAG_TOP_K, ge=1, le=20)
+
+
+class ReflectionMessage(BaseModel):
+    role: str = Field(max_length=16)
+    content: str = Field(max_length=12000)
+
+
+class ReflectionDraftRequest(BaseModel):
+    trigger: str = Field(pattern="^(manual|close)$")
+    messages: list[ReflectionMessage] = Field(default_factory=list, max_length=200)
+
+
+class ReflectionDecision(BaseModel):
+    candidate_id: str = Field(max_length=128)
+    action: str = Field(pattern="^(accept|reject)$")
+    edited_title: str | None = Field(default=None, max_length=240)
+    edited_content: str | None = Field(default=None, max_length=4000)
+
+
+class ReflectionDecideRequest(BaseModel):
+    decisions: list[ReflectionDecision] = Field(default_factory=list, max_length=100)
+
+
+class LearningSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=6000)
+    top_k_memory: int = Field(default=3, ge=0, le=10)
+    top_k_skill: int = Field(default=2, ge=0, le=10)
+
+
+class SkillMatchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=6000)
+    top_k: int = Field(default=3, ge=1, le=10)
+
+
+class SkillRunRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=6000)
+    matched_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    inputs: dict = Field(default_factory=dict)
+
 
 class RuntimeRequest(BaseModel):
     reason: str = Field(default="manual runtime update", max_length=200)
@@ -420,7 +472,13 @@ async def chat_stream(request: ChatRequest):
 
         try:
             ensure_runtime_loaded()
-            for chunk in rag.generate_response_stream(query=request.query, top_k=clamp_chat_top_k(request.top_k), trace_id=trace_id):
+            learning_context = _learning_context_for_query(request.query)
+            for chunk in rag.generate_response_stream(
+                query=request.query,
+                top_k=clamp_chat_top_k(request.top_k),
+                trace_id=trace_id,
+                learning_context=learning_context,
+            ):
                 # 采用标准文本流输出，适配主流前端打字机组件
                 yield chunk
         except Exception as exc:
@@ -720,6 +778,286 @@ def _import_documents(request: PaperImportRequest):
         "imported_count": sum(1 for item in items if item["status"] == "imported"),
         "items": items,
         "workspace": "SoulDrive workspace mounted",
+    }
+
+
+def _generate_reflection_candidates(messages: list[dict[str, str]]) -> list[dict]:
+    prompt = build_reflection_prompt(messages)
+    try:
+        ensure_runtime_loaded()
+        raw = rag._generate_answer_text(prompt)
+        parsed = parse_reflection_response(raw, messages)
+        if parsed:
+            return parsed
+    except Exception as exc:
+        runtime_metrics.record_error(f"reflection generation fallback: {exc}")
+    return build_reflection_candidates(messages)
+
+
+def _learning_context_for_query(query: str) -> dict:
+    try:
+        store = current_learning_store()
+        try:
+            memories = store.list_memories()
+            result = store.search(query, top_k_memory=3, top_k_skill=5)
+            capsule = build_memory_capsule(memories)
+            skill_matches = match_skills(query, result["skills"], top_k=2)
+            skill_execution = None
+            if skill_matches:
+                best_match = skill_matches[0]
+                skill_execution = create_skill_execution_plan(
+                    best_match["skill"],
+                    query,
+                    matched_score=best_match["score"],
+                )
+                run = store.record_skill_run(
+                    skill_execution["skill_id"],
+                    query=query,
+                    plan=skill_execution,
+                    matched_score=best_match["score"],
+                )
+                skill_execution["run_id"] = run["run_id"]
+            result = {
+                **result,
+                "skills": result["skills"][:2],
+                "memory_capsule": capsule,
+                "skill_matches": skill_matches,
+                "skill_execution": skill_execution,
+            }
+        finally:
+            store.close()
+        if result["memories"] or result["skills"] or result["memory_capsule"]["items"]:
+            current_audit_logger().append_event(
+                "learning.injected_into_rag",
+                {
+                    "query_chars": len(query),
+                    "memory_count": len(result["memories"]),
+                    "skill_count": len(result["skills"]),
+                    "memory_capsule_count": len(result["memory_capsule"]["items"]),
+                    "skill_execution": bool(result["skill_execution"]),
+                },
+            )
+        return result
+    except Exception as exc:
+        runtime_metrics.record_error(f"learning context unavailable: {exc}")
+        return {
+            "memories": [],
+            "skills": [],
+            "memory_capsule": {"items": [], "text": ""},
+            "skill_matches": [],
+            "skill_execution": None,
+        }
+
+
+@app.post("/reflection/draft")
+async def reflection_draft(request: ReflectionDraftRequest):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    messages = [message.model_dump() for message in request.messages]
+    if not messages:
+        return JSONResponse({"error": "messages are required for reflection draft"}, status_code=400)
+
+    store = current_learning_store()
+    try:
+        raw_candidates = _generate_reflection_candidates(messages)
+        existing_assets = {
+            "memories": store.list_memories(),
+            "skills": store.list_skills(),
+        }
+        candidates = validate_learning_candidates(raw_candidates, messages, existing_assets=existing_assets)
+        review = store.create_review(request.trigger, candidates)
+        current_audit_logger().append_event(
+            "reflection.draft_created",
+            {
+                "trigger": request.trigger,
+                "candidate_count": len(candidates),
+            },
+        )
+        return review
+    finally:
+        store.close()
+
+
+@app.get("/reflection/reviews/pending")
+async def reflection_pending_reviews():
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        return {"reviews": store.list_pending_reviews()}
+    finally:
+        store.close()
+
+
+@app.post("/reflection/reviews/{review_id}/decide")
+async def reflection_decide(review_id: str, request: ReflectionDecideRequest):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        result = store.decide_review(review_id, [decision.model_dump(exclude_none=True) for decision in request.decisions])
+        current_audit_logger().append_event(
+            "reflection.review_completed",
+            {
+                "review_id": review_id,
+                "accepted_count": result["accepted_count"],
+                "rejected_count": result["rejected_count"],
+            },
+        )
+        return result
+    finally:
+        store.close()
+
+
+@app.get("/learning/memories")
+async def learning_memories():
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        return {"memories": store.list_memories()}
+    finally:
+        store.close()
+
+
+@app.get("/learning/skills")
+async def learning_skills():
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        return {"skills": store.list_skills()}
+    finally:
+        store.close()
+
+
+@app.post("/learning/skills/match")
+async def learning_skill_match(request: SkillMatchRequest):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        result = store.search(request.query, top_k_memory=0, top_k_skill=max(request.top_k, 5))
+        matches = match_skills(request.query, result["skills"], top_k=request.top_k)
+        current_audit_logger().append_event(
+            "learning.skill_match_performed",
+            {
+                "query_chars": len(request.query),
+                "match_count": len(matches),
+            },
+        )
+        return {"matches": [_public_skill_match(match) for match in matches]}
+    finally:
+        store.close()
+
+
+@app.get("/learning/skills/runs")
+async def learning_skill_runs():
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        return {"runs": store.list_skill_runs()}
+    finally:
+        store.close()
+
+
+@app.post("/learning/skills/{skill_id}/runs")
+async def learning_skill_run(skill_id: str, request: SkillRunRequest):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        skills = [skill for skill in store.list_skills() if skill["skill_id"] == skill_id]
+        if not skills:
+            return JSONResponse({"error": "unknown active skill"}, status_code=404)
+        plan = create_skill_execution_plan(
+            skills[0],
+            request.query,
+            matched_score=request.matched_score,
+            inputs=request.inputs,
+        )
+        run = store.record_skill_run(
+            skill_id,
+            query=request.query,
+            plan=plan,
+            matched_score=request.matched_score,
+            inputs=request.inputs,
+        )
+        current_audit_logger().append_event(
+            "learning.skill_run_planned",
+            {
+                "skill_id": skill_id,
+                "query_chars": len(request.query),
+            },
+        )
+        return {"run_id": run["run_id"], "plan": plan, "status": run["status"]}
+    finally:
+        store.close()
+
+
+@app.post("/learning/search")
+async def learning_search(request: LearningSearchRequest):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    store = current_learning_store()
+    try:
+        result = store.search(request.query, request.top_k_memory, request.top_k_skill)
+        current_audit_logger().append_event(
+            "learning.search_performed",
+            {
+                "query_chars": len(request.query),
+                "memory_count": len(result["memories"]),
+                "skill_count": len(result["skills"]),
+            },
+        )
+        return result
+    finally:
+        store.close()
+
+
+def _public_skill_match(match: dict) -> dict:
+    return {
+        "skill_id": match.get("skill_id") or "",
+        "title": match.get("title") or "",
+        "score": match.get("score") or 0,
+        "reason": match.get("reason") or "",
     }
 
 

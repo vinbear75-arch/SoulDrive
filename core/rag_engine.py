@@ -93,7 +93,13 @@ class RAGEngine:
         except Exception:
             pass
 
-    def generate_response_stream(self, query: str, top_k: int = DEFAULT_RAG_TOP_K, trace_id: str | None = None):
+    def generate_response_stream(
+        self,
+        query: str,
+        top_k: int = DEFAULT_RAG_TOP_K,
+        trace_id: str | None = None,
+        learning_context: dict | None = None,
+    ):
         trace_id = trace_id or str(uuid.uuid4())
         started_at = time.time()
 
@@ -141,7 +147,7 @@ class RAGEngine:
 
         vector_context = build_vector_context(vector_docs, vector_metas, evidence)
         graph_context_text = build_graph_context(graph_context)
-        messages = build_answer_messages(query, vector_context, graph_context_text)
+        messages = build_answer_messages(query, vector_context, graph_context_text, learning_context=learning_context)
 
         generated_text = None
         validation_report = None
@@ -319,7 +325,12 @@ def evidence_fallback_answer(query: str, evidence: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def build_answer_messages(query: str, vector_context: str, graph_context: str) -> list[dict[str, str]]:
+def build_answer_messages(
+    query: str,
+    vector_context: str,
+    graph_context: str,
+    learning_context: dict | None = None,
+) -> list[dict[str, str]]:
     system_prompt = (
         "你是 SoulDrive 的本地知识问答助手。"
         "你只能依据给定的 <context> 回答，不允许使用未在证据中出现的事实。"
@@ -330,9 +341,18 @@ def build_answer_messages(query: str, vector_context: str, graph_context: str) -
         "如果证据只支持问题的一部分，也必须诚实说明范围限制。"
         "技术名词如 Transformer、Attention、BERT、RoBERTa 保持英文原名。"
     )
+    system_prompt += (
+        "如果提供了【已确认长期记忆】或【已确认可复用技能】，它们只能作为用户偏好、项目状态或工作方法参考。"
+        "当前用户指令优先于长期记忆和技能。"
+        "文档证据优先于长期记忆中的事实性内容。"
+        "不要把长期记忆或技能当作文档证据引用。"
+    )
+    learning_context_text = build_learning_context(learning_context)
     user_prompt = (
         "<context>\n"
+        f"{learning_context_text}\n"
         f"{graph_context}\n"
+        "【私有文献详情】\n"
         "【私有文献详情】\n"
         f"{vector_context}\n"
         "</context>\n\n"
@@ -342,6 +362,51 @@ def build_answer_messages(query: str, vector_context: str, graph_context: str) -
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+
+
+def build_learning_context(learning_context: dict | None) -> str:
+    if not learning_context:
+        return ""
+    lines = []
+    memory_capsule = learning_context.get("memory_capsule") or {}
+    capsule_text = str(memory_capsule.get("text") or "").strip()
+    if capsule_text:
+        lines.append("【常驻记忆胶囊】")
+        for line in capsule_text.splitlines()[:6]:
+            cleaned = compact_context_text(line, 260)
+            if cleaned:
+                lines.append(cleaned)
+    memories = learning_context.get("memories") or []
+    skills = learning_context.get("skills") or []
+    if memories:
+        lines.append("【已确认长期记忆】")
+        for item in memories[:3]:
+            title = compact_context_text(str(item.get("title") or "记忆"), 80)
+            content = compact_context_text(str(item.get("content") or ""), 220)
+            lines.append(f"- {title}: {content}")
+    if skills:
+        lines.append("【已确认可复用技能】")
+        for item in skills[:2]:
+            title = compact_context_text(str(item.get("title") or "技能"), 80)
+            content = compact_context_text(str(item.get("content") or ""), 220)
+            lines.append(f"- {title}: {content}")
+    skill_execution = learning_context.get("skill_execution")
+    if skill_execution:
+        lines.append("【已匹配技能执行计划】")
+        skill_title = compact_context_text(str(skill_execution.get("skill_title") or "skill"), 80)
+        lines.append(f"- Skill: {skill_title}")
+        for step in (skill_execution.get("steps") or [])[:6]:
+            instruction = compact_context_text(str(step.get("instruction") or ""), 220)
+            if instruction:
+                lines.append(f"  {step.get('index', '-')}. {instruction}")
+        output_contract = compact_context_text(str(skill_execution.get("output_contract") or ""), 220)
+        if output_contract:
+            lines.append(f"- Output contract: {output_contract}")
+        success_criteria = skill_execution.get("success_criteria") or []
+        if success_criteria:
+            criteria = "; ".join(compact_context_text(str(item), 120) for item in success_criteria[:3])
+            lines.append(f"- Success criteria: {criteria}")
+    return "\n".join(lines)
 
 
 def fallback_intro(query: str) -> str:
