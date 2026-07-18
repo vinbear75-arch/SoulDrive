@@ -14,8 +14,8 @@ class PackageSidecarTests(unittest.TestCase):
         script_path = Path(__file__).resolve().parents[1] / "scripts" / "package-sidecar.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("--copy-metadata docling", content)
-        self.assertIn("--copy-metadata docling_slim", content)
+        self.assertIn('"--copy-metadata", "docling"', content)
+        self.assertIn('"--copy-metadata", "docling_slim"', content)
 
 
 if __name__ == "__main__":

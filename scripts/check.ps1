@@ -4,20 +4,44 @@ $env:PYTHONIOENCODING = "utf-8"
 chcp 65001 | Out-Null
 
 $Root = Split-Path -Parent $PSScriptRoot
-$Python = if ($env:SOULDRIVE_PYTHON) { $env:SOULDRIVE_PYTHON } else { "D:\Anaconda\envs\souldrive\python.exe" }
+
+function Invoke-SoulDrivePython {
+    param([Parameter(Mandatory=$true)][string[]]$Arguments)
+
+    if ($env:SOULDRIVE_PYTHON) {
+        & $env:SOULDRIVE_PYTHON @Arguments
+    } elseif (Get-Command conda -ErrorAction SilentlyContinue) {
+        & conda run --no-capture-output -n souldrive python @Arguments
+    } else {
+        & python @Arguments
+    }
+}
+
+function Assert-LastCommandSucceeded {
+    param([Parameter(Mandatory=$true)][string]$Step)
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Step failed with exit code $LASTEXITCODE"
+    }
+}
 
 Push-Location $Root
 try {
-    & $Python -m unittest discover -s tests -v
-    & $Python -m compileall -q core tests
+    Invoke-SoulDrivePython -Arguments @("-m", "unittest", "discover", "-s", "tests", "-v")
+    Assert-LastCommandSucceeded "backend tests"
+
+    Invoke-SoulDrivePython -Arguments @("-m", "compileall", "-q", "core", "tests")
+    Assert-LastCommandSucceeded "python compileall"
 
     Push-Location "souldrive-ui"
     try {
         npm.cmd run build
+        Assert-LastCommandSucceeded "frontend build"
 
         Push-Location "src-tauri"
         try {
             cargo check
+            Assert-LastCommandSucceeded "cargo check"
         }
         finally {
             Pop-Location

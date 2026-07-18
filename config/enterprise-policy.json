@@ -1,7 +1,7 @@
 {
   "organization": "SoulDrive Local",
-  "allow_lite_mode": true,
-  "require_signed_license": false,
+  "allow_lite_mode": false,
+  "require_signed_license": true,
   "disable_network_update": true,
   "audit_retention_days": 180,
   "max_chat_top_k": 8,

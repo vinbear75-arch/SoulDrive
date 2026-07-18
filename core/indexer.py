@@ -17,7 +17,7 @@ from core.paper_importer import safe_pdf_filename
 logger = get_logger(__name__)
 
 
-INDEX_METADATA_SCHEMA_VERSION = 2
+INDEX_METADATA_SCHEMA_VERSION = 3
 
 
 def _failure_summary(failures: list[dict]):

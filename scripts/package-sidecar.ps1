@@ -4,11 +4,21 @@ $env:PYTHONIOENCODING = "utf-8"
 chcp 65001 | Out-Null
 
 $Root = Split-Path -Parent $PSScriptRoot
-$Python = if ($env:SOULDRIVE_PYTHON) { $env:SOULDRIVE_PYTHON } else { "D:\Anaconda\envs\souldrive\python.exe" }
 $Entry = Join-Path $Root "scripts\sidecar_entry.py"
 $SidecarDir = Join-Path $Root "souldrive-ui\src-tauri\sidecars"
 $BuildDir = Join-Path $Root "build\pyinstaller"
-$DoclingParseResources = "D:\Anaconda\envs\souldrive\Lib\site-packages\docling_parse\pdf_resources"
+
+function Invoke-SoulDrivePython {
+    param([Parameter(Mandatory=$true)][string[]]$Arguments)
+
+    if ($env:SOULDRIVE_PYTHON) {
+        & $env:SOULDRIVE_PYTHON @Arguments
+    } elseif (Get-Command conda -ErrorAction SilentlyContinue) {
+        & conda run --no-capture-output -n souldrive python @Arguments
+    } else {
+        & python @Arguments
+    }
+}
 
 function Remove-FileInsideDirectory {
     param(
@@ -62,41 +72,48 @@ function Remove-PortableSidecarBloat {
 
 Push-Location $Root
 try {
-    & $Python -m PyInstaller `
-        --noconfirm `
-        --clean `
-        --onedir `
-        --console `
-        --name "souldrive-sidecar" `
-        --distpath $SidecarDir `
-        --workpath $BuildDir `
-        --specpath $BuildDir `
-        --collect-all docling `
-        --copy-metadata docling `
-        --copy-metadata docling_slim `
-        --add-data "${DoclingParseResources};docling_parse/pdf_resources" `
-        --collect-all rapidocr `
-        --collect-all onnxruntime `
-        --collect-all chromadb `
-        --collect-all sentence_transformers `
-        --collect-all transformers `
-        --collect-all tokenizers `
-        --collect-all llama_cpp `
-        --exclude-module tensorboard `
-        --exclude-module matplotlib `
-        --exclude-module IPython `
-        --exclude-module pytest `
-        --exclude-module hypothesis `
-        --exclude-module tkinter `
-        --hidden-import core.mcp_server `
-        --hidden-import core.indexer_worker `
-        --hidden-import core.gpu_smoke `
-        --hidden-import core.knowledge_base `
-        --hidden-import core.rag_engine `
-        --hidden-import core.graph_extractor `
-        --hidden-import chromadb.telemetry.product.posthog `
-        --hidden-import chromadb.api.rust `
+    $PyInstallerArguments = @(
+        "-m", "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--onedir",
+        "--console",
+        "--name", "souldrive-sidecar",
+        "--distpath", $SidecarDir,
+        "--workpath", $BuildDir,
+        "--specpath", $BuildDir,
+        "--collect-all", "docling",
+        "--copy-metadata", "docling",
+        "--copy-metadata", "docling_slim",
+        # docling_parse package data includes pdf_resources; collect it without a local site-packages path.
+        "--collect-all", "docling_parse",
+        "--collect-all", "rapidocr",
+        "--collect-all", "onnxruntime",
+        "--collect-all", "chromadb",
+        "--collect-all", "sentence_transformers",
+        "--collect-all", "transformers",
+        "--collect-all", "tokenizers",
+        "--collect-all", "llama_cpp",
+        "--exclude-module", "tensorboard",
+        "--exclude-module", "matplotlib",
+        "--exclude-module", "IPython",
+        "--exclude-module", "pytest",
+        "--exclude-module", "hypothesis",
+        "--exclude-module", "tkinter",
+        "--hidden-import", "core.mcp_server",
+        "--hidden-import", "core.indexer_worker",
+        "--hidden-import", "core.gpu_smoke",
+        "--hidden-import", "core.knowledge_base",
+        "--hidden-import", "core.rag_engine",
+        "--hidden-import", "core.graph_extractor",
+        "--hidden-import", "chromadb.telemetry.product.posthog",
+        "--hidden-import", "chromadb.api.rust",
         $Entry
+    )
+    Invoke-SoulDrivePython -Arguments $PyInstallerArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "PyInstaller sidecar packaging failed with exit code $LASTEXITCODE"
+    }
 
     Remove-PortableSidecarBloat -PackageRoot (Join-Path $SidecarDir "souldrive-sidecar")
 }

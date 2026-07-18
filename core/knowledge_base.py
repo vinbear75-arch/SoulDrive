@@ -114,6 +114,8 @@ class LocalKnowledgeBase:
                     "child_index": child.child_index,
                     "child_start_char": child.start_char,
                     "child_end_char": child.end_char,
+                    "chunk_strategy": child.chunk_strategy,
+                    "chunk_overlap_chars": child.overlap_chars,
                     "child_excerpt": child.content[:420],
                 }
                 texts.append(child.content)

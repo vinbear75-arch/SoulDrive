@@ -64,7 +64,7 @@ class IndexerScopeTests(unittest.TestCase):
         indexer = DriveIndexer()
         indexer.kb = _FakeKnowledgeBase({
             "ids": ["new_child"],
-            "metadatas": [{"document_hash": "abc", "metadata_schema_version": 2, "page": 3}],
+            "metadatas": [{"document_hash": "abc", "metadata_schema_version": 3, "page": 3}],
         })
 
         self.assertTrue(indexer._document_index_is_current("abc"))

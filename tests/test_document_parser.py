@@ -31,6 +31,15 @@ class FakeTableItem:
         return self._markdown
 
 
+class FakeImageItem:
+    def __init__(self, text, page_no):
+        self.text = text
+        self.orig = text
+        self.prov = [FakeProv(page_no)]
+        self.label = "picture"
+        self.level = 1
+
+
 class FakeDoclingDocument:
     def iterate_items(self):
         return iter(
@@ -38,6 +47,7 @@ class FakeDoclingDocument:
                 (FakeDoclingItem("Transformer Paper", 1, label="section_header", level=1), 1),
                 (FakeDoclingItem("Self-attention connects every token on the first page.", 1), 1),
                 (FakeTableItem("| Layer | Value |\n|---|---|\n| heads | 8 |", 2), 1),
+                (FakeImageItem("Decoder architecture diagram", 2), 1),
                 (FakeDoclingItem("The decoder stack is described on the second page.", 2), 1),
             ]
         )
@@ -74,6 +84,23 @@ class DocumentParserTests(unittest.TestCase):
         )
         for chunk in chunks:
             self.assertIn(chunk.metadata.get("page_label"), {"1", "2"})
+
+    def test_parse_and_chunk_records_table_and_image_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pdf_path = Path(temp_dir) / "paper.pdf"
+            pdf_path.write_bytes(b"%PDF fake")
+
+            with patch("core.document_parser.DocumentConverter", return_value=FakeConverter()):
+                chunks = AdvancedDocumentParser().parse_and_chunk(str(pdf_path))
+
+        table_chunks = [chunk for chunk in chunks if chunk.metadata.get("table_count")]
+        image_chunks = [chunk for chunk in chunks if chunk.metadata.get("image_count")]
+
+        self.assertTrue(table_chunks)
+        self.assertIn("Layer", table_chunks[0].metadata.get("tables_json", ""))
+        self.assertTrue(image_chunks)
+        self.assertIn("Decoder architecture diagram", image_chunks[0].metadata.get("image_metadata_json", ""))
+        self.assertIn("[图像:", image_chunks[0].page_content)
 
     def test_parse_failure_exposes_structured_error(self):
         class FailingConverter:

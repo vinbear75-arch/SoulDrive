@@ -20,6 +20,20 @@ class ScriptTests(unittest.TestCase):
         script = (ROOT / "scripts" / "audit.ps1").read_text(encoding="utf-8")
 
         self.assertIn("npm.cmd audit --omit=dev", script)
+        self.assertIn('"--ignore-vuln", "PYSEC-2026-311"', script)
+        self.assertIn('"--ignore-vuln", "CVE-2025-69872"', script)
+        self.assertIn("Ensure-RustSecAdvisoryDb", script)
+        self.assertIn('"--ignore", "RUSTSEC-2026-0194"', script)
+        self.assertIn('"--ignore", "RUSTSEC-2026-0195"', script)
+        self.assertIn("Rust advisory audit cannot run", script)
+
+    def test_scripts_do_not_pin_local_anaconda_paths(self):
+        for script_name in ("check.ps1", "audit.ps1", "package-sidecar.ps1"):
+            with self.subTest(script=script_name):
+                script = (ROOT / "scripts" / script_name).read_text(encoding="utf-8")
+
+                self.assertNotIn("D:\\Anaconda", script)
+                self.assertNotIn("envs\\souldrive\\python.exe", script)
 
     def test_package_sidecar_collects_offline_document_runtime_assets(self):
         script_path = ROOT / "scripts" / "package-sidecar.ps1"
@@ -28,8 +42,9 @@ class ScriptTests(unittest.TestCase):
         script = script_path.read_text(encoding="utf-8")
         self.assertIn("--collect-all", script)
         self.assertIn("docling", script)
+        self.assertIn("docling_parse", script)
         self.assertIn("rapidocr", script)
-        self.assertIn("--collect-all chromadb", script)
+        self.assertIn('"--collect-all", "chromadb"', script)
         self.assertIn("souldrive-ui\\src-tauri\\sidecars", script)
 
     def test_package_sidecar_prunes_only_nonessential_cuda_and_video_runtime_bloat(self):
@@ -45,8 +60,8 @@ class ScriptTests(unittest.TestCase):
     def test_package_sidecar_includes_chromadb_dynamic_runtime_imports(self):
         script = (ROOT / "scripts" / "package-sidecar.ps1").read_text(encoding="utf-8")
 
-        self.assertIn("--hidden-import chromadb.telemetry.product.posthog", script)
-        self.assertIn("--hidden-import chromadb.api.rust", script)
+        self.assertIn('"--hidden-import", "chromadb.telemetry.product.posthog"', script)
+        self.assertIn('"--hidden-import", "chromadb.api.rust"', script)
 
     def test_tauri_dev_prefers_source_backend_over_packaged_sidecar(self):
         source = (ROOT / "souldrive-ui" / "src-tauri" / "src" / "lib.rs").read_text(encoding="utf-8")
@@ -70,6 +85,17 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("souldrive", script)
         self.assertIn("scripts/eval_rag.py", script)
         self.assertIn("[int]$TopK = 6", script)
+
+    def test_rag_harness_runner_combines_retrieval_and_ingestion_metrics(self):
+        script_path = ROOT / "scripts" / "run-rag-harness.ps1"
+
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("eval/retrieval_quality_blind_v0.3.jsonl", script)
+        self.assertIn("eval/ingestion_quality_v0.1.jsonl", script)
+        self.assertIn("eval/results/rag_harness_candidate_v0.1.json", script)
+        self.assertIn("scripts/eval_harness.py", script)
+        self.assertIn('"run", "--no-capture-output", "-n", "souldrive"', script)
 
     def test_frontend_chat_uses_six_evidence_items_by_default(self):
         source = (ROOT / "souldrive-ui" / "src" / "App.tsx").read_text(encoding="utf-8")

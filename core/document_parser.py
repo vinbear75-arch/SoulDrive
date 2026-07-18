@@ -1,3 +1,4 @@
+import json
 import os
 from collections import defaultdict
 from typing import Any
@@ -29,10 +30,12 @@ class AdvancedDocumentParser:
             strip_headers=False
         )
         self.last_error: dict[str, str] | None = None
+        self._page_assets: dict[int, dict[str, list[dict[str, Any]]]] = {}
 
     def parse_and_chunk(self, pdf_path: str):
         """主入口：基于版面感知 (Layout-Aware) 的极速解析管道"""
         self.last_error = None
+        self._page_assets = {}
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"找不到指定的 PDF 文件: {pdf_path}")
 
@@ -65,17 +68,24 @@ class AdvancedDocumentParser:
 
     def _export_markdown_by_page(self, document) -> dict[int, str]:
         page_parts: dict[int, list[str]] = defaultdict(list)
+        page_assets: dict[int, dict[str, list[dict[str, Any]]]] = defaultdict(lambda: {"tables": [], "images": []})
         last_page: int | None = None
 
         for raw_entry in document.iterate_items():
             item = raw_entry[0] if isinstance(raw_entry, tuple) else raw_entry
             page = self._page_number(item) or last_page
+            label = self._item_label(item)
             markdown = self._item_markdown(document, item)
+            if page is not None and "table" in label and markdown:
+                page_assets[page]["tables"].append(self._table_metadata(page, markdown))
+            if page is not None and self._is_image_label(label):
+                page_assets[page]["images"].append(self._image_metadata(page, item, markdown))
             if page is None or not markdown:
                 continue
             page_parts[page].append(markdown)
             last_page = page
 
+        self._page_assets = dict(page_assets)
         return {
             page: "\n\n".join(part for part in parts if part.strip()).strip()
             for page, parts in sorted(page_parts.items())
@@ -92,6 +102,7 @@ class AdvancedDocumentParser:
                 chunk.metadata["page"] = page
                 chunk.metadata["page_number"] = page
                 chunk.metadata["page_label"] = str(page)
+                chunk.metadata.update(self._structured_metadata_for_chunk(page, chunk.page_content))
                 chunks.append(chunk)
         return chunks
 
@@ -106,6 +117,8 @@ class AdvancedDocumentParser:
                 return ""
 
         text = str(getattr(item, "text", None) or getattr(item, "orig", "") or "").strip()
+        if self._is_image_label(label):
+            return f"[图像: {text}]" if text else "[图像]"
         if not text:
             return ""
 
@@ -127,6 +140,48 @@ class AdvancedDocumentParser:
     def _item_label(self, item) -> str:
         label = getattr(item, "label", "")
         return str(getattr(label, "value", label)).lower()
+
+    def _structured_metadata_for_chunk(self, page: int, content: str) -> dict[str, Any]:
+        assets = self._page_assets.get(page, {"tables": [], "images": []})
+        tables = [
+            table
+            for table in assets.get("tables", [])
+            if table["markdown"] and table["markdown"] in content
+        ]
+        images = [
+            image
+            for image in assets.get("images", [])
+            if not image.get("caption") or image.get("caption") in content or "[图像" in content
+        ]
+        metadata: dict[str, Any] = {}
+        if tables:
+            metadata["table_count"] = len(tables)
+            metadata["tables_json"] = json.dumps(tables, ensure_ascii=False)
+        if images:
+            metadata["image_count"] = len(images)
+            metadata["image_metadata_json"] = json.dumps(images, ensure_ascii=False)
+        return metadata
+
+    def _table_metadata(self, page: int, markdown: str) -> dict[str, Any]:
+        rows = [line for line in markdown.splitlines() if line.strip().startswith("|")]
+        data_rows = [line for line in rows if "---" not in line]
+        return {
+            "page": page,
+            "row_count": max(0, len(data_rows) - 1),
+            "markdown": markdown,
+        }
+
+    def _image_metadata(self, page: int, item: Any, markdown: str) -> dict[str, Any]:
+        caption = str(getattr(item, "text", None) or getattr(item, "orig", "") or "").strip()
+        return {
+            "page": page,
+            "caption": caption,
+            "placeholder": markdown or "[图像]",
+            "vision_status": "pending_local_model",
+        }
+
+    def _is_image_label(self, label: str) -> bool:
+        return any(token in label for token in ("picture", "image", "figure"))
 
     def _bounded_heading_level(self, value: Any) -> int:
         level = self._positive_int(value) or 1

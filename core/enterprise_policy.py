@@ -71,6 +71,8 @@ def load_policy(path: Path | None = None) -> EnterprisePolicy:
         payload = json.loads(target.read_text(encoding="utf-8"))
     except Exception:
         return default_policy()
+    if not isinstance(payload, dict):
+        return default_policy()
 
     return EnterprisePolicy(
         organization=str(payload.get("organization") or "SoulDrive Local")[:120],
