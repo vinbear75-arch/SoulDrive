@@ -12,8 +12,8 @@ from typing import Any
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from core.keyword_index import TOKEN_PATTERN
 from core.keyword_index import KeywordSearchResult
+from core.keyword_index import lexical_tokens
 from core.retrieval import bm25_scores
 
 
@@ -22,7 +22,7 @@ CHILD_CONTENT_AAD = b"SoulDrive secure child content v1"
 CHILD_METADATA_AAD = b"SoulDrive secure child metadata v1"
 CHILD_EMBEDDING_AAD = b"SoulDrive secure child embedding v1"
 KEYWORD_POSTING_AAD = b"SoulDrive secure keyword posting v1"
-MAX_KEYWORD_TOKENS = 1024
+MAX_KEYWORD_TOKENS = 4096
 
 
 @dataclass(frozen=True)
@@ -279,7 +279,11 @@ class SecureVectorStore:
 
     def keyword_candidates(self, query: str, limit: int = 80) -> list[SecureCandidate]:
         scores: dict[str, float] = {}
-        for token in self._tokens(query):
+        total_documents = max(
+            1,
+            int(self.conn.execute("SELECT COUNT(*) FROM child_chunks").fetchone()[0]),
+        )
+        for token in dict.fromkeys(self._tokens(query)):
             token_id = self._token_id(token)
             row = self.conn.execute(
                 """
@@ -297,8 +301,15 @@ class SecureVectorStore:
                 row[1],
                 KEYWORD_POSTING_AAD + token_id.encode("ascii"),
             )
-            for chunk_id, count in posting.get("chunks", {}).items():
-                scores[chunk_id] = scores.get(chunk_id, 0.0) + float(count)
+            chunks = posting.get("chunks", {})
+            document_frequency = len(chunks)
+            inverse_frequency = math.log(
+                1.0 + (total_documents - document_frequency + 0.5) / (document_frequency + 0.5)
+            )
+            for chunk_id, count in chunks.items():
+                scores[chunk_id] = scores.get(chunk_id, 0.0) + (
+                    inverse_frequency * (1.0 + math.log(max(1.0, float(count))))
+                )
         ranked = [SecureCandidate(chunk_id=chunk_id, score=score) for chunk_id, score in scores.items()]
         ranked.sort(key=lambda item: (-item.score, item.chunk_id))
         return ranked[:limit]
@@ -322,8 +333,19 @@ class SecureVectorStore:
     def delete(self, ids: list[str]):
         if not ids:
             return
+        self._remove_keyword_postings(ids)
         placeholders = ",".join("?" for _ in ids)
         self.conn.execute(f"DELETE FROM child_chunks WHERE child_id IN ({placeholders})", tuple(ids))
+        self.conn.commit()
+
+    def delete_parent_ids(self, parent_ids: list[str]):
+        if not parent_ids:
+            return
+        placeholders = ",".join("?" for _ in parent_ids)
+        self.conn.execute(
+            f"DELETE FROM parent_documents WHERE parent_id IN ({placeholders})",
+            tuple(parent_ids),
+        )
         self.conn.commit()
 
     def keyword_search(self, query: str, limit: int = 12) -> list[KeywordSearchResult]:
@@ -492,7 +514,7 @@ class SecureVectorStore:
                 self.conn.execute("DELETE FROM keyword_postings WHERE token_id = ?", (token_id,))
 
     def _tokens(self, text: str) -> list[str]:
-        return TOKEN_PATTERN.findall((text or "").lower())[:MAX_KEYWORD_TOKENS]
+        return lexical_tokens(text)[:MAX_KEYWORD_TOKENS]
 
     def _token_id(self, token: str) -> str:
         return hmac.new(self.keys.metadata_key, token.encode("utf-8"), hashlib.sha256).hexdigest()

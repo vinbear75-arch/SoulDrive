@@ -1,6 +1,8 @@
 import re
 from typing import Any
 
+from core.memory_gate import evaluate_memory_write_gate
+
 
 VALID_ASSET_TYPES = {"memory", "skill"}
 VALID_MEMORY_SUBTYPES = {"user_preference", "project_fact", "workflow_fact"}
@@ -43,6 +45,14 @@ def validate_learning_candidates(
 
         if normalized["confidence"] < 0.75:
             normalized["selected_by_default"] = False
+
+        if normalized["asset_type"] == "memory":
+            write_gate = evaluate_memory_write_gate(normalized, messages)
+            normalized["write_gate"] = write_gate.public_dict()
+            if write_gate.hard_block:
+                continue
+            if write_gate.decision != "review":
+                normalized["selected_by_default"] = False
 
         validated.append(normalized)
     return validated

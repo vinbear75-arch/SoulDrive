@@ -2,7 +2,12 @@ import json
 import unittest
 from pathlib import Path
 
-from scripts import check_rag_eval_workspace, import_rag_eval_corpus
+from scripts import (
+    build_ingestion_eval_dataset,
+    check_rag_eval_workspace,
+    import_rag_eval_corpus,
+    rebuild_child_index,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -47,13 +52,10 @@ class ScriptTests(unittest.TestCase):
         self.assertIn('"--collect-all", "chromadb"', script)
         self.assertIn("souldrive-ui\\src-tauri\\sidecars", script)
 
-    def test_package_sidecar_prunes_only_nonessential_cuda_and_video_runtime_bloat(self):
+    def test_package_sidecar_prunes_video_runtime_bloat(self):
         script = (ROOT / "scripts" / "package-sidecar.ps1").read_text(encoding="utf-8")
 
         self.assertIn("Remove-PortableSidecarBloat", script)
-        self.assertNotIn('"_internal\\llama_cpp\\lib\\ggml-cuda.dll"', script)
-        self.assertIn('"_internal\\llama_cpp\\lib\\ggml-cuda.lib"', script)
-        self.assertIn('"_internal\\cublasLt64_12.dll"', script)
         self.assertIn("opencv_videoio_ffmpeg*.dll", script)
         self.assertNotIn("--exclude-module torchvision", script)
 
@@ -96,6 +98,67 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("eval/results/rag_harness_candidate_v0.1.json", script)
         self.assertIn("scripts/eval_harness.py", script)
         self.assertIn('"run", "--no-capture-output", "-n", "souldrive"', script)
+
+    def test_ingestion_eval_dataset_builder_covers_every_manifest_document_six_times(self):
+        manifest = json.loads((ROOT / "eval" / "corpus_manifest_v0.2.json").read_text(encoding="utf-8"))
+        inventory = json.loads((ROOT / "eval" / "corpus_file_inventory_v0.2.json").read_text(encoding="utf-8"))
+        modality_ground_truth = json.loads(
+            (ROOT / "eval" / "corpus_modality_ground_truth_v0.1.json").read_text(encoding="utf-8")
+        )
+        inventory_by_doc_id = {item["doc_id"]: item for item in inventory["files"]}
+        modality_by_doc_id = {
+            item["doc_id"]: item
+            for item in modality_ground_truth["documents"]
+        }
+        records = [
+            record
+            for document in manifest["documents"]
+            for record in build_ingestion_eval_dataset.build_records(
+                document,
+                inventory_by_doc_id[document["doc_id"]],
+                modality_by_doc_id[document["doc_id"]],
+            )
+        ]
+        manifest_doc_ids = {document["doc_id"] for document in manifest["documents"]}
+        samples_per_document = {
+            doc_id: sum(1 for record in records if record["doc_id"] == doc_id)
+            for doc_id in manifest_doc_ids
+        }
+
+        self.assertEqual(len(records), 216)
+        self.assertEqual({record["doc_id"] for record in records}, manifest_doc_ids)
+        self.assertTrue(all(count == 6 for count in samples_per_document.values()))
+        self.assertTrue(any(record["language"] == "en" for record in records))
+        self.assertTrue(any(record["difficulty"] == "hard" for record in records))
+
+    def test_child_index_rebuild_upgrades_schema_and_reports_overlap_coverage(self):
+        chunk = type("Chunk", (), {"metadata": {"document_hash": "abc123"}})()
+
+        document_id = rebuild_child_index.upgraded_document_id(
+            "abc123_schema_6",
+            [chunk],
+        )
+        report = rebuild_child_index.summarize_rebuild(
+            source_workspace="source",
+            target_workspace="target",
+            embedding_model="bge-small-zh-v1.5",
+            summaries=[{
+                "parent_count": 2,
+                "child_count": 2,
+                "boundary_overlap_opportunity_count": 1,
+                "boundary_overlap_count": 1,
+                "max_child_tokens": 120,
+                "max_embedding_input_tokens": 160,
+            }],
+            elapsed_seconds=1.25,
+        )
+
+        self.assertEqual(
+            document_id,
+            f"abc123_schema_{rebuild_child_index.INDEX_METADATA_SCHEMA_VERSION}",
+        )
+        self.assertEqual(report["totals"]["boundary_overlap_coverage_rate"], 1.0)
+        self.assertEqual(report["totals"]["document_count"], 1)
 
     def test_frontend_chat_uses_six_evidence_items_by_default(self):
         source = (ROOT / "souldrive-ui" / "src" / "App.tsx").read_text(encoding="utf-8")

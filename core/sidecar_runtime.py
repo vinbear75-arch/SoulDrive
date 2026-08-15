@@ -147,14 +147,6 @@ def main(argv: list[str] | None = None):
             if getattr(sys, "frozen", False):
                 os._exit(exit_code)
 
-    if argv and argv[0] == "gpu-smoke":
-        from core.gpu_smoke import main as gpu_smoke_main
-
-        exit_code = gpu_smoke_main(argv[1:])
-        if getattr(sys, "frozen", False):
-            os._exit(exit_code)
-        return exit_code
-
     shutdown_event = threading.Event()
     audit_logger = default_audit_logger
     watcher = None

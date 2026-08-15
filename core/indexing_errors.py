@@ -1,5 +1,7 @@
 def classify_indexing_error(message: str) -> dict[str, str]:
     normalized = (message or "").lower()
+    if "partial_success conversion" in normalized or "failed pages:" in normalized:
+        return {"error_code": "PARTIAL_DOCUMENT_PARSE", "category": "parser"}
     if "no parseable chunks" in normalized:
         return {"error_code": "NO_PARSEABLE_CHUNKS", "category": "parser"}
     if "password" in normalized or "encrypted" in normalized:
@@ -8,7 +10,7 @@ def classify_indexing_error(message: str) -> dict[str, str]:
         return {"error_code": "FILE_ACCESS_DENIED", "category": "filesystem"}
     if "no such file" in normalized or "not found" in normalized:
         return {"error_code": "FILE_NOT_FOUND", "category": "filesystem"}
-    if "cuda" in normalized or "vram" in normalized or "out of memory" in normalized:
+    if "out of memory" in normalized or "bad_alloc" in normalized:
         return {"error_code": "RESOURCE_EXHAUSTED", "category": "resource"}
     if "insufficient disk" in normalized or "disk space" in normalized or "no space left" in normalized:
         return {"error_code": "INSUFFICIENT_DISK_SPACE", "category": "resource"}

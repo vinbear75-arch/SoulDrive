@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from core.keyword_index import KeywordIndex
 from core.workspace import SoulDriveWorkspace
 from scripts import check_rag_eval_workspace, import_rag_eval_corpus
 
@@ -99,6 +100,25 @@ class RagEvalCorpusImportTests(unittest.TestCase):
         self.assertEqual(report["indexed_count"], 1)
         self.assertEqual(report["missing_indexed_count"], 1)
         self.assertEqual(report["missing_indexed_documents"], ["beta.pdf"])
+
+    def test_workspace_check_reads_current_keyword_index_schema(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace(
+                str(Path(temp_dir) / "SoulDrive")
+            ).ensure()
+            index = KeywordIndex(workspace.keyword_index_path)
+            index.upsert_document(
+                "alpha-child",
+                "alpha content",
+                {"source_filename": "alpha.pdf"},
+            )
+            index.close()
+
+            names = check_rag_eval_workspace.plain_indexed_source_names(
+                workspace
+            )
+
+        self.assertEqual(names, ["alpha.pdf"])
 
 
 def _write_fixture_corpus(root: Path):

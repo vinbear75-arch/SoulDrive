@@ -1,3 +1,6 @@
+import re
+
+
 TERM_ALIASES = (
     ("异常检测", "anomaly detection"),
     ("工业控制系统", "industrial control systems ICS"),
@@ -44,6 +47,13 @@ def expand_query_variants(query: str, limit: int = 5) -> list[str]:
     variants = [base]
     lowered = base.lower()
 
+    comparison_variants = split_comparison_query(base)
+    for comparison_query in comparison_variants:
+        variants.append(comparison_query)
+        alias_query = build_alias_query(comparison_query)
+        if alias_query:
+            variants.append(alias_query)
+
     if any(token in base for token in ("怎么", "如何")):
         variants.append(base.replace("怎么", "实现方式").replace("如何", "实现方式"))
 
@@ -73,6 +83,82 @@ def expand_query_variants(query: str, limit: int = 5) -> list[str]:
         if len(deduped) >= limit:
             break
     return deduped
+
+
+def split_comparison_query(query: str) -> list[str]:
+    base = (query or "").strip()
+    if not base or not query_requires_source_diversity(base):
+        return []
+
+    title_hints = [
+        title.strip()
+        for title in re.findall(r"《([^》]{2,120})》", base)
+        if title.strip()
+    ]
+    if len(title_hints) >= 2:
+        return [f"{title} 核心证据" for title in title_hints[:3]]
+
+    match = re.search(
+        r"(?:对比|比较)\s*"
+        r"(?P<left>[^，,。；;：:？?]{2,80}?)"
+        r"(?:与|和|及)\s*"
+        r"(?P<right>[^，,。；;：:？?]{2,80}?)"
+        r"(?:两类资料|两份资料|两类文档|两个方案|二者|在|：|:)",
+        base,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return []
+
+    return [
+        f"{_clean_comparison_subject(match.group('left'))} 核心证据",
+        f"{_clean_comparison_subject(match.group('right'))} 核心证据",
+    ]
+
+
+def query_requires_source_diversity(query: str) -> bool:
+    normalized = (query or "").lower()
+    if any(
+        marker in normalized
+        for marker in (
+            "对比",
+            "比较",
+            "异同",
+            "差异",
+            "两类资料",
+            "两份资料",
+            "多份文档",
+            "compare",
+            "versus",
+            " vs ",
+        )
+    ):
+        return True
+
+    if "分别" not in normalized and "各自" not in normalized:
+        return False
+    title_count = len(re.findall(r"《[^》]{2,120}》", normalized))
+    return title_count >= 2 or any(
+        marker in normalized
+        for marker in (
+            "两个方案",
+            "两种方案",
+            "两类文档",
+            "两份文档",
+            "两项政策",
+            "二者",
+            "双方",
+        )
+    )
+
+
+def _clean_comparison_subject(value: str) -> str:
+    cleaned = re.sub(
+        r"^(?:在不(?:直接)?(?:透露|给出)文档名的情况下[，,\s]*|请\s*)",
+        "",
+        (value or "").strip(),
+    )
+    return cleaned.strip(" ，,。；;：:")
 
 
 def build_alias_query(query: str) -> str | None:

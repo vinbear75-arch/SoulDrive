@@ -113,6 +113,31 @@ class SecureVectorStoreTests(unittest.TestCase):
         self.assertIsNotNone(kept_parent)
         self.assertIsNone(deleted_parent)
 
+    def test_delete_child_ids_removes_only_their_keyword_postings(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["deleted-child", "kept-child"],
+                    documents=["uniquedeleted evidence", "uniquekept evidence"],
+                    metadatas=[
+                        {"parent_id": "deleted-parent"},
+                        {"parent_id": "kept-parent"},
+                    ],
+                    embeddings=[[1.0], [1.0]],
+                )
+                store.delete(["deleted-child"])
+                deleted_matches = store.keyword_candidates("uniquedeleted", limit=5)
+                kept_matches = store.keyword_candidates("uniquekept", limit=5)
+            finally:
+                store.close()
+
+        self.assertEqual(deleted_matches, [])
+        self.assertEqual([item.chunk_id for item in kept_matches], ["kept-child"])
+
     def test_keyword_candidates_index_terms_beyond_short_token_prefix(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()

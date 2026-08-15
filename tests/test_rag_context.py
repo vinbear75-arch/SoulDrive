@@ -1,6 +1,11 @@
 import unittest
 
-from core.rag_engine import build_evidence_mindmap, compact_context_text, normalize_technical_terms
+from core.rag_engine import (
+    build_agent_status_bar,
+    build_evidence_mindmap,
+    compact_context_text,
+    normalize_technical_terms,
+)
 
 
 class RagContextTests(unittest.TestCase):
@@ -36,6 +41,23 @@ class RagContextTests(unittest.TestCase):
 
     def test_normalize_technical_terms_keeps_transformer_name(self):
         self.assertEqual(normalize_technical_terms("变压器架构"), "Transformer 架构")
+
+    def test_agent_status_bar_compacts_runtime_metadata(self):
+        status = build_agent_status_bar(
+            {
+                "trace_id": "trace-123",
+                "retrieval_mode": "parent_child_hybrid_dense_fts_graph_rrf",
+                "top_k": 6,
+                "evidence_count": 3,
+                "matched_entities": ["数据安全", "隐私保护"],
+                "evidence_gate": {"decision": "accept", "reason": "evidence accepted"},
+            }
+        )
+
+        self.assertIn("【Agent 状态栏】", status)
+        self.assertIn("trace-123", status)
+        self.assertIn("evidence_count: 3", status)
+        self.assertIn("数据安全", status)
 
 
 if __name__ == "__main__":

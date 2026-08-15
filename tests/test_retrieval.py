@@ -1,10 +1,35 @@
 import unittest
 
 from core.knowledge_base import LocalKnowledgeBase
-from core.retrieval import SearchCandidate, _select_diverse_sources, build_citations, rank_hybrid_candidates
+from core.retrieval import (
+    SearchCandidate,
+    _select_diverse_sources,
+    _source_match_score,
+    build_citations,
+    classify_query_intent,
+    rank_hybrid_candidates,
+)
 
 
 class RetrievalTests(unittest.TestCase):
+    def test_query_intent_distinguishes_formal_document_question_types(self):
+        clause_intent = classify_query_intent("《数据安全管理办法》第三条规定了什么？")
+        table_intent = classify_query_intent("验收指标值、完成比例和期限分别是多少？")
+        summary_intent = classify_query_intent("概述《项目实施方案》的核心要点")
+        comparison_intent = classify_query_intent("对比《甲方案》和《乙方案》的技术参数")
+        document_number_intent = classify_query_intent("某府〔2026〕12号第一条规定了什么？")
+
+        self.assertEqual(clause_intent.name, "clause_lookup")
+        self.assertEqual(clause_intent.clause_references, ("第三条",))
+        self.assertEqual(table_intent.name, "table_lookup")
+        self.assertTrue(table_intent.prefers_table)
+        self.assertEqual(summary_intent.name, "broad_summary")
+        self.assertTrue(summary_intent.explicit_source)
+        self.assertEqual(comparison_intent.name, "multi_source_comparison")
+        self.assertTrue(comparison_intent.prefers_table)
+        self.assertEqual(document_number_intent.name, "clause_lookup")
+        self.assertTrue(document_number_intent.explicit_source)
+
     def test_hybrid_rank_rewards_keyword_and_graph_hits(self):
         candidates = [
             SearchCandidate(
@@ -58,9 +83,13 @@ class RetrievalTests(unittest.TestCase):
             metadata={
                 "source_filename": "rag.pdf",
                 "source_path": "E:/rag.pdf",
+                "document_title": "企业知识库建设方案",
+                "document_number": "企标〔2026〕1号",
                 "page": 3,
                 "chunk_index": 2,
                 "Header 2": "Method",
+                "clause_id": "3.2",
+                "content_kind": "clause",
             },
             final_score=0.5,
         )
@@ -72,8 +101,34 @@ class RetrievalTests(unittest.TestCase):
         self.assertNotIn("source_path", citations[0])
         self.assertEqual(citations[0]["page_label"], "3")
         self.assertEqual(citations[0]["section"], "Method")
+        self.assertEqual(citations[0]["document_title"], "企业知识库建设方案")
+        self.assertEqual(citations[0]["document_number"], "企标〔2026〕1号")
+        self.assertEqual(citations[0]["clause_id"], "3.2")
+        self.assertEqual(citations[0]["content_kind"], "clause")
 
-    def test_merge_candidates_collapses_children_by_parent_id(self):
+    def test_build_citations_falls_back_to_document_title_for_legacy_indexes(self):
+        candidate = SearchCandidate(
+            id="legacy-child",
+            content="企业技术方案正文",
+            metadata={"document_title": "企业技术方案", "page": 1},
+            final_score=0.5,
+        )
+
+        citations = build_citations([candidate])
+
+        self.assertEqual(citations[0]["source_filename"], "企业技术方案")
+
+    def test_source_match_uses_formal_title_and_document_number_not_only_filename(self):
+        metadata = {
+            "source_filename": "upload_20260728_001.pdf",
+            "document_title": "数据安全管理办法",
+            "document_number": "某府〔2026〕12号",
+        }
+
+        self.assertEqual(_source_match_score("《数据安全管理办法》有哪些要求？", metadata), 1.0)
+        self.assertEqual(_source_match_score("某府〔2026〕12号第一条是什么？", metadata), 1.0)
+
+    def test_merge_candidates_preserves_distinct_children_until_rerank(self):
         kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
 
         merged = kb._merge_candidates(
@@ -105,12 +160,12 @@ class RetrievalTests(unittest.TestCase):
             ],
         )
 
-        self.assertEqual(len(merged), 1)
+        self.assertEqual(len(merged), 2)
         self.assertEqual(merged[0].id, "parent-1_child_0")
         self.assertEqual(merged[0].dense_rank, 5)
-        self.assertEqual(merged[0].sparse_rank, 2)
-        self.assertEqual(merged[0].keyword_score, 3.5)
-        self.assertEqual(merged[0].metadata["child_excerpt"], "keyword child excerpt")
+        self.assertEqual(merged[1].sparse_rank, 2)
+        self.assertEqual(merged[1].keyword_score, 3.5)
+        self.assertEqual(merged[1].metadata["child_excerpt"], "keyword child excerpt")
 
     def test_source_title_candidates_are_created_from_metadata_matches(self):
         kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
@@ -129,7 +184,7 @@ class RetrievalTests(unittest.TestCase):
         candidates = kb._source_title_candidates("在《大模型落地路线图研究报告》中，RAG 的核心论述是什么？", limit=3)
 
         self.assertEqual(len(candidates), 1)
-        self.assertEqual(candidates[0].id, "source_title:child-2")
+        self.assertEqual(candidates[0].id, "child-2")
         self.assertEqual(candidates[0].metadata["source_filename"], "大模型落地路线图研究报告.pdf")
         self.assertEqual(candidates[0].metadata["parent_id"], "p-roadmap")
 
@@ -186,6 +241,185 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(ranked[0].id, "maxkb-paper")
         self.assertGreater(ranked[0].score_breakdown["source"], ranked[1].score_breakdown["source"])
 
+    def test_hybrid_rank_promotes_explicit_document_number_match(self):
+        candidates = [
+            SearchCandidate(
+                id="generic-policy",
+                content="第一条规定数据分类分级和访问控制要求。",
+                metadata={"source_filename": "其他管理办法.pdf"},
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="numbered-policy",
+                content="第一条规定适用范围和责任边界。",
+                metadata={
+                    "source_filename": "上传文件.pdf",
+                    "document_number": "某府〔2026〕12号",
+                },
+                dense_rank=12,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(
+            "某府〔2026〕12号第一条规定了什么？",
+            candidates,
+            top_k=1,
+        )
+
+        self.assertEqual(ranked[0].id, "numbered-policy")
+        self.assertEqual(ranked[0].score_breakdown["source"], 1.0)
+
+    def test_hybrid_rank_promotes_exact_clause_for_clause_lookup(self):
+        candidates = [
+            SearchCandidate(
+                id="generic-prose",
+                content="本办法介绍数据安全管理要求和适用范围。",
+                metadata={
+                    "source_filename": "数据安全管理办法.pdf",
+                    "content_kind": "prose",
+                },
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="exact-clause",
+                content="第三条 企业应当建立数据分类分级与访问控制制度。",
+                metadata={
+                    "source_filename": "数据安全管理办法.pdf",
+                    "content_kind": "clause",
+                    "clause_id": "第三条",
+                },
+                dense_rank=8,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(
+            "《数据安全管理办法》第三条规定了什么？",
+            candidates,
+            top_k=2,
+        )
+
+        self.assertEqual(ranked[0].id, "exact-clause")
+        self.assertEqual(ranked[0].score_breakdown["structure"], 1.0)
+
+    def test_hybrid_rank_promotes_table_for_metric_lookup(self):
+        candidates = [
+            SearchCandidate(
+                id="prose",
+                content="本章说明项目验收指标和完成期限。",
+                metadata={"source_filename": "方案.pdf", "content_kind": "prose"},
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="table",
+                content="| 验收指标 | 指标值 | 完成期限 |\n| --- | --- | --- |\n| 可用率 | 99.9% | 12月 |",
+                metadata={"source_filename": "方案.pdf", "content_kind": "table", "table_count": 1},
+                dense_rank=7,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(
+            "验收指标值和完成期限分别是多少？",
+            candidates,
+            top_k=2,
+        )
+
+        self.assertEqual(ranked[0].id, "table")
+        self.assertGreater(ranked[0].score_breakdown["structure"], 0.9)
+
+    def test_hybrid_rank_defers_overlapping_formal_windows(self):
+        diagnostics = {}
+        candidates = [
+            SearchCandidate(
+                id="window-0",
+                content="第一段安全目标。第二段访问控制。",
+                metadata={
+                    "source_filename": "制度.pdf",
+                    "parent_id": "parent-1",
+                    "child_id": "window-0",
+                    "child_start_char": 0,
+                    "child_end_char": 200,
+                },
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="window-1",
+                content="第二段访问控制。第三段审计要求。",
+                metadata={
+                    "source_filename": "制度.pdf",
+                    "parent_id": "parent-1",
+                    "child_id": "window-1",
+                    "child_start_char": 100,
+                    "child_end_char": 300,
+                },
+                dense_rank=2,
+            ),
+            SearchCandidate(
+                id="window-2",
+                content="第四段应急响应。第五段恢复要求。",
+                metadata={
+                    "source_filename": "制度.pdf",
+                    "parent_id": "parent-1",
+                    "child_id": "window-2",
+                    "child_start_char": 320,
+                    "child_end_char": 520,
+                },
+                dense_rank=3,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(
+            "制度安全要求",
+            candidates,
+            top_k=2,
+            diagnostics=diagnostics,
+        )
+
+        self.assertEqual([candidate.id for candidate in ranked], ["window-0", "window-2"])
+        self.assertEqual(diagnostics["redundant_deferred_count"], 1)
+
+    def test_parent_expansion_uses_local_clause_window_instead_of_full_parent(self):
+        paragraphs = [
+            "第一条 总则。",
+            "第二条 适用范围。",
+            "第三条 企业应建立数据分类分级制度。",
+            "第四条 企业应配置访问控制措施。",
+            "第五条 企业应保存审计记录。",
+            "第六条 附则。",
+        ]
+        parent_content = "\n\n".join(paragraphs)
+        target_start = parent_content.index(paragraphs[2])
+        target_end = target_start + len(paragraphs[2])
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _FakeParentStore(parent_content)
+        candidate = SearchCandidate(
+            id="child-2",
+            content=paragraphs[2],
+            metadata={
+                "source_filename": "制度.pdf",
+                "parent_id": "parent-1",
+                "child_start_char": target_start,
+                "child_end_char": target_end,
+                "content_kind": "clause",
+            },
+        )
+
+        expanded = kb._expand_parent_context(
+            [candidate],
+            top_k=1,
+            query="第三条规定了什么？",
+        )
+
+        self.assertIn("第三条", expanded[0].content)
+        self.assertIn("第二条", expanded[0].content)
+        self.assertIn("第四条", expanded[0].content)
+        self.assertNotIn("第一条", expanded[0].content)
+        self.assertNotIn("第五条", expanded[0].content)
+        self.assertEqual(
+            expanded[0].metadata["context_expansion_mode"],
+            "local_parent_window",
+        )
+
     def test_hybrid_rank_keeps_competitive_cross_document_sources(self):
         candidates = [
             SearchCandidate(
@@ -211,6 +445,36 @@ class RetrievalTests(unittest.TestCase):
         ranked = rank_hybrid_candidates("compare alpha beta retrieval evidence", candidates, top_k=2)
 
         self.assertEqual({candidate.metadata["source_filename"] for candidate in ranked}, {"alpha.pdf", "beta.pdf"})
+
+    def test_hybrid_rank_keeps_multiple_sections_for_single_named_document(self):
+        candidates = [
+            SearchCandidate(
+                id="target-1",
+                content="建设目标与总体范围",
+                metadata={"source_filename": "项目实施方案.pdf"},
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="target-2",
+                content="验收指标与交付要求",
+                metadata={"source_filename": "项目实施方案.pdf"},
+                dense_rank=2,
+            ),
+            SearchCandidate(
+                id="other-1",
+                content="其他项目的验收指标",
+                metadata={"source_filename": "其他方案.pdf"},
+                dense_rank=3,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(
+            "请依据《项目实施方案》说明建设目标和验收指标",
+            candidates,
+            top_k=2,
+        )
+
+        self.assertEqual([candidate.id for candidate in ranked], ["target-1", "target-2"])
 
     def test_final_selection_prefers_distinct_exact_source_matches(self):
         candidates = [
@@ -248,6 +512,17 @@ class _FakeCollection:
     def get(self, include=None):
         _ = include
         return self.payload
+
+
+class _FakeParentStore:
+    def __init__(self, content):
+        self.content = content
+
+    def get_parent(self, parent_id):
+        return {
+            "content": self.content,
+            "metadata": {"parent_id": parent_id},
+        }
 
 
 if __name__ == "__main__":

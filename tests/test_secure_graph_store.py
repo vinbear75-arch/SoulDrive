@@ -113,7 +113,7 @@ class SecureGraphStoreTests(unittest.TestCase):
                     "core.rag_engine.resolve_chat_model_path",
                     return_value=str(Path(temp_dir) / "fake-model.gguf"),
                 ), patch("core.rag_engine.os.path.exists", return_value=True), patch(
-                    "core.rag_engine.load_llama_with_gpu_fallback",
+                    "core.rag_engine.load_llama_model",
                     return_value=_FakeLoadResult(),
                 ):
                     engine = RAGEngine(
@@ -152,7 +152,6 @@ class _FakeLoadResult:
     model = object()
     effective_config = _FakeRuntimeConfig()
     load_ms = 1
-    fallback_error = None
 
 
 if __name__ == "__main__":

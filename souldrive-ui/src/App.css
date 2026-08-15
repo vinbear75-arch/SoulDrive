@@ -20,7 +20,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -1433,6 +1434,163 @@ button {
   border-radius: 8px;
   background: #fbf8ef;
   box-shadow: 0 24px 62px rgba(45, 48, 38, 0.24);
+}
+
+.presentation-dialog {
+  width: min(920px, calc(100vw - 48px));
+  max-height: min(720px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border: 1px solid #cfc8b7;
+  border-radius: 10px;
+  background: #f8f6ee;
+  box-shadow: 0 26px 72px rgba(31, 40, 35, 0.28);
+  overflow: hidden;
+}
+
+.presentation-builder-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
+  gap: 16px;
+  padding: 18px 20px;
+  overflow: hidden;
+}
+
+.presentation-source-list {
+  min-height: 300px;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.presentation-source-list label {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 18px 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d8d0be;
+  border-radius: 8px;
+  background: #fffdf7;
+  color: #30352f;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.presentation-source-list label.selected {
+  border-color: rgba(34, 116, 101, 0.42);
+  background: rgba(34, 116, 101, 0.08);
+  color: #173f3b;
+}
+
+.presentation-source-list label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.presentation-options {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.presentation-options > label:not(.presentation-toggle) {
+  display: grid;
+  gap: 6px;
+  color: #5f655c;
+  font-size: 12px;
+}
+
+.presentation-options input:not([type="checkbox"]),
+.presentation-options select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #d3cbb8;
+  border-radius: 7px;
+  background: #fffdf7;
+  color: #242620;
+  padding: 0 10px;
+  outline: none;
+}
+
+.presentation-options input:focus,
+.presentation-options select:focus {
+  border-color: rgba(34, 116, 101, 0.62);
+}
+
+.presentation-toggle {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #30352f;
+  font-size: 13px;
+}
+
+.presentation-task-state {
+  min-height: 112px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  border: 1px solid #d8d0be;
+  border-radius: 8px;
+  background: #fffdf7;
+  padding: 12px;
+}
+
+.presentation-task-state strong {
+  color: #173f3b;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.presentation-task-state span,
+.presentation-task-state p {
+  margin: 0;
+  overflow: hidden;
+  color: #697064;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presentation-task-state.failed,
+.presentation-task-state.interrupted {
+  border-color: rgba(178, 75, 50, 0.4);
+  background: rgba(178, 75, 50, 0.07);
+}
+
+.presentation-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #dfddd4;
+}
+
+.presentation-progress i {
+  height: 100%;
+  display: block;
+  background: #227465;
+  transition: width 180ms ease;
+}
+
+@media (max-width: 900px) {
+  .presentation-builder-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .presentation-source-list {
+    min-height: 220px;
+    max-height: 280px;
+  }
 }
 
 .learning-review-head,

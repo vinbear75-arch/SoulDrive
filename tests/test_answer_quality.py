@@ -26,6 +26,51 @@ class AnswerQualityTests(unittest.TestCase):
         self.assertEqual(gate.decision, "retry")
         self.assertEqual(gate.reason, "evidence confidence requires retry")
 
+    def test_evidence_gate_accepts_low_scored_corroborating_sources(self):
+        gate = evaluate_evidence_gate(
+            [
+                {
+                    "id": "E1",
+                    "score": 0.070,
+                    "source_filename": "甲方案.pdf",
+                    "snippet": "模型风险评估采用分级控制，安全审计按月核验。",
+                },
+                {
+                    "id": "E2",
+                    "score": 0.066,
+                    "source_filename": "乙方案.pdf",
+                    "snippet": "模型风险评估采用动态授权，安全审计按季度验收。",
+                },
+            ],
+            query="比较两个方案在模型风险评估和安全审计上的做法。",
+        )
+
+        self.assertTrue(gate.allowed)
+        self.assertEqual(gate.decision, "accept")
+        self.assertEqual(gate.reason, "evidence accepted by corroboration")
+
+    def test_evidence_gate_does_not_treat_one_source_as_corroboration(self):
+        gate = evaluate_evidence_gate(
+            [
+                {
+                    "id": "E1",
+                    "score": 0.070,
+                    "source_filename": "甲方案.pdf",
+                    "snippet": "模型风险评估采用分级控制，安全审计按月核验。",
+                },
+                {
+                    "id": "E2",
+                    "score": 0.066,
+                    "source_filename": "甲方案.pdf",
+                    "snippet": "模型风险评估采用分级控制，安全审计按季度检查。",
+                },
+            ],
+            query="比较两个方案在模型风险评估和安全审计上的做法。",
+        )
+
+        self.assertFalse(gate.allowed)
+        self.assertEqual(gate.decision, "retry")
+
     def test_evidence_gate_requests_retry_when_query_is_not_answered_by_evidence(self):
         gate = evaluate_evidence_gate(
             [

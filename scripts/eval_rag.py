@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -14,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.runtime_state import get_runtime_state
+from core.evaluation import wilson_interval
 from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.security_context import WORKSPACE_DATA_KEY_ENV, get_workspace_keys, restore_workspace_keys, set_workspace_keys
 from core.workspace import WORKSPACE_MANIFEST, SoulDriveWorkspace
@@ -216,7 +218,9 @@ def run_retrieval(records: list[EvalRecord], workspace: str | None, top_k: int) 
     kb = LocalKnowledgeBase(workspace_path=workspace)
     results = []
     try:
-        for record in records:
+        for index, record in enumerate(records, start=1):
+            if index == 1 or index % 10 == 0 or index == len(records):
+                print(f"[{index}/{len(records)}] 检索评测: {record.id}", flush=True)
             started_at = time.time()
             retrieval = kb.search_with_evidence(record.question, top_k=top_k)
             elapsed_ms = int((time.time() - started_at) * 1000)
@@ -413,15 +417,20 @@ def summarize(records: list[EvalRecord], results: list[EvalResult], top_k: int, 
     model_names = sorted({row["model_name"] for row in rows if row["model_name"]})
     answer_sample_count = len(answer_rows)
 
+    retrieval_all_hits = sum(row["source_all_hit"] for row in positive_rows)
+    retrieval_any_hits = sum(row["source_any_hit"] for row in positive_rows)
+    first_hits = sum(row["first_hit"] for row in positive_rows)
+    multi_doc_hits = sum(row["source_all_hit"] for row in multi_doc_rows)
+    graph_hits = sum(row["source_any_hit"] for row in graph_rows)
     return {
         "mode": mode or ("答案生成评测" if answer_sample_count else "检索评测"),
         "sample_count": len(rows),
         "answer_sample_count": answer_sample_count,
         "top_k": top_k,
         "model_name": model_names[0] if len(model_names) == 1 else ("mixed" if len(model_names) > 1 else None),
-        "retrieval_all_hit_rate": _ratio(sum(row["source_all_hit"] for row in positive_rows), len(positive_rows)),
-        "retrieval_any_hit_rate": _ratio(sum(row["source_any_hit"] for row in positive_rows), len(positive_rows)),
-        "first_hit_rate": _ratio(sum(row["first_hit"] for row in positive_rows), len(positive_rows)),
+        "retrieval_all_hit_rate": _ratio(retrieval_all_hits, len(positive_rows)),
+        "retrieval_any_hit_rate": _ratio(retrieval_any_hits, len(positive_rows)),
+        "first_hit_rate": _ratio(first_hits, len(positive_rows)),
         "mean_reciprocal_rank": _ratio(
             sum(row["reciprocal_rank"] for row in positive_rows),
             len(positive_rows),
@@ -430,14 +439,27 @@ def summarize(records: list[EvalRecord], results: list[EvalResult], top_k: int, 
             sum(row["source_coverage"] for row in positive_rows),
             len(positive_rows),
         ),
-        "multi_doc_all_hit_rate": _ratio(
-            sum(row["source_all_hit"] for row in multi_doc_rows),
-            len(multi_doc_rows),
-        ),
-        "graph_context_hit_rate": _ratio(
-            sum(row["source_any_hit"] for row in graph_rows),
-            len(graph_rows),
-        ),
+        "multi_doc_all_hit_rate": _ratio(multi_doc_hits, len(multi_doc_rows)),
+        "graph_context_hit_rate": _ratio(graph_hits, len(graph_rows)),
+        "retrieval_confidence_intervals_95": {
+            "retrieval_all_hit_rate": wilson_interval(
+                retrieval_all_hits,
+                len(positive_rows),
+            ),
+            "retrieval_any_hit_rate": wilson_interval(
+                retrieval_any_hits,
+                len(positive_rows),
+            ),
+            "first_hit_rate": wilson_interval(first_hits, len(positive_rows)),
+            "multi_doc_all_hit_rate": wilson_interval(
+                multi_doc_hits,
+                len(multi_doc_rows),
+            ),
+            "graph_context_hit_rate": wilson_interval(
+                graph_hits,
+                len(graph_rows),
+            ),
+        },
         "citation_valid_rate": _ratio(sum(row["citation_valid"] for row in answer_rows), len(answer_rows)),
         "invalid_citation_rate": _ratio(sum(not row["citation_valid"] for row in answer_rows), len(answer_rows)),
         "refusal_accuracy": _ratio(sum(row["refusal_correct"] for row in refusal_rows), len(refusal_rows)),
@@ -576,6 +598,11 @@ def print_report(report: dict[str, Any]):
     print(f"检索全命中率@{report['top_k']}: {_percent(report['retrieval_all_hit_rate'])}")
     print(f"检索任一命中率@{report['top_k']}: {_percent(report['retrieval_any_hit_rate'])}")
     print(f"首条命中率@1: {_percent(report['first_hit_rate'])}")
+    confidence = report["retrieval_confidence_intervals_95"]
+    print(
+        "检索全命中率 95% CI: "
+        f"{_interval(confidence['retrieval_all_hit_rate'])}"
+    )
     print(f"平均倒数排名(MRR): {_decimal(report['mean_reciprocal_rank'])}")
     print(f"平均来源覆盖率@{report['top_k']}: {_percent(report['average_source_coverage'])}")
     print(f"跨文档全命中率@{report['top_k']}: {_percent(report['multi_doc_all_hit_rate'])}")
@@ -644,6 +671,59 @@ def print_comparison_report(
         if before is None and after is None:
             continue
         print(f"{label}: {_format_metric(before, direction)} -> {_format_metric(after, direction)} ({_format_delta(before, after, direction)})")
+    paired = paired_binary_comparison(
+        baseline_report.get("rows") or [],
+        candidate_report.get("rows") or [],
+        "source_all_hit",
+    )
+    print(
+        "配对全命中变化: "
+        f"改善={paired['improved']}, 退化={paired['regressed']}, "
+        f"不变={paired['unchanged']}, exact McNemar p={paired['p_value']:.6f}"
+    )
+
+
+def paired_binary_comparison(
+    baseline_rows: list[dict[str, Any]],
+    candidate_rows: list[dict[str, Any]],
+    key: str,
+) -> dict[str, int | float]:
+    baseline_by_id = {
+        str(row.get("id") or ""): bool(row.get(key))
+        for row in baseline_rows
+        if row.get("id")
+    }
+    candidate_by_id = {
+        str(row.get("id") or ""): bool(row.get(key))
+        for row in candidate_rows
+        if row.get("id")
+    }
+    shared_ids = sorted(set(baseline_by_id) & set(candidate_by_id))
+    improved = sum(
+        not baseline_by_id[row_id] and candidate_by_id[row_id]
+        for row_id in shared_ids
+    )
+    regressed = sum(
+        baseline_by_id[row_id] and not candidate_by_id[row_id]
+        for row_id in shared_ids
+    )
+    unchanged = len(shared_ids) - improved - regressed
+    discordant = improved + regressed
+    if discordant == 0:
+        p_value = 1.0
+    else:
+        tail = sum(
+            math.comb(discordant, successes)
+            for successes in range(min(improved, regressed) + 1)
+        ) / (2**discordant)
+        p_value = min(1.0, 2 * tail)
+    return {
+        "sample_count": len(shared_ids),
+        "improved": improved,
+        "regressed": regressed,
+        "unchanged": unchanged,
+        "p_value": round(p_value, 6),
+    }
 
 
 def _percent(value: float | None) -> str:
@@ -656,6 +736,14 @@ def _decimal(value: float | None) -> str:
     if value is None:
         return "无样本"
     return f"{value:.3f}"
+
+
+def _interval(value: dict[str, Any]) -> str:
+    low = value.get("low")
+    high = value.get("high")
+    if low is None or high is None:
+        return "无样本"
+    return f"[{float(low) * 100:.1f}%, {float(high) * 100:.1f}%]"
 
 
 def _ratio(numerator: int, denominator: int) -> float | None:

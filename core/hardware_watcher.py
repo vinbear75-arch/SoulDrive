@@ -161,7 +161,7 @@ class UDriveWatcher:
                 # 【安全熔断机制】：
                 # 当承载机密数据/凭证的物理设备拔出时，立刻进行“清场”。
                 # 这在机密计算和企业级安全软件中是极重要的防泄露 (DLP) 措施。
-                logger.info("[System] 正在执行防泄漏清场、释放 VRAM 并挂起 API 服务...")
+                logger.info("[System] 正在执行防泄漏清场并挂起 API 服务...")
                 self._stop_indexer_worker()
                 lock_runtime("storage device removed")
                 self._notify_runtime_api("/runtime/lock", {

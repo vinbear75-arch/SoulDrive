@@ -83,6 +83,8 @@ class McpServerLearningTests(unittest.TestCase):
         self.assertGreaterEqual(len(payload["candidates"]), 1)
         self.assertEqual(payload["candidates"][0]["asset_type"], "memory")
         self.assertEqual(payload["candidates"][0]["subtype"], "user_preference")
+        self.assertEqual(payload["candidates"][0]["write_gate"]["decision"], "review")
+        self.assertTrue(payload["candidates"][0]["write_gate"]["requires_human_review"])
         self.assertEqual(pending.status_code, 200)
         self.assertEqual(len(pending.json()["reviews"]), 1)
 

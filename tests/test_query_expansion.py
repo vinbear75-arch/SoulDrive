@@ -1,6 +1,6 @@
 import unittest
 
-from core.query_expansion import expand_query_variants
+from core.query_expansion import expand_query_variants, query_requires_source_diversity
 
 
 class QueryExpansionTests(unittest.TestCase):
@@ -29,6 +29,30 @@ class QueryExpansionTests(unittest.TestCase):
         joined = " ".join(variants).lower()
         self.assertLessEqual(len(variants), 3)
         self.assertIn("anomaly detection", joined)
+
+    def test_expand_query_variants_splits_blind_cross_document_question(self):
+        variants = expand_query_variants(
+            "在不透露文档名的情况下，对比RAG 评测综述与企业知识管理大模型两类资料："
+            "它们在evaluation、知识管理和落地证据上的关注点有什么差异？"
+        )
+
+        self.assertEqual(variants[0].startswith("在不透露文档名的情况下"), True)
+        self.assertTrue(any("RAG 评测综述 核心证据" in item for item in variants))
+        self.assertTrue(any("企业知识管理大模型 核心证据" in item for item in variants))
+        self.assertLessEqual(len(variants), 5)
+
+    def test_expand_query_variants_splits_two_explicit_document_titles(self):
+        variants = expand_query_variants(
+            "请对比《数据安全技术规范》和《项目实施方案》在验收要求上的差异"
+        )
+
+        self.assertTrue(any(item == "数据安全技术规范 核心证据" for item in variants))
+        self.assertTrue(any(item == "项目实施方案 核心证据" for item in variants))
+
+    def test_query_requires_source_diversity_detects_comparison_intent(self):
+        self.assertTrue(query_requires_source_diversity("分别说明两个方案的风险与收益"))
+        self.assertFalse(query_requires_source_diversity("说明项目方案的建设目标"))
+        self.assertFalse(query_requires_source_diversity("验收指标值和完成期限分别是多少"))
 
     def test_expand_query_variants_covers_strict_retrieval_eval_terms(self):
         cases = [

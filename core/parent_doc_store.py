@@ -53,5 +53,15 @@ class ParentDocumentStore:
         """, (document_hash,))
         self.conn.commit()
 
+    def delete(self, parent_ids: list[str]):
+        if not parent_ids:
+            return
+        placeholders = ",".join("?" for _ in parent_ids)
+        self.conn.execute(
+            f"DELETE FROM parent_documents WHERE parent_id IN ({placeholders})",
+            tuple(parent_ids),
+        )
+        self.conn.commit()
+
     def close(self):
         self.conn.close()

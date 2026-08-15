@@ -581,6 +581,7 @@ class LearningStore:
                 "title": payload.get("title") or "",
                 "content": payload.get("content") or payload.get("text") or "",
                 "score": score,
+                "updated_at": row["updated_at"],
             }
             if row["asset_type"] == "memory" and len(memories) < top_k_memory:
                 memories.append(record)
@@ -841,6 +842,8 @@ class LearningStore:
             "tags": list(candidate.get("tags") or []),
             "source_excerpt": str(candidate.get("source_excerpt") or "").strip(),
         }
+        if candidate.get("write_gate"):
+            payload["write_gate"] = dict(candidate["write_gate"])
         if candidate.get("asset_type") == "skill":
             for key in (
                 "intent",

@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.paper_importer import safe_pdf_filename
+from core.keyword_index import KEYWORD_TABLE
 from core.secure_document_store import SecureDocumentStore
 from core.secure_vector_store import SecureVectorStore
 from core.security_context import get_workspace_keys
@@ -166,7 +167,25 @@ def plain_indexed_source_names(workspace: SoulDriveWorkspace) -> list[str]:
 
     conn = sqlite3.connect(str(keyword_index_path))
     try:
-        rows = conn.execute("SELECT metadata_json FROM keyword_documents").fetchall()
+        available = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        table_name = next(
+            (
+                candidate
+                for candidate in (KEYWORD_TABLE, "keyword_documents")
+                if candidate in available
+            ),
+            None,
+        )
+        if table_name is None:
+            return []
+        rows = conn.execute(
+            f"SELECT metadata_json FROM {table_name}"
+        ).fetchall()
     except sqlite3.Error:
         return []
     finally:

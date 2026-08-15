@@ -46,12 +46,7 @@ function Remove-PortableSidecarBloat {
         return
     }
 
-    $exactFiles = @(
-        "_internal\llama_cpp\lib\ggml-cuda.lib",
-        "_internal\cublas64_12.dll",
-        "_internal\cublasLt64_12.dll",
-        "_internal\cudart64_12.dll"
-    )
+    $exactFiles = @()
 
     foreach ($relativePath in $exactFiles) {
         Remove-FileInsideDirectory -RootDirectory $PackageRoot -TargetPath (Join-Path $PackageRoot $relativePath)
@@ -102,12 +97,12 @@ try {
         "--exclude-module", "tkinter",
         "--hidden-import", "core.mcp_server",
         "--hidden-import", "core.indexer_worker",
-        "--hidden-import", "core.gpu_smoke",
         "--hidden-import", "core.knowledge_base",
         "--hidden-import", "core.rag_engine",
         "--hidden-import", "core.graph_extractor",
         "--hidden-import", "chromadb.telemetry.product.posthog",
         "--hidden-import", "chromadb.api.rust",
+        "--add-data", ((Join-Path $Root "scripts\render_pptx_wps.ps1") + ";scripts"),
         $Entry
     )
     Invoke-SoulDrivePython -Arguments $PyInstallerArguments

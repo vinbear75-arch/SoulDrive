@@ -41,6 +41,14 @@ class SoulDriveWorkspace:
         return str(Path(self.root_path) / "data" / "learning.sqlite")
 
     @property
+    def task_journal_path(self):
+        return str(Path(self.root_path) / "runtime" / "task_journal.sqlite")
+
+    @property
+    def presentations_path(self):
+        return str(Path(self.root_path) / "data" / "presentations")
+
+    @property
     def index_path(self):
         return str(Path(self.root_path) / "index")
 
@@ -100,6 +108,7 @@ class SoulDriveWorkspace:
         for path in (
             self.papers_path,
             self.documents_path,
+            self.presentations_path,
             self.index_path,
             self.chroma_path,
             str(Path(self.root_path) / "audit"),
@@ -121,6 +130,7 @@ class SoulDriveWorkspace:
             "layout": {
                 "papers": "data/papers",
                 "documents": "data/documents",
+                "presentations": "data/presentations",
                 "index": "index",
                 "audit": "audit",
                 "models": "models",

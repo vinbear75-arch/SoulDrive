@@ -3,7 +3,7 @@ import json
 import re
 from core.graph_db import LocalGraphDB
 from core.logging_config import get_logger
-from core.model_runtime import llama_runtime_config, load_llama_with_gpu_fallback, resolve_chat_model_path
+from core.model_runtime import llama_runtime_config, load_llama_model, resolve_chat_model_path
 from core.observability import runtime_metrics
 from core.security_context import get_workspace_keys
 from core.secure_graph_store import SecureGraphStore
@@ -31,7 +31,7 @@ class GraphExtractor:
             raise FileNotFoundError(f"[致命错误] 找不到模型文件: {model_path}")
 
         try:
-            load_result = load_llama_with_gpu_fallback(
+            load_result = load_llama_model(
                 model_path=model_path,
                 config=self.runtime_config,
                 n_ctx=self.runtime_config.graph_n_ctx,
@@ -39,9 +39,6 @@ class GraphExtractor:
             self.llm = load_result.model
             self.runtime_config = load_result.effective_config
             runtime_metrics.record_model_load(load_result.load_ms)
-            if load_result.fallback_error:
-                runtime_metrics.record_error(f"GPU fallback: {load_result.fallback_error}")
-                logger.warning("[Graph Extractor] GPU 初始化失败，已自动回退 CPU 图谱抽取。")
         except Exception as exc:
             runtime_metrics.increment("model_load_failures")
             runtime_metrics.record_error(str(exc))

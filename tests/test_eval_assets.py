@@ -628,6 +628,12 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertEqual(report["refusal_leak_rate"], 0.5)
         self.assertEqual(report["overall_reliability_rate"], 2 / 3)
         self.assertEqual(report["invalid_citation_rate"], 1 / 3)
+        self.assertEqual(
+            report["retrieval_confidence_intervals_95"][
+                "retrieval_all_hit_rate"
+            ]["total"],
+            1,
+        )
 
     def test_eval_script_prints_comparison_report_from_saved_answer_results(self):
         fixture = [
@@ -698,6 +704,28 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertIn("对比报告: 3B -> 7B", output)
         self.assertIn("答案关键词覆盖率", output)
         self.assertIn("+50.0百分点", output)
+
+    def test_paired_retrieval_comparison_uses_exact_mcnemar_test(self):
+        baseline_rows = [
+            {"id": f"Q{index}", "source_all_hit": False}
+            for index in range(6)
+        ]
+        candidate_rows = [
+            {"id": f"Q{index}", "source_all_hit": True}
+            for index in range(6)
+        ]
+
+        report = eval_rag.paired_binary_comparison(
+            baseline_rows,
+            candidate_rows,
+            "source_all_hit",
+        )
+
+        self.assertEqual(report["sample_count"], 6)
+        self.assertEqual(report["improved"], 6)
+        self.assertEqual(report["regressed"], 0)
+        self.assertEqual(report["unchanged"], 0)
+        self.assertEqual(report["p_value"], 0.03125)
 
     def test_eval_script_comparison_report_includes_retrieval_metrics(self):
         fixture = [

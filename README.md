@@ -50,7 +50,7 @@ python -m pip install -r requirements.txt
 python -m pip check
 ```
 
-`git status` 应显示干净工作区。安装 CUDA 版 PyTorch 或 CUDA 版 `llama-cpp-python` 时，应根据重装后的显卡驱动单独处理；默认 CPU 路径仍可用于功能恢复。
+`git status` 应显示干净工作区。当前恢复基线为 CPU-only。
 
 ### 4. 恢复前端与 Rust 依赖
 

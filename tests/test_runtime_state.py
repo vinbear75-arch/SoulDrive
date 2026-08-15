@@ -47,6 +47,8 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertEqual(state["indexing"]["succeeded_files"], 0)
         self.assertEqual(state["indexing"]["failure_summary"], {})
         self.assertEqual(state["indexing"]["chunk_count"], 0)
+        self.assertEqual(state["indexing"]["observability"]["schema_version"], "indexing_observability_v4")
+        self.assertEqual(state["indexing"]["observability"]["documents"], [])
 
     def test_runtime_unlock_marks_hardware_only_until_software_unlock(self):
         with tempfile.TemporaryDirectory() as temp_dir:

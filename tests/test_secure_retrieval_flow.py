@@ -55,6 +55,18 @@ class SecureRetrievalFlowTests(unittest.TestCase):
         self.assertTrue(loaded_ids)
         self.assertLessEqual(len(set(loaded_ids)), 4)
         self.assertEqual(result["metadatas"][0]["source_filename"], "policy.pdf")
+        self.assertEqual(result["observability"]["schema_version"], "retrieval_observability_v1")
+        self.assertEqual(result["observability"]["schema_revision"], 3)
+        self.assertEqual(result["observability"]["stage_counts"]["final"], 1)
+        self.assertEqual(result["observability"]["query_intent"], "factual_lookup")
+        self.assertIn("redundant_deferred_count", result["observability"]["ranking"])
+        self.assertIn("mode_counts", result["observability"]["context_expansion"])
+        self.assertIn("query_token_coverage", result["observability"]["quality_signals"])
+        self.assertIn(
+            result["observability"]["sufficiency"]["decision"],
+            {"accept", "retry", "reject"},
+        )
+        self.assertIn("total", result["observability"]["timings_ms"])
         self.assertIn("zero trust architecture", result["documents"][0])
 
     def test_secure_retrieval_merges_graph_chunk_candidates(self):

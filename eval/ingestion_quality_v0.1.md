@@ -1,69 +1,70 @@
-# 文档清洗切片入库质量评测 v0.1
+# 文档清洗、切片、入库质量评测 v0.1
 
-这个评测集专门评估 ingestion 链路，不替代原有检索评测集。
+该评测集只验收 ingestion 链路，不替代检索盲测。
 
-## 文件位置
+## 覆盖范围
 
-- 评测集：`eval/ingestion_quality_v0.1.jsonl`
-- 指标脚本：`scripts/eval_ingestion.py`
-- 统一 Harness：`scripts/eval_harness.py`
-- 旧检索主评测集：`eval/retrieval_quality_blind_v0.3.jsonl`
+- 216 条样本，覆盖语料清单中的全部 36 份文档。
+- 每份文档固定 6 个检查面，单条样本权重约 0.46%。
+- 覆盖企业技术方案、项目方案、政府政策、国家标准及中英文 RAG 研究文献。
+- 包含 131 条 hard 样本、11 类评测 scope、58 个 focus 标签。
+- 表格样本 56 条、图片样本 58 条、多模态样本 46 条、深切片样本 103 条。
+- 表格与图片要求来自独立 PDF 页级审计，不再按主题标签推测；无嵌入模态的正式文件仍保留文本版式检查。
 
-## 评测范围
+每份文档的 6 个检查面：
 
-每条样本对应一份源文档，重点覆盖：
-
-- 企业技术方案和项目方案。
-- 政府正式报告、标准、指引、清单。
-- 包含表格、流程图、图片、指标表的结构化文档。
-- 中英文 RAG 参考文献。
+1. 结构与章节切分。
+2. 两段滑窗与单段重叠。
+3. 上下文增强与来源溯源。
+4. 父子索引、语义单元和模型/Schema 版本。
+5. 表格、图片、清单或条款保真。
+6. 正文编码与控制字符完整性。
 
 ## 核心指标
 
-- `document_coverage_rate`：评测文档是否在索引中存在切片。
-- `chunk_count_pass_rate`：每份文档的最小切片数是否达标。
-- `page_metadata_rate`：切片是否保留页码。
-- `section_metadata_rate`：切片是否保留标题/章节信息。
-- `dynamic_chunk_rate`：切片是否使用 `dynamic_structure_overlap_v1`。
-- `paragraph_overlap_rate`：需要段落重叠的文档是否出现有效 overlap。
-- `table_coverage_rate`：需要表格的文档是否保留表格结构。
-- `image_metadata_rate`：需要图片/流程图的文档是否存在图片元数据。
-- `overall_ingestion_quality_rate`：上述要求按样本聚合后的整体达标率。
+- `document_coverage_rate`：36 份文档是否均有可检索切片。
+- `section_metadata_rate`：章节、标题层级是否保留。
+- `paragraph_overlap_rate`：相邻窗口是否存在有效重叠。
+- `formal_window_rate`：正式文件是否采用“两段一块、重复一段”。
+- `retrieval_context_rate`：切片是否带文档标题和章节语境。
+- `source_provenance_rate`：文件名、文档哈希、Schema 是否可追溯。
+- `parent_linkage_rate`：父子切片标识是否完整。
+- `semantic_unit_rate`：语义单元计数是否有效。
+- `index_schema_rate`：索引 Schema 和嵌入模型版本是否记录。
+- `token_safe_rate`：实际嵌入输入是否未超过模型上限。
+- `table_coverage_rate`、`image_metadata_rate`：结构化内容是否保留。
+- `content_integrity_rate`：正文是否非空、无替换字符和非法控制字符。
 
-## 单独运行 ingestion 评测
+## 运行
+
+先验证评测集自身的广度与深度：
+
+```powershell
+conda run --no-capture-output -n souldrive python scripts/eval_ingestion.py --dataset eval/ingestion_quality_v0.1.jsonl --audit-dataset-only
+```
+
+语料变化后先重建表格/图片页级真值，再生成评测集：
+
+```powershell
+conda run --no-capture-output -n souldrive python scripts/build_corpus_modality_ground_truth.py --corpus-dir <PDF 目录>
+conda run --no-capture-output -n souldrive python scripts/build_ingestion_eval_dataset.py
+```
+
+当前质量门禁基线：
+
+```text
+评测集质量门禁: 通过 (100.0%)
+评测集覆盖: 样本=216, 文档=36, 每文档最少样本=6, 文档类=5, 语言=2, scope=11, hard样本=131, focus标签=58, 表格样本=56, 图片样本=58, 多模态样本=46, 深切片样本=103
+```
+
+验收真实 workspace：
 
 ```powershell
 conda run --no-capture-output -n souldrive python scripts/eval_ingestion.py --workspace <SoulDrive workspace>
 ```
 
-如果 workspace 是加密索引：
-
-```powershell
-conda run --no-capture-output -n souldrive python scripts/eval_ingestion.py --workspace <SoulDrive workspace> --passphrase <workspace password>
-```
-
-也可以用离线 chunk JSONL 调试指标：
-
-```powershell
-conda run --no-capture-output -n souldrive python scripts/eval_ingestion.py --dataset eval/ingestion_quality_v0.1.jsonl --chunks-jsonl eval/results/indexed_chunks_candidate.jsonl
-```
-
-## 统一 Harness
-
-统一 Harness 会把旧检索评测和新的 ingestion 评测聚合在一起，作为后续方案取舍的总入口。
-
-使用已保存检索结果和当前 workspace：
+统一执行 ingestion 与 retrieval Harness：
 
 ```powershell
 conda run --no-capture-output -n souldrive python scripts/eval_harness.py --workspace <SoulDrive workspace> --retrieval-results eval/results/retrieval_candidate_v0.3.jsonl
 ```
-
-完整输出 JSON：
-
-```powershell
-conda run --no-capture-output -n souldrive python scripts/eval_harness.py --workspace <SoulDrive workspace> --retrieval-results eval/results/retrieval_candidate_v0.3.jsonl --save-report eval/results/rag_harness_candidate_v0.1.json
-```
-
-## 当前边界
-
-表格会以 Markdown 和 `tables_json` 元数据保留到切片 metadata 中。图片/流程图先记录 `image_metadata_json` 和 `vision_status=pending_local_model`，不在本轮引入联网视觉模型。后续接入本地视觉模型时，应把视觉描述写回同一字段并继续使用本评测集比较。

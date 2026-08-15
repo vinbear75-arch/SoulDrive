@@ -2,20 +2,16 @@ from pathlib import Path
 from typing import Any
 
 from core.audit_log import AuditLogger
+from core.embedding_models import (
+    preferred_embedding_model_path,
+    required_embedding_files,
+)
 from core.enterprise_policy import ensure_policy_file, load_policy, policy_path
 from core.license import verify_license_for_workspace
 from core.model_runtime import model_runtime_diagnostics
 from core.paths import app_root, model_search_dirs
 from core.runtime_state import get_runtime_state
 from core.workspace import SoulDriveWorkspace, resolve_workspace
-
-
-REQUIRED_MODEL_FILES = (
-    "bge-small-zh-v1.5/config.json",
-    "bge-small-zh-v1.5/model.safetensors",
-    "bge-small-zh-v1.5/tokenizer.json",
-    "bge-small-zh-v1.5/vocab.txt",
-)
 
 
 def product_diagnostics() -> dict[str, Any]:
@@ -77,19 +73,16 @@ def model_diagnostics(workspace_path: str | None = None) -> dict[str, Any]:
     missing = []
     resolved = []
     dirs = model_search_dirs(workspace_path)
-    for relative_path in REQUIRED_MODEL_FILES:
-        found = None
-        for directory in dirs:
-            candidate = directory / relative_path
-            if candidate.exists():
-                found = candidate
-                break
-        if found is None:
-            missing.append(relative_path)
+    embedding_path = Path(preferred_embedding_model_path(workspace_path))
+    for filename in required_embedding_files(embedding_path.name):
+        candidate = embedding_path / filename
+        display_path = f"{embedding_path.name}/{filename}"
+        if not candidate.exists():
+            missing.append(display_path)
         else:
             resolved.append({
-                "path": relative_path,
-                "size": found.stat().st_size,
+                "path": display_path,
+                "size": candidate.stat().st_size,
             })
     runtime_report = model_runtime_diagnostics(workspace_path)
     return {

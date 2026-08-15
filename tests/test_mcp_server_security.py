@@ -13,6 +13,17 @@ from core.workspace_crypto import initialize_keystore
 
 
 class McpServerSecurityTests(unittest.TestCase):
+    def test_tools_call_returns_bad_request_for_invalid_arguments(self):
+        with patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False):
+            response = TestClient(mcp_server.app).post(
+                "/tools/call",
+                headers={"X-SoulDrive-Token": "test-token"},
+                json={"name": "souldrive.audit_recent", "arguments": {"limit": 1000}},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("limit", response.json()["error"])
+
     def test_security_init_requires_no_recovery_acknowledgement(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = str(Path(temp_dir) / "runtime_state.json")

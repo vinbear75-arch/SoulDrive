@@ -38,6 +38,28 @@ class ApiSecurityTests(unittest.TestCase):
         self.assertEqual(snapshot["model_load_failures"], 1)
         self.assertEqual(snapshot["last_model_load_ms"], 1234)
 
+    def test_metrics_include_indexing_status(self):
+        metrics = RuntimeMetrics()
+
+        metrics.record_indexing_run(2345, 12, failed=True)
+        snapshot = metrics.snapshot()
+
+        self.assertEqual(snapshot["indexing_runs"], 1)
+        self.assertEqual(snapshot["indexing_failures"], 1)
+        self.assertEqual(snapshot["last_indexing_ms"], 2345)
+        self.assertEqual(snapshot["last_indexed_chunk_count"], 12)
+
+    def test_metrics_include_retrieval_status(self):
+        metrics = RuntimeMetrics()
+
+        metrics.record_retrieval_run(345, candidate_count=42, evidence_count=6)
+        snapshot = metrics.snapshot()
+
+        self.assertEqual(snapshot["retrieval_runs"], 1)
+        self.assertEqual(snapshot["last_retrieval_ms"], 345)
+        self.assertEqual(snapshot["last_retrieval_candidate_count"], 42)
+        self.assertEqual(snapshot["last_retrieval_evidence_count"], 6)
+
     def test_metrics_last_error_redacts_paths_and_sensitive_fields(self):
         metrics = RuntimeMetrics()
 

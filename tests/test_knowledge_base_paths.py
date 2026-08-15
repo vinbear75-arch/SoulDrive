@@ -1,10 +1,15 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from core.knowledge_base import LocalKnowledgeBase
+from core.knowledge_base import _contextualized_child_text
+from core.knowledge_base import _select_parent_context
+from core.embedding_models import preferred_embedding_model_path
 from core.knowledge_base import _persistent_client
+from core.retrieval import SearchCandidate, classify_query_intent
 from core.workspace import SoulDriveWorkspace
 
 
@@ -25,9 +30,12 @@ class KnowledgeBasePathTests(unittest.TestCase):
                 patch("core.knowledge_base._sentence_transformer"),
             ):
                 kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                self.assertTrue(kb.embedding_query_instruction.startswith("为这个句子生成表示"))
+                self.assertTrue(kb._query_embedding_text("访问控制").endswith("访问控制"))
                 kb.close()
 
         persistent_client.assert_called_once_with(path=workspace.chroma_path)
+        chroma_client.close.assert_called_once_with()
 
     def test_embedding_model_can_be_loaded_from_workspace_models(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -38,7 +46,6 @@ class KnowledgeBasePathTests(unittest.TestCase):
 
             with (
                 patch("core.knowledge_base._persistent_client", return_value=chroma_client),
-                patch("core.knowledge_base.resolve_torch_device", return_value="cuda"),
                 patch("core.knowledge_base._sentence_transformer") as sentence_transformer,
             ):
                 kb = LocalKnowledgeBase(
@@ -51,7 +58,34 @@ class KnowledgeBasePathTests(unittest.TestCase):
 
         sentence_transformer.assert_called_once_with(str(embedding_model_path))
 
-    def test_embedding_model_uses_resolved_torch_device(self):
+    def test_qwen3_embedding_is_preferred_when_already_installed_locally(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            bge_path = Path(workspace.models_path) / "bge-small-zh-v1.5"
+            qwen_path = Path(workspace.models_path) / "Qwen3-Embedding-0.6B"
+            bge_path.mkdir(parents=True)
+            qwen_path.mkdir(parents=True)
+
+            selected = preferred_embedding_model_path(workspace.root_path)
+
+        self.assertEqual(selected, str(qwen_path))
+
+    def test_qwen3_embedding_is_preferred_across_search_dirs(self):
+        with tempfile.TemporaryDirectory() as first_dir, tempfile.TemporaryDirectory() as second_dir:
+            bge_path = Path(first_dir) / "bge-small-zh-v1.5"
+            qwen_path = Path(second_dir) / "Qwen3-Embedding-0.6B"
+            bge_path.mkdir(parents=True)
+            qwen_path.mkdir(parents=True)
+
+            with patch(
+                "core.embedding_models.model_search_dirs",
+                return_value=[Path(first_dir), Path(second_dir)],
+            ):
+                selected = preferred_embedding_model_path()
+
+        self.assertEqual(selected, str(qwen_path))
+
+    def test_embedding_model_uses_cpu_device(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
             embedding_model_path = Path(workspace.models_path) / "bge-small-zh-v1.5"
@@ -60,7 +94,6 @@ class KnowledgeBasePathTests(unittest.TestCase):
 
             with (
                 patch("core.knowledge_base._persistent_client", return_value=chroma_client),
-                patch("core.knowledge_base.resolve_torch_device", return_value="cuda:0"),
                 patch("sentence_transformers.SentenceTransformer") as sentence_transformer,
             ):
                 kb = LocalKnowledgeBase(
@@ -72,7 +105,44 @@ class KnowledgeBasePathTests(unittest.TestCase):
                 kb.close()
 
         sentence_transformer.assert_called_once_with(
-            str(embedding_model_path), local_files_only=True, device="cuda:0"
+            str(embedding_model_path), local_files_only=True, device="cpu"
+        )
+
+    def test_contextualized_text_does_not_strip_version_from_formal_title(self):
+        text, _ = _contextualized_child_text(
+            "正文",
+            {
+                "document_title": "企业数据平台建设方案 v1.0",
+                "source_filename": "upload.pdf",
+            },
+        )
+
+        self.assertIn("[DOCUMENT] 企业数据平台建设方案 v1.0", text)
+
+    def test_parent_expansion_keeps_formal_boundary_window(self):
+        prefix = "[DOCUMENT] scheme"
+        candidate = SearchCandidate(
+            id="child-2",
+            content=f"{prefix}\n\nPrevious paragraph.\n\nCurrent paragraph.",
+            metadata={
+                "retrieval_context": prefix,
+                "boundary_overlap_chars": len("Previous paragraph."),
+                "child_start_char": 0,
+                "child_end_char": len("Current paragraph."),
+                "content_kind": "prose",
+            },
+        )
+
+        context, metadata = _select_parent_context(
+            "Current paragraph.",
+            candidate,
+            classify_query_intent("What are the requirements?"),
+        )
+
+        self.assertEqual(context, "Previous paragraph.\n\nCurrent paragraph.")
+        self.assertEqual(
+            metadata["context_expansion_mode"],
+            "formal_two_paragraph_boundary_window",
         )
 
     def test_persistent_client_disables_chroma_anonymized_telemetry(self):
@@ -82,6 +152,362 @@ class KnowledgeBasePathTests(unittest.TestCase):
 
         settings = persistent_client.call_args.kwargs["settings"]
         self.assertFalse(settings.anonymized_telemetry)
+
+    def test_ingest_chunks_returns_stage_observability_summary(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _FakeParentStore()
+        kb.keyword_index = _FakeKeywordIndex()
+        kb.embedding_model = _FakeEmbeddingModel()
+        kb.collection = _FakeCollection()
+        kb._source_candidate_cache = {"stale": True}
+
+        chunks = [
+            SimpleNamespace(
+                page_content="\n\n".join([
+                    "# 总体方案",
+                    "第一段说明建设目标。",
+                    "第二段说明技术架构。",
+                ]),
+                metadata={
+                    "source_filename": "scheme.pdf",
+                    "section_path": ["总体方案"],
+                    "structure_aware": True,
+                    "document_number": "企标〔2026〕1号",
+                    "document_profile": "project_plan",
+                    "clause_ids": "1.1,1.2",
+                },
+            )
+        ]
+
+        summary = kb.ingest_chunks("doc-hash", chunks)
+
+        self.assertEqual(summary["parent_count"], 1)
+        self.assertGreaterEqual(summary["child_count"], 1)
+        self.assertGreaterEqual(summary["embedding_ms"], 0)
+        self.assertGreaterEqual(summary["vector_store_ms"], 0)
+        self.assertGreaterEqual(summary["keyword_index_ms"], 0)
+        self.assertEqual(kb._source_candidate_cache, None)
+        self.assertTrue(chunks[0].metadata["child_ids"])
+        self.assertTrue(kb.collection.documents[0].startswith("[DOCUMENT] scheme"))
+        self.assertIn("[SECTION] 总体方案", kb.collection.documents[0])
+        self.assertIn("[DOCUMENT_NUMBER] 企标〔2026〕1号", kb.collection.documents[0])
+        self.assertIn("[DOCUMENT_TYPE] 项目方案", kb.collection.documents[0])
+        self.assertIn("[CLAUSE] 1.1,1.2", kb.collection.documents[0])
+        self.assertIn("[DOCUMENT] scheme", kb.keyword_index.documents[0])
+        self.assertEqual(
+            summary["child_strategy_counts"],
+            {"formal_structure_paragraph_window_v2": summary["child_count"]},
+        )
+        self.assertIn("previous_child_id", kb.collection.metadatas[0])
+        self.assertIn("next_child_id", kb.collection.metadatas[0])
+
+    def test_ingest_chunks_enforces_embedding_model_token_limit(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _FakeParentStore()
+        kb.keyword_index = _FakeKeywordIndex()
+        kb.embedding_model = _FakeTokenAwareEmbeddingModel(max_seq_length=128)
+        kb.collection = _FakeCollection()
+        kb._source_candidate_cache = None
+        chunks = [
+            SimpleNamespace(
+                page_content="\n\n".join(
+                    [
+                        "# 数据治理方案",
+                        "第一段 " + "甲" * 160,
+                        "第二段 " + "乙" * 160,
+                        "第三段 " + "丙" * 160,
+                    ]
+                ),
+                metadata={
+                    "document_title": "数据治理方案",
+                    "document_profile": "project_plan",
+                    "section_path": ["总体方案"],
+                    "structure_aware": True,
+                },
+            )
+        ]
+
+        summary = kb.ingest_chunks("token-safe-doc", chunks)
+
+        self.assertGreater(summary["child_count"], 3)
+        self.assertEqual(summary["embedding_token_limit"], 128)
+        self.assertLessEqual(summary["max_embedding_input_tokens"], 128)
+        self.assertTrue(all(length <= 128 for length in kb.embedding_model.encoded_lengths))
+
+    def test_ingest_chunks_overlaps_adjacent_parents_only_within_same_section(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _FakeParentStore()
+        kb.keyword_index = _FakeKeywordIndex()
+        kb.embedding_model = _FakeEmbeddingModel()
+        kb.collection = _FakeCollection()
+        kb._source_candidate_cache = None
+        chunks = [
+            SimpleNamespace(
+                page_content="First deployment requirement.",
+                metadata={
+                    "source_filename": "scheme.pdf",
+                    "section_path": ["Deployment"],
+                    "section": "Deployment",
+                    "structure_aware": True,
+                    "content_kind": "prose",
+                    "page": 1,
+                },
+            ),
+            SimpleNamespace(
+                page_content="Second deployment requirement.",
+                metadata={
+                    "source_filename": "scheme.pdf",
+                    "section_path": ["Deployment"],
+                    "section": "Deployment",
+                    "structure_aware": True,
+                    "content_kind": "prose",
+                    "page": 1,
+                },
+            ),
+            SimpleNamespace(
+                page_content="Acceptance requirement.",
+                metadata={
+                    "source_filename": "scheme.pdf",
+                    "section_path": ["Acceptance"],
+                    "section": "Acceptance",
+                    "structure_aware": True,
+                    "content_kind": "prose",
+                    "page": 2,
+                },
+            ),
+        ]
+
+        summary = kb.ingest_chunks("boundary-doc", chunks)
+
+        self.assertEqual(summary["boundary_overlap_opportunity_count"], 1)
+        self.assertEqual(summary["boundary_overlap_count"], 1)
+        self.assertGreater(kb.collection.metadatas[1]["boundary_overlap_chars"], 0)
+        self.assertEqual(kb.collection.metadatas[1]["semantic_unit_count"], 2)
+        self.assertIn("First deployment requirement.", kb.collection.documents[1])
+        self.assertIn("Second deployment requirement.", kb.collection.documents[1])
+        self.assertEqual(kb.collection.metadatas[2]["boundary_overlap_chars"], 0)
+
+    def test_ingest_chunks_rolls_back_vectors_when_parent_write_fails(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _FailingParentStore()
+        kb.keyword_index = _FakeKeywordIndex()
+        kb.embedding_model = _FakeEmbeddingModel()
+        kb.collection = _FakeCollection()
+        kb._source_candidate_cache = {"stale": True}
+        chunk = SimpleNamespace(
+            page_content="# 建设方案\n\n系统采用分层架构。",
+            metadata={
+                "source_filename": "scheme.pdf",
+                "structure_aware": True,
+            },
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "parent write failed"):
+            kb.ingest_chunks("failed-doc", [chunk])
+
+        self.assertEqual(kb.collection.ids, [])
+        self.assertTrue(kb.collection.deleted_ids)
+        self.assertEqual(kb.parent_store.deleted_ids, ["failed-doc_parent_0"])
+        self.assertTrue(kb.keyword_index.deleted_ids)
+        self.assertEqual(kb.keyword_index.documents, [])
+        self.assertNotIn("child_ids", chunk.metadata)
+        self.assertEqual(kb._source_candidate_cache, {"stale": True})
+
+    def test_delete_document_indexes_removes_local_graph_provenance(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.collection = _FakeDeleteCollection(["child-1", "child-2"])
+        kb.parent_store = _FakeDeleteStore()
+        kb.keyword_index = _FakeDeleteStore()
+        kb.workspace = SimpleNamespace(graph_db_path="graph.sqlite")
+        kb._source_candidate_cache = {"stale": True}
+
+        with (
+            patch("core.knowledge_base.os.path.exists", return_value=True),
+            patch("core.knowledge_base.LocalGraphDB", return_value=_FakeGraphStore()) as graph_factory,
+        ):
+            kb.delete_document_indexes("doc-hash")
+
+        graph_store = graph_factory.return_value
+        self.assertEqual(graph_store.removed_chunk_ids, [["child-1", "child-2"]])
+        self.assertTrue(graph_store.closed)
+        self.assertEqual(kb.collection.deleted_ids, ["child-1", "child-2"])
+        self.assertEqual(kb.parent_store.deleted_hashes, ["doc-hash"])
+        self.assertEqual(kb.keyword_index.deleted_hashes, ["doc-hash"])
+        self.assertIsNone(kb._source_candidate_cache)
+
+    def test_delete_index_records_removes_only_requested_local_records(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.collection = _FakeCollection()
+        kb.collection.add(
+            embeddings=[[0.1], [0.2]],
+            documents=["old", "new"],
+            metadatas=[{"parent_id": "old-parent"}, {"parent_id": "new-parent"}],
+            ids=["old-child", "new-child"],
+        )
+        kb.parent_store = _FakeParentStore()
+        kb.parent_store.parent_ids = ["old-parent", "new-parent"]
+        kb.keyword_index = _FakeKeywordIndex()
+        kb.keyword_index.ids = ["old-child", "new-child"]
+        kb.keyword_index.documents = ["old", "new"]
+        kb.workspace = SimpleNamespace(graph_db_path="missing.sqlite")
+        kb._source_candidate_cache = {"stale": True}
+
+        with patch("core.knowledge_base.os.path.exists", return_value=False):
+            kb.delete_index_records(
+                child_ids=["old-child"],
+                parent_ids=["old-parent"],
+            )
+
+        self.assertEqual(kb.collection.ids, ["new-child"])
+        self.assertEqual(kb.parent_store.parent_ids, ["new-parent"])
+        self.assertEqual(kb.keyword_index.ids, ["new-child"])
+        self.assertIsNone(kb._source_candidate_cache)
+
+
+class _FakeParentStore:
+    def __init__(self):
+        self.parent_ids = []
+        self.deleted_ids = []
+
+    def upsert_parent(self, parent_id, content, metadata):
+        _ = content
+        _ = metadata
+        self.parent_ids.append(parent_id)
+
+    def delete(self, parent_ids):
+        self.deleted_ids.extend(parent_ids)
+        deleted = set(parent_ids)
+        self.parent_ids = [parent_id for parent_id in self.parent_ids if parent_id not in deleted]
+
+
+class _FailingParentStore(_FakeParentStore):
+    def upsert_parent(self, parent_id, content, metadata):
+        _ = parent_id
+        _ = content
+        _ = metadata
+        raise RuntimeError("parent write failed")
+
+
+class _FakeKeywordIndex:
+    def __init__(self):
+        self.documents = []
+        self.ids = []
+        self.deleted_ids = []
+
+    def upsert_document(self, doc_id, content, metadata):
+        _ = metadata
+        self.ids.append(doc_id)
+        self.documents.append(content)
+
+    def delete(self, doc_ids):
+        self.deleted_ids.extend(doc_ids)
+        deleted = set(doc_ids)
+        kept = [
+            (doc_id, content)
+            for doc_id, content in zip(self.ids, self.documents)
+            if doc_id not in deleted
+        ]
+        self.ids = [doc_id for doc_id, _content in kept]
+        self.documents = [content for _doc_id, content in kept]
+
+
+class _FakeEmbeddingModel:
+    def encode(self, texts, normalize_embeddings=True):
+        _ = normalize_embeddings
+        return _FakeEmbeddings([[0.1, 0.2] for _text in texts])
+
+
+class _CharacterTokenizer:
+    def tokenize(self, text):
+        return list(text)
+
+
+class _FakeTokenAwareEmbeddingModel(_FakeEmbeddingModel):
+    def __init__(self, max_seq_length):
+        self.max_seq_length = max_seq_length
+        self.tokenizer = _CharacterTokenizer()
+        self.encoded_lengths = []
+
+    def encode(self, texts, normalize_embeddings=True):
+        self.encoded_lengths = [len(self.tokenizer.tokenize(text)) for text in texts]
+        if any(length > self.max_seq_length for length in self.encoded_lengths):
+            raise AssertionError("embedding input was truncated")
+        return super().encode(texts, normalize_embeddings=normalize_embeddings)
+
+
+class _FakeEmbeddings(list):
+    def tolist(self):
+        return list(self)
+
+
+class _FakeCollection:
+    def __init__(self):
+        self.ids = []
+        self.documents = []
+        self.metadatas = []
+        self.deleted_ids = []
+
+    def add(self, embeddings, documents, metadatas, ids):
+        _ = embeddings
+        self.ids.extend(ids)
+        self.documents.extend(documents)
+        self.metadatas.extend(metadatas)
+
+    def delete(self, ids):
+        self.deleted_ids.extend(ids)
+        deleted = set(ids)
+        kept = [
+            (doc_id, document, metadata)
+            for doc_id, document, metadata in zip(
+                self.ids,
+                self.documents,
+                self.metadatas,
+            )
+            if doc_id not in deleted
+        ]
+        self.ids = [doc_id for doc_id, _document, _metadata in kept]
+        self.documents = [document for _doc_id, document, _metadata in kept]
+        self.metadatas = [metadata for _doc_id, _document, metadata in kept]
+
+
+class _FakeDeleteCollection:
+    def __init__(self, ids):
+        self.ids = ids
+        self.deleted_ids = []
+
+    def get(self, where, include):
+        _ = where
+        _ = include
+        return {"ids": self.ids}
+
+    def delete(self, ids):
+        self.deleted_ids.extend(ids)
+
+
+class _FakeDeleteStore:
+    def __init__(self):
+        self.deleted_hashes = []
+
+    def delete_by_document_hash(self, document_hash):
+        self.deleted_hashes.append(document_hash)
+
+
+class _FakeGraphStore:
+    def __init__(self):
+        self.removed_chunk_ids = []
+        self.closed = False
+
+    def remove_chunk_ids(self, chunk_ids):
+        self.removed_chunk_ids.append(chunk_ids)
+
+    def close(self):
+        self.closed = True
 
 
 if __name__ == "__main__":

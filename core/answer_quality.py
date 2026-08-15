@@ -41,13 +41,47 @@ def evaluate_evidence_gate(
     if max_score < reject_score:
         return EvidenceGateResult(False, "evidence confidence below threshold", len(evidence), max_score, "reject")
 
+    answers_query = evidence_answers_query(query, evidence) if query else None
     if max_score < retry_score:
+        if (
+            answers_query
+            and has_corroborating_evidence(
+                evidence,
+                minimum_score=max(reject_score, retry_score * 0.65),
+            )
+        ):
+            return EvidenceGateResult(
+                True,
+                "evidence accepted by corroboration",
+                len(evidence),
+                max_score,
+                "accept",
+            )
         return EvidenceGateResult(False, "evidence confidence requires retry", len(evidence), max_score, "retry")
 
-    if query and not evidence_answers_query(query, evidence):
+    if query and not answers_query:
         return EvidenceGateResult(False, "evidence does not answer query", len(evidence), max_score, "retry")
 
     return EvidenceGateResult(True, "evidence accepted", len(evidence), max_score, "accept")
+
+
+def has_corroborating_evidence(
+    evidence: list[dict[str, Any]],
+    minimum_score: float,
+) -> bool:
+    credible = [
+        item
+        for item in evidence
+        if _safe_float(item.get("score")) >= minimum_score
+    ]
+    if len(credible) < 2:
+        return False
+    sources = {
+        str(item.get("source_filename") or "").strip()
+        for item in credible
+        if str(item.get("source_filename") or "").strip()
+    }
+    return len(sources) >= 2
 
 
 def refusal_answer(query: str, gate: EvidenceGateResult) -> str:

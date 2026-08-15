@@ -68,6 +68,23 @@ class LocalGraphDB:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS entity_chunks (
+                entity_name TEXT NOT NULL,
+                chunk_id TEXT NOT NULL,
+                PRIMARY KEY (entity_name, chunk_id),
+                FOREIGN KEY (entity_name) REFERENCES entities(name)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS relationship_chunks (
+                relationship_id INTEGER NOT NULL,
+                chunk_id TEXT NOT NULL,
+                PRIMARY KEY (relationship_id, chunk_id),
+                FOREIGN KEY (relationship_id) REFERENCES relationships(id)
+            )
+        """)
+
         # ==========================================
         # 性能优化：建立索引 (Indexes)
         # ==========================================
@@ -75,6 +92,8 @@ class LocalGraphDB:
         # 如果不建立索引，每次查询都会全表扫描 (O(N))；建立索引后查询时间降至 O(log N)，极大提升多跳检索的速度。
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_source ON relationships(source)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_target ON relationships(target)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_chunks_chunk ON entity_chunks(chunk_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_chunks_chunk ON relationship_chunks(chunk_id)")
 
         # 提交上述建表和索引操作到数据库
         self.conn.commit()
@@ -83,22 +102,27 @@ class LocalGraphDB:
         """
         数据写入层：插入或更新实体节点
         """
-        _ = chunk_ids
         cursor = self.conn.cursor()
-        # INSERT OR REPLACE (Upsert 机制)
-        # 逻辑：如果 name（主键）不存在，则插入新行；如果已存在，则用新传入的 type 和 description 覆盖旧数据。
-        # 优势：保证了大模型在多次抽取知识时，实体的描述能够不断被更新和修正，且不会报错中断。
         cursor.execute("""
-            INSERT OR REPLACE INTO entities (name, type, description)
+            INSERT INTO entities (name, type, description)
             VALUES (?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+                type = excluded.type,
+                description = excluded.description
         """, (name, entity_type, description))
+        cursor.executemany(
+            """
+            INSERT OR IGNORE INTO entity_chunks (entity_name, chunk_id)
+            VALUES (?, ?)
+            """,
+            [(name, chunk_id) for chunk_id in _dedupe(chunk_ids or [])],
+        )
         self.conn.commit()
 
     def add_relationship(self, source: str, target: str, relation: str, evidence_chunk_ids: list[str] | None = None):
         """
         数据写入层：插入实体间的连接关系
         """
-        _ = evidence_chunk_ids
         cursor = self.conn.cursor()
         # INSERT OR IGNORE
         # 逻辑：尝试插入新的关系。因为我们在建表时设置了 UNIQUE(source, target, relation)，
@@ -107,6 +131,22 @@ class LocalGraphDB:
             INSERT OR IGNORE INTO relationships (source, target, relation)
             VALUES (?, ?, ?)
         """, (source, target, relation))
+        cursor.execute(
+            """
+            SELECT id
+            FROM relationships
+            WHERE source = ? AND target = ? AND relation = ?
+            """,
+            (source, target, relation),
+        )
+        relationship_id = cursor.fetchone()[0]
+        cursor.executemany(
+            """
+            INSERT OR IGNORE INTO relationship_chunks (relationship_id, chunk_id)
+            VALUES (?, ?)
+            """,
+            [(relationship_id, chunk_id) for chunk_id in _dedupe(evidence_chunk_ids or [])],
+        )
         self.conn.commit()
 
     def get_all_entities(self):
@@ -239,13 +279,142 @@ class LocalGraphDB:
         return graph_context
 
     def recall_chunk_ids(self, query: str, limit: int = 40):
-        _ = query
-        _ = limit
-        return []
+        if limit <= 0:
+            return []
+
+        match_space = (query or "").lower()
+        matched_entities = [
+            entity
+            for entity in self.get_all_entities()
+            if entity and entity.lower() in match_space
+        ]
+
+        chunk_ids = []
+        seen = set()
+        for entity_name in matched_entities:
+            for chunk_id in self._entity_chunk_ids(entity_name):
+                if chunk_id not in seen:
+                    seen.add(chunk_id)
+                    chunk_ids.append(chunk_id)
+
+            for source, relation, target in self.get_subgraph(entity_name, depth=1):
+                for related_entity in (source, target):
+                    for chunk_id in self._entity_chunk_ids(related_entity):
+                        if chunk_id not in seen:
+                            seen.add(chunk_id)
+                            chunk_ids.append(chunk_id)
+                for chunk_id in self._relationship_chunk_ids(source, relation, target):
+                    if chunk_id not in seen:
+                        seen.add(chunk_id)
+                        chunk_ids.append(chunk_id)
+                if len(chunk_ids) >= limit:
+                    return chunk_ids[:limit]
+
+        return chunk_ids[:limit]
+
+    def remove_chunk_ids(self, chunk_ids: list[str]) -> None:
+        removed = _dedupe(chunk_ids)
+        if not removed:
+            return
+
+        affected_entities = set()
+        affected_relationships = set()
+        cursor = self.conn.cursor()
+        for batch in _batches(removed, 500):
+            placeholders = ",".join("?" for _ in batch)
+            cursor.execute(
+                f"SELECT DISTINCT entity_name FROM entity_chunks WHERE chunk_id IN ({placeholders})",
+                batch,
+            )
+            affected_entities.update(row[0] for row in cursor.fetchall())
+            cursor.execute(
+                f"SELECT DISTINCT relationship_id FROM relationship_chunks WHERE chunk_id IN ({placeholders})",
+                batch,
+            )
+            affected_relationships.update(row[0] for row in cursor.fetchall())
+            cursor.execute(
+                f"DELETE FROM entity_chunks WHERE chunk_id IN ({placeholders})",
+                batch,
+            )
+            cursor.execute(
+                f"DELETE FROM relationship_chunks WHERE chunk_id IN ({placeholders})",
+                batch,
+            )
+
+        cursor.executemany(
+            """
+            DELETE FROM relationships
+            WHERE id = ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM relationship_chunks
+                  WHERE relationship_id = relationships.id
+              )
+            """,
+            [(relationship_id,) for relationship_id in affected_relationships],
+        )
+        cursor.executemany(
+            """
+            DELETE FROM entities
+            WHERE name = ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM entity_chunks
+                  WHERE entity_name = entities.name
+              )
+            """,
+            [(entity_name,) for entity_name in affected_entities],
+        )
+        self.conn.commit()
+
+    def _entity_chunk_ids(self, name: str) -> list[str]:
+        rows = self.conn.execute(
+            """
+            SELECT chunk_id
+            FROM entity_chunks
+            WHERE entity_name = ?
+            ORDER BY chunk_id ASC
+            """,
+            (name,),
+        ).fetchall()
+        return [row[0] for row in rows]
+
+    def _relationship_chunk_ids(self, source: str, relation: str, target: str) -> list[str]:
+        rows = self.conn.execute(
+            """
+            SELECT relationship_chunks.chunk_id
+            FROM relationship_chunks
+            JOIN relationships
+              ON relationships.id = relationship_chunks.relationship_id
+            WHERE relationships.source = ?
+              AND relationships.relation = ?
+              AND relationships.target = ?
+            ORDER BY relationship_chunks.chunk_id ASC
+            """,
+            (source, relation, target),
+        ).fetchall()
+        return [row[0] for row in rows]
 
     def close(self):
         """释放资源，安全关闭数据库连接，防止连接池泄漏"""
         self.conn.close()
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        item = str(value)
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _batches(values: list[str], size: int):
+    for start in range(0, len(values), size):
+        yield values[start : start + size]
 # ---------------------------------------------------------
 # 简易测试代码 (仅在直接运行此脚本时执行)
 # ---------------------------------------------------------

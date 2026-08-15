@@ -3,6 +3,8 @@ import uuid
 import sqlite3
 import inspect
 import os
+import json
+import re
 import subprocess
 import sys
 import threading
@@ -29,9 +31,10 @@ from core.enterprise_security import (
 )
 from core.learning_store import LearningStore
 from core.learning_validator import validate_learning_candidates
-from core.memory_runtime import build_memory_capsule
+from core.memory_runtime import gate_memory_context
 from core.observability import runtime_metrics
 from core.paper_importer import import_paper_into_workspace
+from core.presentation_service import PresentationService
 from core.paths import app_root
 from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.runtime_state import (
@@ -141,6 +144,8 @@ rag = None
 loaded_workspace_path = None
 indexer_process: subprocess.Popen | None = None
 indexer_lock = threading.Lock()
+presentation_threads: dict[str, threading.Thread] = {}
+presentation_thread_lock = threading.Lock()
 
 
 def current_workspace():
@@ -427,6 +432,14 @@ class RuntimeRequest(BaseModel):
 class PaperImportRequest(BaseModel):
     source_paths: list[str] = Field(min_length=1, max_length=100)
 
+
+class PresentationGenerateRequest(BaseModel):
+    source_filenames: list[str] = Field(min_length=1, max_length=12)
+    title: str = Field(default="", max_length=120)
+    audience: str = Field(default="management", pattern="^(management|technical|government|general)$")
+    max_slides: int = Field(default=10, ge=4, le=16)
+    open_in_wps: bool = True
+
 class SecurityInitRequest(BaseModel):
     passphrase: str = Field(min_length=8, max_length=256)
     acknowledge_no_recovery: bool = False
@@ -603,6 +616,122 @@ async def documents_import(request: PaperImportRequest):
     return _import_documents(request)
 
 
+def _run_presentation_task(task_id: str) -> None:
+    try:
+        service = current_presentation_service()
+        result = service.run_task(task_id)
+        if result.get("status") == "completed":
+            runtime_metrics.increment("presentation_tasks_completed")
+        else:
+            runtime_metrics.increment("presentation_tasks_failed")
+    except Exception as exc:
+        runtime_metrics.increment("presentation_tasks_failed")
+        runtime_metrics.record_error(f"presentation task failed: {exc}")
+    finally:
+        with presentation_thread_lock:
+            presentation_threads.pop(task_id, None)
+
+
+def _start_presentation_thread(task_id: str) -> bool:
+    with presentation_thread_lock:
+        existing = presentation_threads.get(task_id)
+        if existing is not None and existing.is_alive():
+            return False
+        thread = threading.Thread(
+            target=_run_presentation_task,
+            args=(task_id,),
+            daemon=True,
+            name=f"presentation-{task_id[-8:]}",
+        )
+        presentation_threads[task_id] = thread
+        thread.start()
+        return True
+
+
+@app.get("/presentations/sources")
+async def presentation_sources():
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    library = _document_library_payload(current_workspace())
+    return {
+        "sources": [
+            document
+            for document in library["documents"]
+            if document.get("indexed")
+        ]
+    }
+
+
+@app.post("/presentations/generate")
+async def presentation_generate(request: PresentationGenerateRequest):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    try:
+        service = current_presentation_service()
+        task = service.create_task(request.model_dump())
+        runtime_metrics.increment("presentation_tasks_started")
+        started = _start_presentation_thread(task["task_id"])
+        public_task = service.get_task(task["task_id"])
+        return JSONResponse(
+            {**public_task, "worker_started": started},
+            status_code=202,
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.get("/presentations/tasks")
+async def presentation_tasks(limit: int = 30):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    service = current_presentation_service()
+    return {"tasks": service.list_tasks(limit=max(1, min(limit, 100)))}
+
+
+@app.get("/presentations/tasks/{task_id}")
+async def presentation_task(task_id: str):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    try:
+        return current_presentation_service().get_task(task_id)
+    except KeyError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=404)
+
+
+@app.post("/presentations/tasks/{task_id}/resume")
+async def presentation_resume(task_id: str):
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    try:
+        task = current_presentation_service().get_task(task_id)
+    except KeyError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=404)
+    if task["status"] == "completed":
+        return task
+    started = _start_presentation_thread(task_id)
+    return JSONResponse({**task, "worker_started": started}, status_code=202 if started else 409)
+
+
 @app.get("/papers/list")
 async def papers_list():
     mounted_response = require_workspace_mounted()
@@ -763,6 +892,74 @@ def _document_library_payload(workspace: SoulDriveWorkspace) -> dict:
     }
 
 
+def current_presentation_service() -> PresentationService:
+    workspace = current_workspace()
+    keys = get_workspace_keys(workspace.root_path)
+    if keys is None:
+        raise RuntimeError("workspace keys are not available")
+    return PresentationService(
+        workspace,
+        keys,
+        audit_logger=current_audit_logger(),
+        outline_generator=_presentation_outline_with_local_model,
+    )
+
+
+def _presentation_outline_with_local_model(records: list[dict], inputs: dict) -> dict:
+    from core.presentation_service import build_extractable_presentation_plan
+
+    # The deterministic evidence-bound plan remains the fallback and the validation baseline.
+    baseline = build_extractable_presentation_plan(records, inputs)
+    try:
+        ensure_runtime_loaded()
+    except Exception:
+        return baseline
+    if rag is None:
+        return baseline
+
+    evidence_lines = []
+    for record in records[:24]:
+        content = " ".join(str(record.get("content") or "").split())[:700]
+        evidence_lines.append(
+            f"[{record['source_filename']} | {record.get('section') or '未标注章节'} | "
+            f"第{record.get('page_number') or '?'}页] {content}"
+        )
+    prompt = [
+        {
+            "role": "system",
+            "content": (
+                "你是企业正式汇报材料编辑。只依据用户提供的证据摘录生成 PPT 提纲。"
+                "不要引入外部事实，不要写营销空话。输出严格 JSON："
+                '{"title":"...","slides":[{"kind":"cover|content|sources",'
+                '"title":"...","subtitle":"...","points":["..."],'
+                '"sources":["必须是给定文件名"],"footer":"..."}]}。'
+                "每页最多 5 个要点，每个要点不超过 55 个汉字。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"标题：{inputs.get('title') or '自动归纳'}\n"
+                f"受众：{inputs['audience']}\n"
+                f"最多页数：{inputs['max_slides']}\n"
+                "证据摘录：\n" + "\n\n".join(evidence_lines)
+            ),
+        },
+    ]
+    raw = rag._generate_answer_text(prompt)
+    cleaned = raw.strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        cleaned = fenced.group(1)
+    try:
+        payload = json.loads(cleaned)
+    except (json.JSONDecodeError, TypeError):
+        return baseline
+    payload.setdefault("schema_version", "souldrive_presentation_plan_v1")
+    payload.setdefault("generated_at_label", time.strftime("%Y-%m-%d %H:%M"))
+    return payload
+
+
 def _import_documents(request: PaperImportRequest):
     mounted_response = require_workspace_mounted()
     if mounted_response is not None:
@@ -800,7 +997,23 @@ def _learning_context_for_query(query: str) -> dict:
         try:
             memories = store.list_memories()
             result = store.search(query, top_k_memory=3, top_k_skill=5)
-            capsule = build_memory_capsule(memories)
+            scored_memories = {
+                str(item.get("asset_id") or ""): item
+                for item in result["memories"]
+            }
+            memory_candidates = [
+                {
+                    **memory,
+                    "score": (scored_memories.get(str(memory.get("memory_id") or "")) or {}).get("score", 0.0),
+                }
+                for memory in memories
+            ]
+            memory_context = gate_memory_context(query, memory_candidates)
+            runtime_metrics.record_memory_gate(
+                memory_context["gate"]["decision"],
+                memory_context["gate"]["accepted_count"],
+                memory_context["gate"]["rejected_count"],
+            )
             skill_matches = match_skills(query, result["skills"], top_k=2)
             skill_execution = None
             if skill_matches:
@@ -819,8 +1032,10 @@ def _learning_context_for_query(query: str) -> dict:
                 skill_execution["run_id"] = run["run_id"]
             result = {
                 **result,
+                "memories": memory_context["memories"],
                 "skills": result["skills"][:2],
-                "memory_capsule": capsule,
+                "memory_capsule": memory_context["memory_capsule"],
+                "memory_gate": memory_context["gate"],
                 "skill_matches": skill_matches,
                 "skill_execution": skill_execution,
             }
@@ -834,6 +1049,7 @@ def _learning_context_for_query(query: str) -> dict:
                     "memory_count": len(result["memories"]),
                     "skill_count": len(result["skills"]),
                     "memory_capsule_count": len(result["memory_capsule"]["items"]),
+                    "memory_gate": result["memory_gate"],
                     "skill_execution": bool(result["skill_execution"]),
                 },
             )
@@ -844,6 +1060,7 @@ def _learning_context_for_query(query: str) -> dict:
             "memories": [],
             "skills": [],
             "memory_capsule": {"items": [], "text": ""},
+            "memory_gate": {"decision": "skip", "accepted_count": 0, "rejected_count": 0},
             "skill_matches": [],
             "skill_execution": None,
         }
@@ -1061,6 +1278,17 @@ def _public_skill_match(match: dict) -> dict:
     }
 
 
+def _presentation_tool_generate(arguments: dict) -> dict:
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        raise RuntimeError("workspace must be unlocked")
+    service = current_presentation_service()
+    task = service.create_task(arguments)
+    runtime_metrics.increment("presentation_tasks_started")
+    started = _start_presentation_thread(task["task_id"])
+    return {**service.get_task(task["task_id"]), "worker_started": started}
+
+
 tool_registry = build_default_tool_registry(
     runtime_status_handler=lambda _arguments: public_runtime_state(),
     audit_recent_handler=lambda arguments: {
@@ -1069,6 +1297,7 @@ tool_registry = build_default_tool_registry(
     workspace_diagnostics_handler=lambda _arguments: workspace_diagnostics(),
     product_diagnostics_handler=lambda _arguments: product_diagnostics(),
     audit_verify_handler=lambda arguments: audit_verify_report(arguments.get("limit")),
+    presentation_generate_handler=_presentation_tool_generate,
 )
 
 
@@ -1080,9 +1309,16 @@ async def tools_list():
 @app.post("/tools/call")
 async def tools_call(request: ToolCallRequest):
     try:
-        return {"result": tool_registry.call(request.name, request.arguments)}
+        spec, arguments = tool_registry.validate_call(request.name, request.arguments)
+        if spec.requires_unlocked_workspace:
+            locked_response = require_software_unlock()
+            if locked_response is not None:
+                return locked_response
+        return {"result": spec.handler(arguments)}
     except KeyError as exc:
         return JSONResponse({"error": str(exc)}, status_code=404)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
 
 @app.get("/audit/recent")
 async def audit_recent(limit: int = 30):

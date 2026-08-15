@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import {
   Activity,
@@ -14,6 +13,7 @@ import {
   Layers3,
   LocateFixed,
   Network,
+  Presentation,
   RefreshCw,
   Search,
   Send,
@@ -168,12 +168,7 @@ interface ProductDiagnostics {
         selected?: string | null;
         mode?: string;
       };
-      config?: {
-        n_gpu_layers?: number;
-        gpu_mode?: string;
-        gpu_device_name?: string | null;
-        gpu_reason?: string;
-      };
+      config?: Record<string, unknown>;
     };
   };
   policy?: {
@@ -232,13 +227,28 @@ interface ReflectionReview {
   candidates: ReflectionCandidate[];
 }
 
+interface PresentationTask {
+  task_id: string;
+  status: "pending" | "running" | "interrupted" | "completed" | "failed" | "cancelled";
+  current_step?: string | null;
+  error?: string | null;
+  recoverable?: boolean;
+  progress: { completed: number; total: number };
+  result?: {
+    output_path: string;
+    slide_count: number;
+    renderer: string;
+    opened_in_wps: boolean;
+    source_count: number;
+  } | null;
+}
+
 interface ReviewDraftState {
   review: ReflectionReview | null;
   selectedIds: Set<string>;
   edits: Record<string, { title: string; content: string }>;
   mode: "idle" | "drafting" | "reviewing" | "submitting" | "done" | "error";
   message: string;
-  closeAfterSubmit: boolean;
 }
 
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
@@ -412,11 +422,17 @@ export default function App() {
     edits: {},
     mode: "idle",
     message: "",
-    closeAfterSubmit: false,
   });
+  const [presentationOpen, setPresentationOpen] = useState(false);
+  const [presentationSources, setPresentationSources] = useState<Set<string>>(new Set());
+  const [presentationTitle, setPresentationTitle] = useState("");
+  const [presentationAudience, setPresentationAudience] = useState<"management" | "technical" | "government" | "general">("management");
+  const [presentationMaxSlides, setPresentationMaxSlides] = useState(10);
+  const [presentationOpenInWps, setPresentationOpenInWps] = useState(true);
+  const [presentationTask, setPresentationTask] = useState<PresentationTask | null>(null);
+  const [presentationMessage, setPresentationMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const workbenchRef = useRef<HTMLElement | null>(null);
-  const closeBypassRef = useRef(false);
 
   const parsedMessages = useMemo(
     () => messages.map((message) => ({ message, parsed: parseMessageArtifacts(message.content) })),
@@ -449,6 +465,7 @@ export default function App() {
   }, [latestMindmap, collapsedNodeIds]);
 
   const documents = documentLibrary?.documents ?? [];
+  const indexedDocuments = useMemo(() => documents.filter((document) => document.indexed), [documents]);
   const totalDocumentPages = Math.max(1, Math.ceil(documents.length / PAPERS_PER_PAGE));
   const activeDocumentPage = Math.min(documentPage, totalDocumentPages);
   const visibleDocuments = useMemo(() => {
@@ -640,6 +657,34 @@ export default function App() {
   }, [latestMindmap, latestEvidence.length]);
 
   useEffect(() => {
+    if (!presentationTask || !["pending", "running"].includes(presentationTask.status)) return;
+    let active = true;
+    const pollTask = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/presentations/tasks/${presentationTask.task_id}`, {
+          headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined,
+        });
+        if (!response.ok) throw new Error("presentation task unavailable");
+        const task = await response.json() as PresentationTask;
+        if (!active) return;
+        setPresentationTask(task);
+        if (task.status === "completed") setPresentationMessage("PPT 已生成");
+        if (task.status === "failed" || task.status === "interrupted") {
+          setPresentationMessage(task.error || "生成中断，可从检查点继续");
+        }
+      } catch {
+        if (active) setPresentationMessage("暂时无法读取生成状态");
+      }
+    };
+    void pollTask();
+    const timer = window.setInterval(() => void pollTask(), 1200);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [apiBaseUrl, apiToken, presentationTask?.task_id, presentationTask?.status]);
+
+  useEffect(() => {
     if (!isWorkbenchDragging) return;
 
     const handlePointerMove = (event: PointerEvent) => {
@@ -668,30 +713,6 @@ export default function App() {
       window.removeEventListener("pointercancel", stopDragging);
     };
   }, [isWorkbenchDragging, leftCollapsed]);
-
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-
-    const setupCloseHandler = async () => {
-      try {
-        const appWindow = getCurrentWindow();
-        unlisten = await appWindow.onCloseRequested(async (event) => {
-          if (closeBypassRef.current) return;
-          if (!messages.length || locked || isGenerating) return;
-          event.preventDefault();
-          await requestReflectionDraft("close", true);
-        });
-      } catch {
-        // Browser preview mode does not expose Tauri window APIs.
-      }
-    };
-
-    void setupCloseHandler();
-
-    return () => {
-      if (unlisten) unlisten();
-    };
-  }, [messages, locked, isGenerating, apiBaseUrl, apiToken]);
 
   const toggleMindmapNode = (nodeId: string) => {
     setCollapsedNodeIds((previous) => {
@@ -753,17 +774,6 @@ export default function App() {
 
   const authHeaders = (): Record<string, string> => (apiToken ? { "X-SoulDrive-Token": apiToken } : {});
 
-  const closeWindowAfterReview = (delayMs = 0) => {
-    window.setTimeout(() => {
-      closeBypassRef.current = true;
-      try {
-        void getCurrentWindow().close();
-      } catch {
-        // Browser preview mode has no native window to close.
-      }
-    }, delayMs);
-  };
-
   const updateReviewEdit = (candidateId: string, field: "title" | "content", value: string) => {
     setReviewState((previous) => {
       const currentEdit = previous.edits[candidateId] || { title: "", content: "" };
@@ -780,14 +790,13 @@ export default function App() {
     });
   };
 
-  const requestReflectionDraft = async (trigger: "manual" | "close", closeAfterSubmit = false) => {
+  const requestReflectionDraft = async (trigger: "manual" | "close") => {
     if (!messages.length || locked) {
       setReviewState((previous) => ({
         ...previous,
         review: null,
         mode: "done",
         message: locked ? "工作区未解锁，无法生成记忆候选。" : "当前会话没有可沉淀内容。",
-        closeAfterSubmit,
       }));
       return null;
     }
@@ -796,7 +805,6 @@ export default function App() {
       ...previous,
       mode: "drafting",
       message: "正在生成候选记忆...",
-      closeAfterSubmit,
     }));
 
     try {
@@ -827,11 +835,7 @@ export default function App() {
         edits,
         mode: review.candidates.length ? "reviewing" : "done",
         message: review.candidates.length ? "" : "本轮没有可沉淀内容。",
-        closeAfterSubmit,
       });
-      if (!review.candidates.length && closeAfterSubmit) {
-        closeWindowAfterReview(300);
-      }
       return review;
     } catch {
       setReviewState((previous) => ({
@@ -839,7 +843,6 @@ export default function App() {
         review: null,
         mode: "error",
         message: "候选记忆生成失败。",
-        closeAfterSubmit,
       }));
       return null;
     }
@@ -887,11 +890,8 @@ export default function App() {
       setReviewState((previous) => ({
         ...previous,
         mode: "done",
-        message: previous.closeAfterSubmit ? "记忆已完成，将自动关闭程序。" : "记忆已完成。",
+        message: "记忆已完成。",
       }));
-      if (reviewState.closeAfterSubmit) {
-        closeWindowAfterReview(900);
-      }
     } catch {
       setReviewState((previous) => ({
         ...previous,
@@ -976,6 +976,57 @@ export default function App() {
       setIndexStartStatus("idle");
     } catch {
       setIndexStartStatus("error");
+    }
+  };
+
+  const openPresentationBuilder = () => {
+    const firstSources = indexedDocuments.slice(0, 3).map((document) => document.name);
+    setPresentationSources((previous) => previous.size ? previous : new Set(firstSources));
+    setPresentationTask(null);
+    setPresentationMessage("");
+    setPresentationOpen(true);
+  };
+
+  const generatePresentation = async () => {
+    if (!presentationSources.size || presentationTask?.status === "running") return;
+    setPresentationMessage("正在创建可恢复任务...");
+    try {
+      const response = await fetch(`${apiBaseUrl}/presentations/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiToken ? { "X-SoulDrive-Token": apiToken } : {}),
+        },
+        body: JSON.stringify({
+          source_filenames: [...presentationSources],
+          title: presentationTitle,
+          audience: presentationAudience,
+          max_slides: presentationMaxSlides,
+          open_in_wps: presentationOpenInWps,
+        }),
+      });
+      const payload = await response.json() as PresentationTask & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "presentation generation failed");
+      setPresentationTask(payload);
+      setPresentationMessage("正在提取文档证据...");
+    } catch (error) {
+      setPresentationMessage(error instanceof Error ? error.message : "PPT 任务创建失败");
+    }
+  };
+
+  const resumePresentation = async () => {
+    if (!presentationTask) return;
+    setPresentationMessage("正在从检查点恢复...");
+    try {
+      const response = await fetch(`${apiBaseUrl}/presentations/tasks/${presentationTask.task_id}/resume`, {
+        method: "POST",
+        headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined,
+      });
+      const payload = await response.json() as PresentationTask & { error?: string };
+      if (!response.ok && response.status !== 409) throw new Error(payload.error || "resume failed");
+      setPresentationTask(payload);
+    } catch (error) {
+      setPresentationMessage(error instanceof Error ? error.message : "恢复失败");
     }
   };
 
@@ -1095,16 +1146,12 @@ export default function App() {
   };
 
   const diagnosticSummary = summarizeDiagnostics(productDiagnostics, healthStatus);
-  const gpuConfig = productDiagnostics?.models?.runtime?.config;
   const selectedChatModel = productDiagnostics?.models?.runtime?.chat_model?.selected || "未检测";
   const selectedReranker =
     productDiagnostics?.models?.runtime?.reranker?.selected ||
     (productDiagnostics?.models?.runtime?.reranker?.mode === "disabled" ? "未启用" : "未检测");
   const workspaceSecurityMode = securityPanelMode(securityStatus);
-  const modelAccelerationLabel =
-    typeof gpuConfig?.n_gpu_layers === "number" && gpuConfig.n_gpu_layers > 0
-      ? `GPU ${gpuConfig.n_gpu_layers}`
-      : "CPU Edge";
+  const modelAccelerationLabel = "CPU Edge";
   const workbenchStyle = {
     "--left-panel-width": leftCollapsed ? "72px" : "300px",
     "--chat-panel-fr": "1fr",
@@ -1176,6 +1223,15 @@ export default function App() {
               onClick={() => void importDocuments()}
             >
               <Upload size={16} />
+            </button>
+            <button
+              type="button"
+              className="rail-button"
+              title="从已索引文档生成 PPT"
+              disabled={locked || indexedDocuments.length === 0}
+              onClick={openPresentationBuilder}
+            >
+              <Presentation size={16} />
             </button>
             <button type="button" className="rail-button" title="导图优先" onClick={useGraphPriorityLayout}>
               <GitBranch size={16} />
@@ -1272,6 +1328,14 @@ export default function App() {
                 onClick={() => void importDocuments()}
               >
                 <Upload size={15} />
+              </button>
+              <button
+                type="button"
+                title="从已索引文档生成 PPT"
+                disabled={locked || indexedDocuments.length === 0}
+                onClick={openPresentationBuilder}
+              >
+                <Presentation size={15} />
               </button>
             </div>
             <div className="library-summary">
@@ -1610,16 +1674,113 @@ export default function App() {
                 type="button"
                 onClick={() => setReviewState((previous) => ({ ...previous, mode: "idle", review: null, message: "" }))}
               >
-                {reviewState.closeAfterSubmit ? "取消关闭" : "取消"}
+                取消
               </button>
-              {reviewState.closeAfterSubmit && (
-                <button type="button" onClick={() => closeWindowAfterReview()}>
-                  不记忆并关闭
+              <button type="button" onClick={() => void submitReflectionDecisions()}>
+                确认记忆
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {presentationOpen && (
+        <section className="learning-review-backdrop" role="presentation">
+          <div className="presentation-dialog" role="dialog" aria-modal="true" aria-labelledby="presentation-title">
+            <div className="learning-review-head">
+              <div>
+                <span>Presentation Builder</span>
+                <h2 id="presentation-title">生成 WPS 演示文稿</h2>
+              </div>
+              <button type="button" title="关闭" onClick={() => setPresentationOpen(false)}>
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="presentation-builder-body">
+              <div className="presentation-source-list" aria-label="已索引文档">
+                {indexedDocuments.map((document) => (
+                  <label key={document.relative_path} className={presentationSources.has(document.name) ? "selected" : ""}>
+                    <input
+                      type="checkbox"
+                      checked={presentationSources.has(document.name)}
+                      disabled={!presentationSources.has(document.name) && presentationSources.size >= 12}
+                      onChange={(event) => {
+                        setPresentationSources((previous) => {
+                          const next = new Set(previous);
+                          if (event.target.checked) next.add(document.name);
+                          else next.delete(document.name);
+                          return next;
+                        });
+                      }}
+                    />
+                    <FileText size={15} />
+                    <span title={document.name}>{document.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="presentation-options">
+                <label>
+                  <span>汇报标题</span>
+                  <input
+                    value={presentationTitle}
+                    onChange={(event) => setPresentationTitle(event.target.value)}
+                    maxLength={120}
+                    placeholder="留空则自动生成"
+                  />
+                </label>
+                <label>
+                  <span>汇报对象</span>
+                  <select value={presentationAudience} onChange={(event) => setPresentationAudience(event.target.value as typeof presentationAudience)}>
+                    <option value="management">管理决策</option>
+                    <option value="technical">技术评审</option>
+                    <option value="government">政府汇报</option>
+                    <option value="general">综合汇报</option>
+                  </select>
+                </label>
+                <label>
+                  <span>页数上限</span>
+                  <input
+                    type="number"
+                    min={4}
+                    max={16}
+                    value={presentationMaxSlides}
+                    onChange={(event) => setPresentationMaxSlides(Math.max(4, Math.min(16, Number(event.target.value) || 10)))}
+                  />
+                </label>
+                <label className="presentation-toggle">
+                  <input type="checkbox" checked={presentationOpenInWps} onChange={(event) => setPresentationOpenInWps(event.target.checked)} />
+                  <span>完成后用 WPS 打开</span>
+                </label>
+                <div className={`presentation-task-state ${presentationTask?.status || "idle"}`}>
+                  <strong>{presentationTask?.status?.toUpperCase() || "READY"}</strong>
+                  <span>{presentationMessage || `已选择 ${presentationSources.size} 份文档`}</span>
+                  {presentationTask && (
+                    <div className="presentation-progress">
+                      <i style={{ width: `${Math.round(100 * presentationTask.progress.completed / Math.max(1, presentationTask.progress.total))}%` }} />
+                    </div>
+                  )}
+                  {presentationTask?.result && (
+                    <p title={presentationTask.result.output_path}>{presentationTask.result.slide_count} 页 · {presentationTask.result.renderer}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="learning-review-actions">
+              <button type="button" onClick={() => setPresentationOpen(false)}>关闭</button>
+              {presentationTask?.recoverable ? (
+                <button type="button" onClick={() => void resumePresentation()}>继续生成</button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!presentationSources.size || ["pending", "running"].includes(presentationTask?.status || "")}
+                  onClick={() => void generatePresentation()}
+                >
+                  生成 PPT
                 </button>
               )}
-              <button type="button" onClick={() => void submitReflectionDecisions()}>
-                {reviewState.closeAfterSubmit ? "确认记忆并关闭" : "确认记忆"}
-              </button>
             </div>
           </div>
         </section>
