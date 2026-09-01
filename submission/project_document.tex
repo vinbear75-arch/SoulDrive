@@ -1,0 +1,496 @@
+\documentclass[UTF8,12pt]{ctexart}
+\input{preamble.tex}
+
+\newcommand{\ProjectTitle}{灵枢 SoulDrive：面向科研实验诊断的端侧多模态项目知识工作台}
+\newcommand{\TeamField}{待按初赛报名信息填写}
+\newcommand{\TrackField}{待按初赛报名信息填写}
+\newcommand{\VersionField}{v0.1（初赛提交版）}
+\newcommand{\Evidence}[1]{\textcolor{sdgreen}{\textbf{#1}}}
+
+\begin{document}
+\pagenumbering{Roman}
+
+\begin{titlepage}
+  \thispagestyle{empty}
+  \begin{center}
+    {\small\color{sdmuted}\ProjectTitle\par}
+    \vspace{0.12cm}
+    {\color{sdgreen}\rule{0.82\textwidth}{0.7pt}\par}
+    \vspace{2.15cm}
+    {\zihao{1}\bfseries 第八届中国研究生人工智能创新大赛\par}
+    \vspace{1.25cm}
+    {\zihao{2}\bfseries \ProjectTitle\par}
+    \vspace{0.75cm}
+    {\zihao{2}\bfseries 项目文档\par}
+    \vspace{0.45cm}
+    {\large\bfseries \VersionField\par}
+    \vfill
+    {\large\bfseries 2026.09.01\par}
+    \vspace{0.28cm}
+    {\large\bfseries 团队：\TeamField\par}
+    \vspace{0.18cm}
+    {\large\bfseries 参赛组别：\TrackField\par}
+    \vspace{0.8cm}
+    \begin{minipage}{0.82\textwidth}
+      \small\color{sdmuted}\centering
+      团队名称、成员排序及参赛组别以初赛报名信息为准；截图位置以占位符标出，提交前替换为脱敏界面。
+    \end{minipage}
+  \end{center}
+\end{titlepage}
+
+\renewcommand{\contentsname}{目录}
+\tableofcontents
+\clearpage
+
+\section*{记录更改历史}
+\addcontentsline{toc}{section}{记录更改历史}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{0.08\textwidth}
+  >{\raggedright\arraybackslash}p{0.24\textwidth}
+  >{\centering\arraybackslash}p{0.13\textwidth}
+  >{\centering\arraybackslash}p{0.13\textwidth}
+  >{\centering\arraybackslash}p{0.16\textwidth}
+  >{\raggedright\arraybackslash}X}
+\toprule
+序号 & 更改原因 & 版本 & 作者 & 更改日期 & 备注\\
+\midrule
+1 & 初赛项目文档首版 & v0.1 & 项目组 & 2026.09.01 & 基于当前代码、测试与已保存评测证据编制；界面截图待补。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+\vfill
+\begin{warnbox}[title={提交前字段检查}]
+团队名称、成员姓名及排序和参赛组别不由本文推断，必须与报名系统信息逐项一致；提交版应删除本提示中的“待填”字样，并再次检查所有截图是否脱敏。
+\end{warnbox}
+\clearpage
+\pagenumbering{arabic}
+
+\section{项目概况}
+
+\subsection{背景和基础}
+
+\begin{keybox}[title={项目定位}]
+SoulDrive 面向 Windows 本机单用户场景，将本地知识、实验记录、屏幕选区和语音交互组织成一个可追溯的项目工作台。主线任务是：用户指向当前实验结果并询问“为什么比上个月差”，系统在当前项目内确认目标、时间、版本和指标，给出可核验的差异、证据等级与最小验证实验。
+\end{keybox}
+
+科研和研发资料通常同时存在于论文、实验报告、CSV/XLSX 表格、配置、日志、截图和会议记录中。传统文件检索只能返回相似文本；普通一次性 RAG 容易出现跨项目串扰、版本混淆、数字没有出处、引用只存在编号但正文不支持，以及语音和屏幕信息没有真正参与决策等问题。SoulDrive 将这些问题拆成可检查的阶段：\emph{解析与结构化、项目/时间路由、混合检索、证据门、受控生成、多模态对齐和安全确认}。
+
+已有工作基础包括：
+\begin{itemize}
+  \item 以 React + Tauri 构成桌面工作台，以 Python sidecar 提供本地 API、索引、检索、推理和审计；
+  \item 以加密工作区保存文档、会话、索引、模型运行态和审计记录，默认不依赖云端推理；
+  \item 已实现 PDF、图片、CSV/XLSX、JSON/YAML 和日志等多格式摄取，保留项目、来源、章节、页码或行级定位；
+  \item 已形成项目优先检索、全局文档回退、实验账本、GraphRAG 补强、引用支持检查和多模态事件契约；
+  \item 已建立 B0/B1 基线、逐样本预测、指标、延迟和失败日志的评测目录，便于复核而不把局部结果外推为整体成绩。
+\end{itemize}
+
+项目灵感来自真实的科研协作动作，而不是“再做一个聊天窗口”：先找到正确的项目和实验版本，再判断能否比较，最后才允许模型组织解释。本文将仓库中已经存在的实现、测试和评测材料整理为参赛项目叙述；公开方法、公开数据和第三方组件仅作为技术调研或运行依赖，并在第 4 节逐项标注，避免将借鉴工作表述为原创算法。
+
+\subsubsection{问题定义与原创性边界}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.24\textwidth}X X}
+\toprule
+层次 & 本项目的工作 & 申报时的准确表述\\
+\midrule
+独立实现 & 项目目录、实验可比性门、E/V/A/M 证据契约、多模态事件图、确认式产物流程和本地回归 Harness。 & 系统级工程创新与可复现闭环。\\
+借鉴公开方法 & 混合检索、GraphRAG、query-dependent evidence、GUI grounding、MLflow 式运行记录。 & 明确标注论文、仓库、版本和许可证；不把公开组件写成原创算法。\\
+尚未证明 & 新基础模型、官方隐藏集成绩、全量真人泛化、图标 grounding 和完整链路五秒达标。 & 作为限制与后续验收项，不写成已完成成果。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{场景和价值}
+
+\subsubsection{核心使用场景}
+演示主线是一个封闭项目内的实验诊断闭环：
+\begin{enumerate}
+  \item 用户在当前窗口明确框选一张指标表、曲线或实验结果；
+  \item 用户按住说话，提出“这个为什么比上个月差”或“总结当前选区的结论”；
+  \item 系统记录语音文本、选区空间范围、屏幕/UI Automation（UIA）信息、OCR/视觉结果、事件时间和当前项目；
+  \item 系统先解析“上个月”的本地时区时间区间，再检查实验名、数据集、split、指标定义、单位和评测脚本是否一致；
+  \item 通过关键词、向量、父子切片和图谱召回证据，并将文档、视觉、语音确认和结构化测量分别标记为 E\#/V\#/A\#/M\#；
+  \item 若证据充分，返回带来源定位的差异与原因等级；若存在歧义、冲突或不可比字段，先澄清或阻断数值比较；
+  \item 用户确认后，系统才生成组会稿、PPT、邮件或日程草案；不会自动发送、写入真实日历、删除文件或控制任意桌面。
+\end{enumerate}
+
+\subsubsection{适用场景与价值}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.18\textwidth}
+  >{\raggedright\arraybackslash}p{0.34\textwidth}X}
+\toprule
+场景 & 典型输入 & 可交付价值\\
+\midrule
+科研实验复盘 & 指标表、配置、日志、报告、语音指代 & 在项目和时间约束下定位可比运行，给出可回到原文件的差异。\\
+论文与技术资料问答 & PDF、截图、结构化表格、局部选区 & 以来源、章节、页码、sheet/row/line 定位回答，证据不足时拒答。\\
+研发协作与汇报 & 会议转写、实验结论、模板和历史产物 & 将确认后的结论转成报告/PPT/待办/沟通草案，保留版本和审计。\\
+本地隐私工作流 & 私有文档、模型权重、索引和审计 & 资料留在本机加密工作区，减少上传私有材料的必要。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsubsection{与常见方案的对比}
+\begin{center}
+\scriptsize
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.18\textwidth}
+  >{\raggedright\arraybackslash}p{0.22\textwidth}
+  >{\raggedright\arraybackslash}p{0.22\textwidth}
+  X}
+\toprule
+方案 & 项目/版本约束 & 多模态目标对齐 & 证据与动作边界\\
+\midrule
+通用云端对话 & 通常依赖用户手工描述 & 可接收图片，但不保证当前窗口/项目绑定 & 生成方便；隐私、引用和外部动作需另行治理。\\
+基础向量 RAG & 多按文档库整体召回 & 多模态常被转成一段附加文本 & 能给引用，但对时间、版本、数字支持和跨项目隔离较弱。\\
+GUI Agent & 擅长屏幕元素定位或点击 & 关注坐标/控件，不理解实验账本 & 不负责实验可比性和来源链，误操作风险较高。\\
+\textbf{SoulDrive} & 项目$\rightarrow$资产$\rightarrow$时间$\rightarrow$版本逐层过滤 & UIA/OCR/授权选区/VLM/语音按时间、空间、置信度合并 & E/V/A/M 类型证据、可比性门和确认门贯穿回答与产物。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+\metricnote{该表是能力边界的结构化比较，不是对其他产品的商业评分；SoulDrive 的优势主张仅限于本项目已实现并有相应证据的链路。}
+
+\subsection{所需支持}
+
+\subsubsection{运行环境与硬件}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.22\textwidth}
+  >{\raggedright\arraybackslash}p{0.30\textwidth}X}
+\toprule
+类别 & 当前配置/组件 & 作用与边界\\
+\midrule
+操作系统 & Windows 11，本机单用户模式 & 桌面端、sidecar、模型、索引、审计和媒体处理均在本机；不要求 U 盘或云端协同。\\
+算力 & NVIDIA RTX 5060，8\,GB 显存；CPU 解析与回退路径 & 支持本地 OCR、语音和小型融合头；8\,GB 对 VLM 与聊天模型驻留/切换构成现实约束。\\
+软件环境 & Conda 环境 \codepath{souldrive}、Python 3.10；Node.js 24/npm 11；Rust/Cargo 1.95 & 版本用于复现实验；本机解释器绝对路径不写入公开材料。\\
+桌面与服务 & React + Tauri；Python sidecar；本地 HTTP/SSE & 统一处理文档、问答、事件、运行态和产物接口。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsubsection{模型、数据与知识来源}
+\begin{center}
+\scriptsize
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.21\textwidth}
+  >{\raggedright\arraybackslash}p{0.30\textwidth}
+  >{\raggedright\arraybackslash}p{0.22\textwidth}X}
+\toprule
+来源/组件 & 用途 & 当前证据 & 提交说明\\
+\midrule
+SenseVoiceSmall（本地） & 语音转写 & 已接入多模态运行链路；真实 pilot 的 ASR 阶段有逐样本日志。 & 模型卡、权重版本和许可证随提交包清单复核。\\
+RapidOCR + ONNX Runtime & 选区文字快路径 & 已接入 OCR 与位置证据；结构化事件契约保留置信度和 bbox。 & 仅处理用户授权的当前窗口/选区。\\
+Qwen2.5-VL-3B-Instruct（本地慢路径） & 图标、图表或多候选目标的视觉理解 & 已有单样本/小规模慢路径 smoke；完整链路 P95 尚未达竞赛目标。 & 只在结构化路径不足时触发，不将 smoke 写成泛化成绩。\\
+SoulAlign-lite & 意图、目标、时间/空间/项目约束的轻量融合头 & 已有 JSON 配置、训练/加载契约与真实 pilot 目标绑定结果。 & 训练集、配置哈希和 sealed-test 使用边界单独记录。\\
+用户私有资产 & PDF、PNG/JPG/WebP、CSV/XLSX、JSON/YAML、日志、模板 & 作为项目知识与实验证据，保留来源定位和版本字段。 & 不默认上传；脱敏后用于演示。\\
+公开数据/工作 & MIntRec2.0、ScreenSpot 等候选基准；RAG/GraphRAG/MLflow 等方法 & 用于方法对比和评测设计，不能替代内部业务集。 & 许可证、原始模态、官方划分和评测协议在封版前复核。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsubsection{实施所需支持}
+\begin{itemize}
+  \item 一台可稳定运行上述软件栈的 Windows 11 演示机，并预先完成模型权重、依赖和工作区解锁；
+  \item 脱敏的同一项目材料（建议 3--5 份论文/报告/配置/日志）及一张可授权的指标截图；
+  \item 最终提交前对团队名称、成员排序、参赛组别、模型许可证、数据许可证和代码版本进行人工复核；
+  \item 用户自行录制项目视频；本文只提供画面脚本和截图占位符，不把未录制视频写成已交付成果。
+\end{itemize}
+
+\section{项目规划}
+
+\subsection{整体目标}
+
+初赛阶段的整体目标是交付一个可运行、可解释、可复核的端侧原型：在单机本地完成“导入材料—项目内检索—语音/屏幕对齐—证据式回答—确认后生成草案”的最小闭环，并用限定数据、逐样本日志和回归测试说明当前能力与边界。
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.18\textwidth}
+  >{\raggedright\arraybackslash}p{0.38\textwidth}X}
+\toprule
+阶段 & 目标 & 验收口径\\
+\midrule
+初赛提交 & 展示项目级 RAG、实验可比性门、多模态目标绑定、类型化证据和安全降级。 & 以本机演示、脱敏截图、核心测试和已保存评测文件为依据；不宣称官方隐藏集成绩。\\
+提交后短期 & 增加五秒预算内的确定性证据快答、多模态消融回放和实验差异证据卡。 & 快答与深度分析分开计时；同一 episode 的 full/text-only/no-time/no-project 结果逐样本可回放。\\
+决赛前 & 补足至少 30 条真实授权多模态 episode，完成跨项目/说话人/分辨率覆盖并冻结提交包。 & 通过数据审计、可比性门、引用校验、延迟 P50/P95 和换目录复现。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsubsection{主线用户故事}
+\begin{enumerate}
+  \item 选择或创建当前项目，导入脱敏实验材料；
+  \item 等待索引完成，确认项目、文档和版本状态；
+  \item 框选当前指标区域并按住麦克风提问；
+  \item 查看系统识别的意图、目标、时间、项目、置信度和冲突；
+  \item 查看“可比/不可比”判断及 M\#/E\#/V\#/A\# 来源；
+  \item 先得到确定性差异，再选择是否请求深度分析；
+  \item 对已证实原因、高可信候选和待验证假设分层查看；
+  \item 用户确认后生成带引用的汇报草稿，并保留审计记录。
+\end{enumerate}
+
+\subsubsection{验收门}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.18\textwidth}
+  >{\raggedright\arraybackslash}p{0.42\textwidth}X}
+\toprule
+门禁 & 必须满足的条件 & 当前状态\\
+\midrule
+数据与来源 & 每条材料有项目、版本、时间和来源定位；测试集不参与调参或错误修正。 & 已有 schema、manifest 与来源定位；正式真人集仍需扩充。\\
+检索与回答 & 项目优先、全局回退；数字和结论能回到证据正文；不支持时拒答。 & 已有回归与诊断结果；词法支持不是 NLI，也不等于事实真值。\\
+多模态安全 & 只采集用户授权的当前窗口/选区；冲突或低置信度时澄清；不自动执行不可逆动作。 & 契约与局部回归通过；完整业务泛化待验证。\\
+性能与资源 & 分阶段记录采集、ASR、OCR/VLM、对齐、检索、首 token、完整回答和显存。 & 已有 pilot 逐阶段记录；完整 P95 仍是主要阻塞。\\
+复现与交付 & 代码、模型、数据、配置、指标、逐样本预测和失败日志可由唯一版本恢复。 & 当前工作区尚待最终冻结；提交前必须完成。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{技术创新点}
+
+\subsubsection{创新点一：项目、时间和版本约束下的实验诊断}
+系统把项目目录、实验、run、metric、measurement 和产物放入结构化账本。用户说“上个月”时，系统按本地时区解析上一个自然月，而不是依赖模糊文本；只有实验名、数据集版本、split、指标定义、单位、方向和评测脚本均兼容时，才计算绝对或相对变化。这样将“检索到相似段落”提升为“找到可比较的实验对象”，并在不可比时保留缺失字段和下一步验证建议。
+
+\subsubsection{创新点二：类型化证据与保守生成}
+证据按权限分为文档 E\#、视觉 V\#、确认语音 A\# 和结构化测量 M\#。回答生成前建立证据计划，生成后分别检查引用 ID 是否存在、引用正文是否支持 claim、数字事实是否在证据中出现；支持不足时重试、抽取式回退或拒答。来源标题和页码只用于定位，不被当成事实支持。这种“证据类型 + claim 支持 + 数字边界”的组合是系统级可靠性设计，而非简单地在答案末尾附链接。
+
+\subsubsection{创新点三：可靠性感知的多模态目标绑定}
+系统不把语音和截图直接拼接给模型，而是把文本、UIA 元素、OCR bbox、授权裁剪、VLM 候选、事件时间原点、项目 ID 和置信度写入统一事件图。可读文字优先走 UIA/OCR 快路径；图标、图表或多候选目标才进入授权区域的 VLM 慢路径；时间错位、空间冲突、项目冲突和低置信度触发澄清。多模态因此参与“用户指向了什么”的决策，而不是只增加一张图片。
+
+\subsubsection{创新点四：本地优先、可恢复和确认式产物}
+加密工作区、随机本地 API token、运行态闸门和 hash-chain 审计保证敏感材料留在本机。邮件、日历、删除和其他外部动作统一先生成草案，必须由用户确认后才可能执行；模型或依赖不可用时，系统仍可用结构化证据、OCR 或抽取式回答降级。可靠性边界位于模型之外，避免把安全寄托在提示词上。
+
+\subsubsection{创新点五：面向比赛交付的可复现实验闭环}
+每次候选优化遵循 B0 Current $\rightarrow$ B1 Simple $\rightarrow$ Candidate 的单因素流程，统一输出运行清单、逐样本预测、指标、延迟、失败和摘要。测试数、合成集或 pilot 只证明对应范围内的契约，不被包装成整体准确率；这使系统的技术主张可以回到数据、代码和硬件条件。
+
+\section{实施方案}
+
+\subsection{技术可行性分析}
+
+\subsubsection{数据采集与治理可行性}
+项目数据按“原始资产—结构化目录—派生索引”三层组织。原始资产保留文件版本和哈希；目录层记录项目、资产类型、实验、run、metric、performed\_at、数据集版本、split、指标定义、单位和来源定位；索引层由关键词、向量、父子切片和图谱重建得到，不能反向替代原始资产。图片仅在用户明确授权的窗口或选区内进入视觉链路，原图、OCR 文本、bbox、置信度和事件时间一并记录，便于审计和删除。
+
+公开数据只作为候选基准，不与项目私有数据混合。当前评测目录包含 MIntRec2.0、ScreenSpot 等候选材料的镜像或结果文件；正式提交前仍需确认原始模态、许可证、官方划分、指标脚本和可再发布范围。自建多模态数据遵循先 30 条种子验证 schema，再扩展到 320/80/80 train/validation/sealed-test 的制度；sealed-test 在冻结前不参与提示词、样本生成或错误修正。
+
+\subsubsection{行业知识与证据可得性}
+项目面向科研和研发知识工作，不依赖单一行业数据库。论文、技术方案、实验报告、表格、日志、会议记录和模板都可作为知识来源；解析器保留标题、章节、页码、sheet/row/line、项目和资产版本。对日期、单位、数据集版本等低置信度字段，系统不让模型静默决定，而是生成确认卡。这样既能适配不同研发主题，也避免把不确定的行业知识伪装成确定事实。
+
+\subsubsection{算法与模型可行性}
+系统采用轻量、可替换的本地组件：
+\begin{itemize}
+  \item 解析层负责多格式结构化抽取；父子切片使短块负责召回、父文档负责回答上下文；
+  \item 查询层先进行项目、资产类型和时间过滤，再选择关键词、向量、图谱、改写或分解路径；
+  \item 重排与证据门对候选进行相关性、来源覆盖和 claim 支持检查；
+  \item SenseVoiceSmall、RapidOCR 和 SoulAlign-lite 负责语音、文字和融合决策，Qwen2.5-VL-3B-Instruct 只在结构化路径不足时作为授权区域慢路径；
+  \item 生成层保留引用修复、抽取式回退和明确拒答，模型不可用不会导致系统凭空编造。
+\end{itemize}
+这些组件均能在本机以离线或本地服务方式运行。RTX 5060 的 8\,GB 显存足以支撑 OCR、语音和轻量融合头，但 VLM 与聊天模型的驻留、切换和完整回答延迟仍需单独预算；因此本文不把慢路径的单样本成功写成最终性能结论。
+
+\subsubsection{工程与安全可行性}
+桌面端通过 Tauri 管理 sidecar、随机端口和本地 token；敏感 API 经过工作区解锁和运行态检查。加密文档库、索引目录、审计日志和模型运行态均位于本机工作区。邮件、日历、文件删除和其他不可逆动作只生成草案并等待确认，确认令牌与 draft\_id 绑定，内容变化后确认失效。该边界位于宿主程序和工具接口，而不是依赖模型遵守提示词，适合单用户本机部署。
+
+\subsection{技术细节}
+
+\subsubsection{总体架构与数据流}
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.72cm and 0.35cm]
+\node[sdnode] (ui) {React\\桌面工作台};
+\node[sdnode,right=of ui] (tauri) {Tauri\\窗口与 sidecar};
+\node[sdnode,right=of tauri] (api) {Python API\\运行态闸门};
+\node[sdstore,below=of api] (catalog) {项目目录\\实验账本};
+\node[sdstore,left=of catalog] (index) {解析与索引\\关键词/向量/父子};
+\node[sdstore,right=of catalog] (graph) {GraphRAG\\实体与关系};
+\node[sdnode,below=of catalog] (gate) {证据门\\可比性/claim 支持};
+\node[sdnode,below=of gate] (gen) {本地生成\\引用/回退/拒答};
+\node[sddanger,below=of gen] (confirm) {确认门\\草案与审计};
+\draw[sdarrow] (ui) -- (tauri);
+\draw[sdarrow] (tauri) -- (api);
+\draw[sdarrow] (api) -- (index);
+\draw[sdarrow] (api) -- (catalog);
+\draw[sdarrow] (api) -- (graph);
+\draw[sdarrow] (index) -- (gate);
+\draw[sdarrow] (catalog) -- (gate);
+\draw[sdarrow] (graph) -- (gate);
+\draw[sdarrow] (gate) -- (gen);
+\draw[sdarrow] (gen) -- (confirm);
+\draw[sddash] (confirm.west) -| (api.south);
+\end{tikzpicture}
+\caption{SoulDrive 端侧架构与证据流。索引、目录和图谱均为可重建派生层，确认门负责外部动作边界。}
+\end{figure}
+
+\subsubsection{文档摄取、切片与检索}
+导入流程先验证扩展名、文件完整性和工作区状态，再调用对应解析器。解析结果保留文档标题、章节路径、页码、表头、段落、来源文件、项目 ID 和资产版本。父子切片让短子块参与召回，同时将相邻父块补回上下文，减少跨页或跨表头误读。查询时先按项目、资产类型和时间过滤，再融合关键词与向量分数；跨文档实体关系需要时才加入图谱上下文。每个候选都携带 source\_locator，回答中的引用可回到原始文件。
+
+\subsubsection{实验账本与“上个月”比较}
+实验账本将一次运行拆为 run、metric 和 measurement。时间表达“上个月”按 Asia/Shanghai 本地时区解析为上一个自然月的起止时间，再在当前 project\_id 内找候选。比较器要求以下字段兼容：实验名、数据集版本、split、指标名称、单位、定义版本、方向、评测脚本和必要的运行元数据。若只有部分指标匹配，或任何关键字段缺失/冲突，则返回 \emph{change\_computation=blocked}，不暴露部分百分比变化；若可比，数值变化同时保留 baseline/current 的 evidence\_version\_id、file\_ref 和 source\_locator。
+
+\subsubsection{多模态事件图与路由}
+每个多模态事件至少包含 modality、source\_modality、captured\_at、time\_origin、空间范围、project\_id、目标候选和置信度。系统按以下顺序决策：
+\begin{enumerate}
+  \item 语音先进入确认态，确认前不提交问答；
+  \item 系统可直接读取 UIA 文本时优先采用 UIA；否则在用户框选区域内运行 OCR；
+  \item OCR 足以定位文字时走快路径；图标、图表、复杂布局或多候选目标才授权调用 VLM；
+  \item 若语音指代、空间候选、项目上下文或时间窗口冲突，生成澄清问题而不是猜测；
+  \item 事件和决策写入本地审计，后续问答只接收本轮授权范围内的视觉证据。
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.52cm and 0.28cm]
+\node[sdnode] (speech) {按住说话\\ASR};
+\node[sdnode,right=of speech] (select) {授权选区\\UIA/OCR};
+\node[sdnode,right=of select] (time) {时间/项目\\对齐};
+\node[sdnode,right=of time] (route) {快/慢\\路由};
+\node[sdstore,below=of route] (evidence) {E/V/A/M\\证据计划};
+\node[sdnode,left=of evidence] (compare) {可比性\\检查};
+\node[sdnode,left=of compare] (answer) {回答/回退\\拒答};
+\node[sddanger,left=of answer] (clarify) {冲突\\澄清};
+\draw[sdarrow] (speech) -- (select);
+\draw[sdarrow] (select) -- (time);
+\draw[sdarrow] (time) -- (route);
+\draw[sdarrow] (route) -- (evidence);
+\draw[sdarrow] (evidence) -- (compare);
+\draw[sdarrow] (compare) -- (answer);
+\draw[sddash] (time.south) |- (clarify.north);
+\draw[sddash] (compare.south) |- (clarify.north);
+\draw[sddash] (clarify.north) |- (speech.south);
+\end{tikzpicture}
+\caption{语音、屏幕和项目上下文的对齐与安全路由。}
+\end{figure}
+
+\subsubsection{证据式回答与安全降级}
+生成前将证据按 E\#/V\#/A\#/M\# 分类并建立证据计划；生成后执行三层检查：
+\begin{enumerate}
+  \item 引用 ID 存在性：未知引用、无引用的事实 claim 进入修复或回退；
+  \item 内容支持性：只用被引用证据的章节、路径、摘录和原始上下文检查主题词重叠；
+  \item 数字边界：答案中的数字、百分比、模型规格等事实 token 必须出现在引用正文中，页码、切片号和引用序号不计入业务数字。
+\end{enumerate}
+检查失败时优先重试；仍失败则使用抽取式证据要点、明确的“无法确定”，或告诉用户缺少哪些字段。GraphRAG 社区报告用于主题导航，不直接作为事实来源。所有回答和产物均保留来源定位，便于人工复核。
+
+\subsubsection{产物、确认与审计}
+报告、PPT、邮件和日程采用“选择项目和证据范围—生成计划—用户确认—分段生成—引用校验—导出”的流程。邮件首版只生成主题、正文、收件人和附件清单；日程首版只生成结构化草案。真实发送、真实日历写入、删除文件和其他外部动作需要独立确认，且记录 draft\_id、确认令牌、幂等键和结果。系统不把外部动作的成功与否隐含到模型回答中。
+
+\subsubsection{界面展示与截图占位符}
+以下占位符是提交版建议补入的脱敏截图。每张图只展示当前任务所需的最小范围，不截取整个桌面；截图中的姓名、邮箱、文件绝对路径、口令、token、项目私有内容和未公开数据必须打码或替换为合成内容。
+
+\screenshotplaceholder{截图 S1：项目工作台与隐私状态}{5.0cm}{建议截取 SoulDrive 主窗口：顶部当前项目、运行模式、工作区锁定/解锁状态；左侧项目与来源材料列表；中央问答入口。应能看出“本机/本地”边界，但不要出现 Windows 用户名、真实项目名或未脱敏身份信息。}
+
+\screenshotplaceholder{截图 S2：材料导入与索引完成}{5.0cm}{建议截取同一演示项目的 3--5 份脱敏材料、文档类型和 indexed 状态；可保留文件名中的通用实验编号。不要展示未脱敏作者、组织、磁盘路径或密钥。}
+
+\screenshotplaceholder{截图 S3：语音与授权选区决策卡}{5.3cm}{建议截取 ASR 转写、授权选区缩略图、UIA/OCR 文本、bbox、识别意图、目标、时间原点、project\_id、置信度和快/慢路径原因。选区外的桌面内容应不可见，语音文本需使用可公开的演示句。}
+
+\screenshotplaceholder{截图 S4：实验可比性与差异证据}{5.3cm}{建议截取当前 run、上个月候选 run、数据集版本、split、指标定义、单位和“可比/不可比”结果；若可比，显示绝对/相对变化及 M\# 来源定位；若不可比，显示被阻断的字段和澄清问题。所有数值必须能回到脱敏的 sheet/row/line 或文件定位。}
+
+\screenshotplaceholder{截图 S5：带引用回答与安全降级}{5.0cm}{建议截取回答正文、E\#/V\#/A\#/M\# 引用、证据详情折叠区和“无法确定/需确认”提示。应同时保留一个证据不足或冲突时的安全降级案例，证明系统不会用模型猜测补齐。}
+
+\screenshotplaceholder{截图 S6：确认式产物草案}{4.5cm}{建议截取生成前计划、产物类型、引用范围、确认按钮和审计记录；若展示邮件/日程，只展示草案，不展示真实收件人，也不要点击真实发送或日历写入。}
+
+\subsubsection{已验证结果与正确口径}
+\begin{center}
+\scriptsize
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.25\textwidth}
+  >{\centering\arraybackslash}p{0.18\textwidth}
+  >{\raggedright\arraybackslash}X}
+\toprule
+评测范围 & 结果 & 允许的解释\\
+\midrule
+冻结 RAG B0，360 条，Top-6 & all-hit@6 87.0\%；any-hit@6 95.4\%；MRR 0.862 & 这是检索命中和排序指标，不是答案准确率。\\
+产品项目查询，10 条 & Version Hit@1/3 均 100\%；错误项目率 0\% & 证明当前限定查询集的项目/版本过滤契约。\\
+产品检索集，30 条 & all-hit@6 90\%（已保存结果） & 只代表该项目语料与该评测集，不能外推到全部文档。\\
+ScreenSpot，1,272 条保存预测 & 总准确率 39.54\%；文字目标 70.59\%；图标目标 1.91\% & 仅是屏幕 grounding 辅助基准，不含语音、项目 RAG 或个性化。\\
+真实授权多模态 pilot，10 条 & 目标绑定 1.0；快路径完整回答 P95 约 35.1\,s；VLM 慢路径完整回答 P95 约 81.4\,s & 是限定 pilot 的链路证据；当前不能宣称完整路径满足五秒目标或真人泛化。\\
+答案质量 dev 重算，16 条 & citation ID 与 claim 支持检查均为 100\%（保存结果） & 证明评测器区分引用存在性与正文支持；词法代理不等于事实真值。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+\metricnote{所有结果均须在提交包中附对应 manifest、逐样本结果、运行条件和限制说明；不得将上述任何局部结果改写为官方成绩或整体准确率。}
+
+\subsubsection{失败处理与降级策略}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.20\textwidth}
+  >{\raggedright\arraybackslash}p{0.36\textwidth}X}
+\toprule
+故障或风险 & 系统行为 & 演示/提交说明\\
+\midrule
+语音未确认或 ASR 置信度低 & 保留待确认态，不提交问答；提示重新录音或改用文本。 & 展示确认卡，不把猜测文本当用户指令。\\
+选区授权失败或 OCR 无结果 & 使用已保存的授权 PNG 回放，或退回文本路径；记录降级原因。 & 不扩大截图范围，不后台录制全屏。\\
+多个项目/历史实验同分 & 返回候选列表和澄清问题，阻断数值比较。 & 展示“先澄清再回答”的安全路径。\\
+指标、单位、split 或脚本不兼容 & 返回不可比字段，change\_computation=blocked。 & 不显示误导性的百分比变化。\\
+证据不足或 claim 不受支持 & 重试、抽取式回退或明确拒答。 & 引用正文必须可定位；不以标题代替事实证据。\\
+模型/索引服务异常 & 保留运行态和失败日志，使用结构化证据或跳过深度分析。 & 说明本机服务可恢复，不伪造成功结果。\\
+邮件、日历、删除等外部动作 & 只生成草案，等待独立确认。 & 演示中不执行真实外部副作用。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{计划和分工}
+
+\subsubsection{按提交节点的计划}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.17\textwidth}
+  >{\raggedright\arraybackslash}p{0.43\textwidth}X}
+\toprule
+节点 & 主要工作 & 退出条件\\
+\midrule
+材料封版 & 补齐简介、项目文档、脱敏截图、架构图和证据清单；确认团队字段。 & 两个 PDF 无“待填”字段；文件名符合规范。\\
+演示录制 & 冷启动、解锁、导入、索引、语音/选区、回答、澄清、草案和安全降级。 & 项目视频由用户自行录制，时长和大小符合官方要求。\\
+提交前复核 & 核对代码/模型/数据/配置哈希、许可证、逐样本结果和限制。 & 提交包可由唯一版本恢复；无未脱敏身份信息。\\
+决赛迭代 & 五秒证据快答、消融回放、实验差异证据卡和至少 30 条真实 episode。 & 以冻结集、同条件基线和分阶段 P50/P95 验收。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsubsection{团队分工表（按报名信息替换姓名）}
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{0.18\textwidth}
+  >{\raggedright\arraybackslash}p{0.26\textwidth}
+  >{\raggedright\arraybackslash}X}
+\toprule
+成员序位 & 报名姓名（待填） & 负责模块与可交付物\\
+\midrule
+成员 1 & 待按报名信息填写 & 项目目录、实验账本、检索/重排、证据门与评测基线。\\
+成员 2 & 待按报名信息填写 & 语音、UIA/OCR、授权选区、多模态事件图与 SoulAlign 路由。\\
+成员 3 & 待按报名信息填写 & 桌面端交互、产物草案、测试回归、演示录制与提交材料。\\
+其他成员 & 待按报名信息填写 & 按报名系统中的排序和实际贡献补充；仅填写已确认的姓名和角色。\\
+\bottomrule
+\end{tabularx}
+\end{center}
+\metricnote{该表只描述角色，不替代报名系统的正式成员信息；提交前需由团队负责人依据报名记录填入并复核。}
+
+\subsubsection{可复现交付清单}
+每次基线或候选运行统一保存：
+\begin{itemize}
+  \item \codepath{run\_manifest.json}：数据、代码、模型、配置、硬件和随机种子；
+  \item \codepath{predictions.jsonl}：每条样本的输入引用、金标和预测；
+  \item \codepath{metrics.json}：总体、分组、置信区间和回归指标；
+  \item \codepath{latency.jsonl}：各阶段耗时和资源占用；
+  \item \codepath{failures.jsonl}：错误类别、证据和可复现输入；
+  \item \codepath{summary.md}：面向人类的结论、限制与是否通过门禁。
+\end{itemize}
+提交包中的模型、数据和第三方组件应附版本、哈希、来源与许可证说明；本机解释器绝对路径、密钥、真实用户资料和运行缓存不进入公开材料。
+
+\section{参考资料}
+
+\begin{enumerate}[label={[\arabic*]},leftmargin=2.2em]
+  \item Lewis, P. et al. Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. \emph{NeurIPS}, 2020. \url{https://arxiv.org/abs/2005.11401}.
+  \item Microsoft Research. GraphRAG: Modular Retrieval-Augmented Generation using Knowledge Graphs. 开源仓库与文档，2024--2026. \url{https://github.com/microsoft/graphrag}.
+  \item Gao, Y. et al. Retrieval-Augmented Generation for Large Language Models: A Survey. 2023. \url{https://arxiv.org/abs/2312.10997}.
+  \item Cheng, Z. et al. SeeClick: Harnessing GUI Grounding for Advanced Visual GUI Agents. 2024. \url{https://arxiv.org/abs/2401.10935}.
+  \item Hu, G. et al. MIntRec2.0: A Comprehensive Benchmark for Multimodal Intent Recognition. 2024. \url{https://arxiv.org/abs/2403.10943}.
+  \item FunAudioLLM Team. SenseVoice: A Multilingual Speech Recognition Model with Advanced Speech Understanding. 2024. \url{https://arxiv.org/abs/2407.04051}.
+  \item RapidOCR Contributors. RapidOCR 开源项目及文档。提交前按实际使用版本复核许可证。 \url{https://github.com/RapidAI/RapidOCR}.
+  \item Qwen Team. Qwen2.5-VL 技术报告与模型仓库。提交前按实际权重版本复核许可证与再发布范围。 \url{https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct}.
+  \item MLflow Documentation. Tracking Runs and Artifacts. 用于本地实验运行记录设计参考。 \url{https://mlflow.org/docs/latest/ml/tracking/}.
+  \item 中国研究生人工智能创新大赛组委会：《第八届中国研究生人工智能创新大赛初赛作品提交规范》，附件 1，2025-05-22 发布，用户提供 PDF。
+  \item 中国研究生人工智能创新大赛组委会：《第八届中国研究生人工智能创新大赛项目文档模版》，附件 2，用户提供 DOCX/PDF。
+  \item SoulDrive 项目材料：\codepath{README.md}、\codepath{docs/competition_project_overview.md}、\codepath{docs/competition_runtime_and_model.md}、\codepath{docs/competition_experiment_and_evidence.md}、\codepath{docs/competition_closeout_current.md}。
+  \item SoulDrive 评测证据：\codepath{eval/results/rag_rebuild_baseline_v0.1.json}、\codepath{eval/results/competition_scorecard_v0.1.json}、\codepath{eval/results/screenspot_subgroups_candidate_20260829.json}、\codepath{eval/results/real_mmi_full_chain_fast_intent_fix_20260830/metrics.json}、\codepath{eval/results/real_mmi_full_chain_vlm_intent_fix_20260830/metrics.json}。
+\end{enumerate}
+
+\begin{warnbox}[title={最终提交前的合规复核}]
+官方规范要求简介不超过 300 字，并分别以“XXX（团队名称）\_XXX（项目名称）\_参赛作品简介.pdf”和“XXX（团队名称）\_XXX（项目名称）\_项目文档.pdf”命名。请在初赛报名系统中确认团队名称、成员排序和参赛组别后替换本文封面及文件名中的待填字段；删除本提示和所有截图占位符后，再检查 PDF 中没有未脱敏身份信息、真实路径或密钥。
+\end{warnbox}
+
+\end{document}

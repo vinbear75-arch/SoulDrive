@@ -1,0 +1,108 @@
+% SoulDrive 参赛材料共享排版设置（UTF-8，XeLaTeX）
+\usepackage[a4paper,left=2.35cm,right=2.35cm,top=2.25cm,bottom=2.25cm,headheight=15pt]{geometry}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds}
+\usepackage[most]{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{lastpage}
+\usepackage{hyperref}
+\usepackage{bookmark}
+
+\definecolor{sdgreen}{HTML}{245B55}
+\definecolor{sdblue}{HTML}{245B78}
+\definecolor{sdink}{HTML}{1E2725}
+\definecolor{sdmuted}{HTML}{5B6763}
+\definecolor{sdline}{HTML}{B8C5C0}
+\definecolor{sdpale}{HTML}{F2F7F5}
+\definecolor{sdwarn}{HTML}{FFF8E8}
+\definecolor{sdred}{HTML}{8B3A3A}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=sdgreen,
+  urlcolor=sdblue,
+  citecolor=sdgreen,
+  pdftitle={SoulDrive 项目文档},
+  pdfauthor={项目组}
+}
+\urlstyle{same}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.25em}
+\setlength{\emergencystretch}{3em}
+\linespread{1.25}
+\setlist[itemize]{leftmargin=2.2em,itemsep=0.25em,topsep=0.25em}
+\setlist[enumerate]{leftmargin=2.5em,itemsep=0.25em,topsep=0.25em}
+\renewcommand{\arraystretch}{1.28}
+
+\titleformat{\section}{\Large\bfseries\heiti\color{sdink}}{\thesection}{0.65em}{}
+\titleformat{\subsection}{\large\bfseries\heiti\color{sdink}}{\thesubsection}{0.55em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\heiti\color{sdink}}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.55em}
+\titlespacing*{\subsection}{0pt}{0.9em}{0.35em}
+\titlespacing*{\subsubsection}{0pt}{0.65em}{0.25em}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\small\color{sdmuted}灵枢 SoulDrive\quad|\quad 项目文档}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.45pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyhead[C]{\small\color{sdmuted}灵枢 SoulDrive\quad|\quad 项目文档}
+  \fancyfoot[C]{\small\thepage}
+  \renewcommand{\headrulewidth}{0.45pt}
+}
+
+\newcommand{\sdtag}[1]{\textcolor{sdgreen}{\textbf{#1}}}
+\newcommand{\codepath}[1]{\texttt{\small\path{#1}}}
+\newcommand{\sourcecite}[1]{\textsuperscript{\textcolor{sdgreen}{[#1]}}}
+
+\newtcolorbox{keybox}[1][]{
+  enhanced,breakable,colback=sdpale,colframe=sdgreen!55!black,
+  boxrule=0.5pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,
+  fonttitle=\bfseries\heiti,#1
+}
+\newtcolorbox{warnbox}[1][]{
+  enhanced,breakable,colback=sdwarn,colframe=orange!60!black,
+  boxrule=0.5pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,
+  fonttitle=\bfseries\heiti,#1
+}
+\newtcolorbox{placeholderbox}[2][]{
+  enhanced,breakable,colback=white,colframe=sdline,
+  boxrule=0.6pt,arc=2pt,left=9pt,right=9pt,top=8pt,bottom=8pt,
+  height=#2,halign=center,valign=center,#1
+}
+
+\newcommand{\screenshotplaceholder}[3]{%
+  \begin{placeholderbox}[title={#1}]{#2}
+    \textcolor{sdmuted}{\Large\textbf{截图占位符}}\\[0.45em]
+    \begin{minipage}{0.88\linewidth}\small\color{sdink}\raggedright
+      #3
+    \end{minipage}
+  \end{placeholderbox}
+}
+
+\newcommand{\metricnote}[1]{\par\smallskip\noindent\textcolor{sdmuted}{\footnotesize\textit{口径说明：#1}}}
+
+% 统一的项目流程节点样式
+\tikzset{
+  sdnode/.style={draw=sdgreen!70!black,fill=sdpale,rounded corners=2pt,
+    align=center,minimum height=0.75cm,minimum width=2.15cm,font=\small},
+  sdstore/.style={draw=sdblue!75!black,fill=sdblue!7,rounded corners=2pt,
+    align=center,minimum height=0.75cm,minimum width=2.15cm,font=\small},
+  sddanger/.style={draw=sdred!75!black,fill=sdred!6,rounded corners=2pt,
+    align=center,minimum height=0.75cm,minimum width=2.15cm,font=\small},
+  sdarrow/.style={-{Latex[length=2.2mm]},draw=sdgreen!75!black,line width=0.65pt},
+  sddash/.style={-{Latex[length=2.2mm]},draw=sdmuted,dashed,line width=0.55pt}
+}
