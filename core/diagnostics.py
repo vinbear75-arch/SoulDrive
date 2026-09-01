@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +8,7 @@ from core.embedding_models import (
     required_embedding_files,
 )
 from core.enterprise_policy import ensure_policy_file, load_policy, policy_path
+from core.enterprise_security import max_body_bytes
 from core.license import verify_license_for_workspace
 from core.model_runtime import model_runtime_diagnostics
 from core.paths import app_root, model_search_dirs
@@ -17,6 +19,11 @@ from core.workspace import SoulDriveWorkspace, resolve_workspace
 def product_diagnostics() -> dict[str, Any]:
     ensure_policy_file()
     policy = load_policy()
+    local_pc_mode = os.environ.get("SOULDRIVE_PC_ONLY", "0") == "1" or os.environ.get("SOULDRIVE_WORKSPACE_MODE") == "local"
+    if local_pc_mode:
+        from dataclasses import replace
+
+        policy = replace(policy, allow_lite_mode=True, require_signed_license=False)
     state = get_runtime_state()
     workspace = _diagnostic_workspace(state)
     workspace_path = workspace.root_path if workspace is not None else None
@@ -51,11 +58,14 @@ def product_diagnostics() -> dict[str, Any]:
     }
     ready = all(checks.values())
 
+    public_policy = policy.public_dict()
+    public_policy["max_request_body_bytes"] = max_body_bytes()
+
     return {
         "ready": ready,
         "app_root": _redact_path(app_root()),
         "checks": checks,
-        "policy": policy.public_dict(),
+        "policy": public_policy,
         "models": model_report,
         "workspace": workspace_report,
         "audit": audit_report,
@@ -64,6 +74,7 @@ def product_diagnostics() -> dict[str, Any]:
             "auth_level": state.get("auth_level"),
             "reason": state.get("reason"),
             "workspace_mounted": bool(state.get("workspace_path")),
+            "local_pc_mode": local_pc_mode,
         },
         "license": license_report,
     }
@@ -73,17 +84,18 @@ def model_diagnostics(workspace_path: str | None = None) -> dict[str, Any]:
     missing = []
     resolved = []
     dirs = model_search_dirs(workspace_path)
-    embedding_path = Path(preferred_embedding_model_path(workspace_path))
-    for filename in required_embedding_files(embedding_path.name):
-        candidate = embedding_path / filename
-        display_path = f"{embedding_path.name}/{filename}"
-        if not candidate.exists():
-            missing.append(display_path)
-        else:
-            resolved.append({
-                "path": display_path,
-                "size": candidate.stat().st_size,
-            })
+    if str(os.environ.get("SOULDRIVE_EMBEDDING_PROVIDER") or "").strip().lower() != "ollama":
+        embedding_path = Path(preferred_embedding_model_path(workspace_path))
+        for filename in required_embedding_files(embedding_path.name):
+            candidate = embedding_path / filename
+            display_path = f"{embedding_path.name}/{filename}"
+            if not candidate.exists():
+                missing.append(display_path)
+            else:
+                resolved.append({
+                    "path": display_path,
+                    "size": candidate.stat().st_size,
+                })
     runtime_report = model_runtime_diagnostics(workspace_path)
     return {
         "ready": not missing and runtime_report["ready"],

@@ -137,18 +137,34 @@ def admit_context(
     fingerprints: list[set[str]] = []
     accepted_chars = 0
     untrusted_instruction_count = 0
+    anchored_sources = _exact_section_sources(query, evidence, metadatas)
+    scope_to_anchor = bool(anchored_sources) and not query_requires_source_diversity(query)
 
     item_count = max(len(documents), len(evidence))
     for index in range(item_count):
         item = dict(evidence[index]) if index < len(evidence) else {}
-        document = str(documents[index] if index < len(documents) else item.get("snippet") or "").strip()
         metadata = dict(metadatas[index]) if index < len(metadatas) else {}
+        document = str(documents[index] if index < len(documents) else "").strip()
+        if not document:
+            document = str(item.get("context") or item.get("snippet") or "").strip()
+            if document:
+                item["context_recovered_from_evidence"] = True
         score = _safe_float(item.get("score"))
         source = str(item.get("source_filename") or metadata.get("source_filename") or "未知文件")
         candidate_id = str(item.get("candidate_id") or metadata.get("child_id") or f"candidate-{index + 1}")
 
+        if scope_to_anchor and source not in anchored_sources:
+            rejected.append(_rejection(candidate_id, source, score, "exact_section_scope"))
+            continue
+
         if not document:
             rejected.append(_rejection(candidate_id, source, score, "empty_context"))
+            continue
+        ocr_confidence = metadata.get("ocr_mean_confidence")
+        if str(metadata.get("modality") or "").lower() == "image" and _safe_float(
+            1.0 if ocr_confidence is None else ocr_confidence
+        ) < 0.60:
+            rejected.append(_rejection(candidate_id, source, score, "low_ocr_confidence"))
             continue
         if score < minimum_score:
             rejected.append(_rejection(candidate_id, source, score, "score_below_floor"))
@@ -193,6 +209,7 @@ def admit_context(
 
         accepted_docs.append(admitted)
         accepted_metas.append(metadata)
+        item["context"] = admitted
         item["id"] = f"E{len(accepted_evidence) + 1}"
         accepted_evidence.append(item)
         accepted_terms.update(item_terms)
@@ -238,6 +255,44 @@ def _rejection(candidate_id: str, source: str, score: float, reason: str) -> dic
         "score": round(score, 6),
         "reason": reason,
     }
+
+
+def _exact_section_sources(
+    query: str,
+    evidence: list[dict[str, Any]],
+    metadatas: list[dict[str, Any]],
+) -> set[str]:
+    topics = [
+        topic.strip()
+        for topic in re.findall(r"[《\"“]([^》\"”]{2,80})[》\"”]", str(query or ""))
+        if topic.strip()
+    ]
+    if not topics:
+        return set()
+
+    sources: set[str] = set()
+    for index, item in enumerate(evidence):
+        metadata = metadatas[index] if index < len(metadatas) else {}
+        section = " ".join(
+            [
+                str(item.get("document_title") or ""),
+                str(item.get("document_number") or ""),
+                str(item.get("section") or ""),
+                str(item.get("snippet") or ""),
+                str(metadata.get("section") or ""),
+                str(metadata.get("section_path") or ""),
+                str(metadata.get("child_excerpt") or ""),
+            ]
+        )
+        source = str(item.get("source_filename") or metadata.get("source_filename") or "").strip()
+        normalized_section = re.sub(r"\s+", "", section)
+        if source and _safe_float(item.get("score")) >= 0.12 and any(
+            normalized_topic in normalized_section
+            or (len(normalized_section) >= 5 and normalized_section in normalized_topic)
+            for normalized_topic in (re.sub(r"\s+", "", topic) for topic in topics)
+        ):
+            sources.add(source)
+    return sources
 
 
 def _compact_context(text: str, max_chars: int) -> str:

@@ -1,0 +1,149 @@
+{
+  "schema_version": "souldrive_business_runtime_repeat_benchmark_v0.1",
+  "dataset_id": "SoulDrive-PC-MMI-media-runtime-smoke-v0.1",
+  "dataset_sha256": "5e1499bad9bb33f45baa814e4cb78d02bda49fba22fd71aa6a7d4acd0356c6e3",
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\runtime\\product_b1_candidate_v0.7\\SoulDrive",
+  "unique_episode_count": 3,
+  "repeat_count": 1,
+  "measurement_count": 3,
+  "cold_start_measurement_count": 1,
+  "warm_measurement_count": 2,
+  "query_source": "frozen_structured_business_query",
+  "pipeline_coverage": {
+    "asr": "measured",
+    "ocr": "measured",
+    "soulalign": "measured",
+    "project_scoped_retrieval": "measured",
+    "model_first_token": "measured",
+    "complete_response": "measured"
+  },
+  "warm_stage_latency_ms": {
+    "asr": {
+      "count": 2,
+      "p50": 195.334,
+      "p95": 203.414,
+      "max": 203.414
+    },
+    "ocr": {
+      "count": 2,
+      "p50": 1720.024,
+      "p95": 1814.782,
+      "max": 1814.782
+    },
+    "soulalign": {
+      "count": 2,
+      "p50": 1.359,
+      "p95": 1.554,
+      "max": 1.554
+    },
+    "perception": {
+      "count": 2,
+      "p50": 1920.971,
+      "p95": 2024.063,
+      "max": 2024.063
+    },
+    "retrieval_and_context_gate": {
+      "count": 2,
+      "p50": 22829.168,
+      "p95": 22951.678,
+      "max": 22951.678
+    },
+    "model_first_token": {
+      "count": 2,
+      "p50": 31728.566,
+      "p95": 31785.233,
+      "max": 31785.233
+    },
+    "first_response_chunk": {
+      "count": 2,
+      "p50": 36115.121,
+      "p95": 36490.221,
+      "max": 36490.221
+    },
+    "complete_response": {
+      "count": 2,
+      "p50": 36115.121,
+      "p95": 36490.221,
+      "max": 36490.221
+    },
+    "rag_response": {
+      "count": 2,
+      "p50": 34194.149,
+      "p95": 34466.156,
+      "max": 34466.156
+    }
+  },
+  "records": [
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 1,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4495,
+      "stage_latency_ms": {
+        "asr": 27176.244,
+        "ocr": 2946.827,
+        "soulalign": 22.322,
+        "perception": 30178.632,
+        "rag_initialization": 7650.214,
+        "retrieval_and_context_gate": 24564.034,
+        "model_first_token": 71935.857,
+        "first_response_chunk": 76255.748,
+        "complete_response": 76255.748,
+        "rag_response": 38426.9
+      },
+      "retrieval_evidence_count": 6
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 1,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4495,
+      "stage_latency_ms": {
+        "asr": 203.414,
+        "ocr": 1814.782,
+        "soulalign": 1.554,
+        "perception": 2024.063,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 22706.658,
+        "model_first_token": 31785.233,
+        "first_response_chunk": 36490.221,
+        "complete_response": 36490.221,
+        "rag_response": 34466.156
+      },
+      "retrieval_evidence_count": 6
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 1,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4495,
+      "stage_latency_ms": {
+        "asr": 187.254,
+        "ocr": 1625.266,
+        "soulalign": 1.163,
+        "perception": 1817.879,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 22951.678,
+        "model_first_token": 31671.899,
+        "first_response_chunk": 35740.022,
+        "complete_response": 35740.022,
+        "rag_response": 33922.141
+      },
+      "retrieval_evidence_count": 6
+    }
+  ],
+  "limitations": [
+    "固定公开媒体 fixture 仅验证本机链路，不是公开数据集或华为隐藏集成绩。",
+    "业务查询是冻结结构化输入；公开示例音频的 ASR 文本单独保留，未伪称为同一条业务查询。",
+    "model_first_token 是模型生成的首 token；为完成引用校验，RAG 当前在验证后才向 UI 输出首个响应块。"
+  ]
+}

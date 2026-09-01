@@ -1,0 +1,15 @@
+{
+  "schema_version": "souldrive_public_data_provenance_v0.1",
+  "dataset": "MIntRec2.0",
+  "scope": "in-scope text-only official split",
+  "source": "https://huggingface.co/datasets/THUIAR/MMLA-Datasets",
+  "source_revision": "ff135d32adaac2c3d5b0268e88a7ce6af200f544",
+  "source_license": "CC-BY-4.0 (mirror metadata; verify against original dataset before redistribution)",
+  "files": [
+    {"path": "train.tsv", "sha256": "E8B8767BD9A4DE5833475DB2438E63390C9674041A7B8EA39183A74FA4B624EF", "samples": 6165},
+    {"path": "dev.tsv", "sha256": "F2F69111D0BD8C26681DB0A613A0112F466C667D56A79949CE17CCADD1E6AE37", "samples": 1106},
+    {"path": "test.tsv", "sha256": "6AA650AFBAF40256AFDBB546A9F7253511F3FE8D791A9ACC7B6829824455A6ED", "samples": 2033}
+  ],
+  "official_drive_crosscheck": "The mirror preserves official IDs, labels and split counts; full byte identity was not claimed because the original Drive dev/test files were quota-blocked.",
+  "evaluation_boundary": "This run is a reproducible in-scope closed-set text baseline. It is not an OOS, audio, video, multimodal, or competition score."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "CP-RAG-017",
+  "question": "请从当前项目语料中查找“选区绑定界面示意”里关于“界面截图：当前项目为端侧多模态智能体优化项目，用户选中实验指标表中的 target_bindin”的记录。",
+  "expected_sources": [
+    "08_selection_ui.png"
+  ],
+  "project_id": "project_souldrive_agent",
+  "type": "current_product_corpus_lookup",
+  "rubric": [
+    "source_traceability"
+  ],
+  "expected_keywords": [
+    "选区绑定界面示意"
+  ],
+  "should_refuse": false,
+  "requires_multi_doc": false,
+  "graph_relevant": false
+}

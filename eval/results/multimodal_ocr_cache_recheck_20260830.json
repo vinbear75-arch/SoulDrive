@@ -1,0 +1,32 @@
+{
+  "schema_version": "multimodal_ocr_cache_recheck_v0.1",
+  "performed_at": "2026-08-30T00:43:58+08:00",
+  "image_ref": "eval/fixtures/product_b1_candidate_v0.1/project_souldrive_agent/08_selection_ui.png",
+  "runtime": {
+    "same_runtime_instance": true,
+    "run_ocr": true,
+    "run_vlm": false,
+    "visual_mode": "fast",
+    "query_count": 5,
+    "region_count_each": 4
+  },
+  "samples": [
+    {"index": 1, "wall_ms": 1559.562, "ocr_ms": 1524.264, "cache_hit": false},
+    {"index": 2, "wall_ms": 1.16, "ocr_ms": 0.115, "cache_hit": true},
+    {"index": 3, "wall_ms": 0.944, "ocr_ms": 0.093, "cache_hit": true},
+    {"index": 4, "wall_ms": 0.901, "ocr_ms": 0.092, "cache_hit": true},
+    {"index": 5, "wall_ms": 0.892, "ocr_ms": 0.091, "cache_hit": true}
+  ],
+  "warm_cache": {
+    "hit_count": 4,
+    "ocr_ms_min": 0.091,
+    "ocr_ms_max": 0.115,
+    "ocr_ms_median": 0.0925
+  },
+  "interpretation": "同一图像内容在同一运行时内换问题时，OCR 结果可复用；首条仍包含模型和首次推理成本。",
+  "limitations": [
+    "单张本地产品截图，不能代表跨应用多样样本或竞赛指标。",
+    "未改变 VLM 慢路径、完整回答、首 token 或端到端 P50/P95 的口径。",
+    "首次运行与缓存命中不是同条件 A/B，不能据此宣称整体延迟提升比例。"
+  ]
+}

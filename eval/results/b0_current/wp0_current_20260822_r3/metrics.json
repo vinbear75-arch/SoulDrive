@@ -1,0 +1,1670 @@
+{
+  "schema_version": "souldrive_b0_metrics_v0.2",
+  "status": "partial",
+  "components": {
+    "retrieval": {
+      "status": "archived",
+      "mode": "B0 archived retrieval",
+      "sample_count": 360,
+      "answer_sample_count": 0,
+      "top_k": 6,
+      "model_name": null,
+      "retrieval_all_hit_rate": 0.9166666666666666,
+      "retrieval_any_hit_rate": 0.9845679012345679,
+      "first_hit_rate": 0.8179012345679012,
+      "mean_reciprocal_rank": 0.8866255144032922,
+      "average_source_coverage": 0.9506172839506173,
+      "multi_doc_all_hit_rate": 0.7962962962962963,
+      "graph_context_hit_rate": 0.9822695035460993,
+      "retrieval_confidence_intervals_95": {
+        "retrieval_all_hit_rate": {
+          "low": 0.88147,
+          "high": 0.942098,
+          "successes": 297,
+          "total": 324
+        },
+        "retrieval_any_hit_rate": {
+          "low": 0.964389,
+          "high": 0.993391,
+          "successes": 319,
+          "total": 324
+        },
+        "first_hit_rate": {
+          "low": 0.772234,
+          "high": 0.856118,
+          "successes": 265,
+          "total": 324
+        },
+        "multi_doc_all_hit_rate": {
+          "low": 0.710785,
+          "high": 0.861453,
+          "successes": 86,
+          "total": 108
+        },
+        "graph_context_hit_rate": {
+          "low": 0.959172,
+          "high": 0.992404,
+          "successes": 277,
+          "total": 282
+        }
+      },
+      "citation_valid_rate": null,
+      "invalid_citation_rate": null,
+      "refusal_accuracy": null,
+      "refusal_leak_rate": null,
+      "false_refusal_rate": null,
+      "answerable_pass_rate": null,
+      "overall_reliability_rate": null,
+      "answer_keyword_coverage": null,
+      "avg_latency_ms": 1792,
+      "avg_retrieval_ms": null,
+      "avg_generation_ms": null
+    },
+    "ingestion": {
+      "status": "archived",
+      "mode": "清洗切片入库评测",
+      "sample_count": 216,
+      "chunk_count": 4593,
+      "matched_chunk_count": 4593,
+      "document_coverage_rate": 1.0,
+      "chunk_count_pass_rate": 1.0,
+      "page_metadata_rate": 1.0,
+      "section_metadata_rate": 1.0,
+      "dynamic_chunk_rate": 1.0,
+      "paragraph_overlap_applicability_rate": 0.8611111111111112,
+      "paragraph_overlap_rate": 1.0,
+      "formal_window_applicability_rate": 0.8676470588235294,
+      "formal_window_rate": 1.0,
+      "document_context_rate": 1.0,
+      "retrieval_context_rate": 1.0,
+      "source_provenance_rate": 1.0,
+      "parent_linkage_rate": 1.0,
+      "semantic_unit_rate": 1.0,
+      "index_schema_rate": 1.0,
+      "content_integrity_rate": 1.0,
+      "token_safe_rate": 1.0,
+      "table_coverage_rate": 1.0,
+      "image_metadata_rate": 1.0,
+      "average_chunk_chars": 520,
+      "chunk_char_distribution": {
+        "min": 49,
+        "p50": 478,
+        "p90": 932,
+        "max": 1638
+      },
+      "oversized_chunk_rate": 0.0,
+      "missing_page_chunk_count": 0,
+      "missing_section_chunk_count": 6,
+      "dataset_quality": {
+        "schema_version": "ingestion_dataset_quality_v2",
+        "pass": true,
+        "score": 1.0,
+        "checks": {
+          "sample_count": true,
+          "document_count": true,
+          "min_samples_per_document": true,
+          "document_class_count": true,
+          "language_count": true,
+          "evaluation_scope_count": true,
+          "hard_record_count": true,
+          "enterprise_technical_plan_count": true,
+          "government_formal_or_standard_count": true,
+          "rag_research_reference_count": true,
+          "table_record_count": true,
+          "image_record_count": true,
+          "multimodal_record_count": true,
+          "section_metadata_record_count": true,
+          "deep_chunk_record_count": true,
+          "focus_tag_count": true,
+          "required_metadata_core": true
+        },
+        "sample_count": 216,
+        "document_count": 36,
+        "min_samples_per_document": 6,
+        "document_class_count": 5,
+        "language_count": 2,
+        "evaluation_scope_count": 11,
+        "hard_record_count": 131,
+        "focus_tag_count": 58,
+        "table_record_count": 56,
+        "image_record_count": 58,
+        "multimodal_record_count": 46,
+        "deep_chunk_record_count": 103
+      },
+      "scope_metrics": {
+        "architecture_figure_metadata": {
+          "sample_count": 9,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.700847,
+            "high": 1.0,
+            "successes": 9,
+            "total": 9
+          }
+        },
+        "content_integrity": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "context_and_provenance": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "english_research_layout": {
+          "sample_count": 4,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.5101,
+            "high": 1.0,
+            "successes": 4,
+            "total": 4
+          }
+        },
+        "formal_report_layout": {
+          "sample_count": 8,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.675584,
+            "high": 1.0,
+            "successes": 8,
+            "total": 8
+          }
+        },
+        "index_integrity": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "paragraph_window_and_overlap": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "scenario_list_preservation": {
+          "sample_count": 2,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.342372,
+            "high": 1.0,
+            "successes": 2,
+            "total": 2
+          }
+        },
+        "structure_and_sectioning": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "table_and_clause_preservation": {
+          "sample_count": 11,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.74116,
+            "high": 1.0,
+            "successes": 11,
+            "total": 11
+          }
+        },
+        "text_only_layout": {
+          "sample_count": 2,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.342372,
+            "high": 1.0,
+            "successes": 2,
+            "total": 2
+          }
+        }
+      },
+      "document_class_metrics": {
+        "enterprise_technical_plan": {
+          "sample_count": 48,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.925897,
+            "high": 1.0,
+            "successes": 48,
+            "total": 48
+          }
+        },
+        "government_formal_document": {
+          "sample_count": 48,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.925897,
+            "high": 1.0,
+            "successes": 48,
+            "total": 48
+          }
+        },
+        "government_standard": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "rag_research_reference": {
+          "sample_count": 60,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.939826,
+            "high": 1.0,
+            "successes": 60,
+            "total": 60
+          }
+        },
+        "scenario_list": {
+          "sample_count": 24,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.862019,
+            "high": 1.0,
+            "successes": 24,
+            "total": 24
+          }
+        }
+      },
+      "difficulty_metrics": {
+        "hard": {
+          "sample_count": 131,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.97151,
+            "high": 1.0,
+            "successes": 131,
+            "total": 131
+          }
+        },
+        "medium": {
+          "sample_count": 85,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.956759,
+            "high": 1.0,
+            "successes": 85,
+            "total": 85
+          }
+        }
+      },
+      "overall_ingestion_quality_rate": 1.0
+    },
+    "product_retrieval": {
+      "status": "fresh_local_product_corpus",
+      "mode": "B0 fresh local product retrieval",
+      "sample_count": 30,
+      "answer_sample_count": 0,
+      "top_k": 6,
+      "model_name": null,
+      "retrieval_all_hit_rate": 0.9333333333333333,
+      "retrieval_any_hit_rate": 0.9333333333333333,
+      "first_hit_rate": 0.5333333333333333,
+      "mean_reciprocal_rank": 0.7277777777777777,
+      "average_source_coverage": 0.9333333333333333,
+      "multi_doc_all_hit_rate": null,
+      "graph_context_hit_rate": null,
+      "retrieval_confidence_intervals_95": {
+        "retrieval_all_hit_rate": {
+          "low": 0.786762,
+          "high": 0.981523,
+          "successes": 28,
+          "total": 30
+        },
+        "retrieval_any_hit_rate": {
+          "low": 0.786762,
+          "high": 0.981523,
+          "successes": 28,
+          "total": 30
+        },
+        "first_hit_rate": {
+          "low": 0.36142,
+          "high": 0.697679,
+          "successes": 16,
+          "total": 30
+        },
+        "multi_doc_all_hit_rate": {
+          "low": null,
+          "high": null,
+          "successes": 0,
+          "total": 0
+        },
+        "graph_context_hit_rate": {
+          "low": null,
+          "high": null,
+          "successes": 0,
+          "total": 0
+        }
+      },
+      "citation_valid_rate": null,
+      "invalid_citation_rate": null,
+      "refusal_accuracy": null,
+      "refusal_leak_rate": null,
+      "false_refusal_rate": null,
+      "answerable_pass_rate": null,
+      "overall_reliability_rate": null,
+      "answer_keyword_coverage": null,
+      "avg_latency_ms": 14842,
+      "avg_retrieval_ms": null,
+      "avg_generation_ms": null
+    },
+    "product_ingestion": {
+      "status": "fresh_local_product_corpus",
+      "mode": "清洗切片入库评测",
+      "sample_count": 30,
+      "chunk_count": 32,
+      "matched_chunk_count": 32,
+      "document_coverage_rate": 0.9333333333333333,
+      "chunk_count_pass_rate": 0.9333333333333333,
+      "page_metadata_rate": 1.0,
+      "section_metadata_rate": null,
+      "dynamic_chunk_rate": 1.0,
+      "paragraph_overlap_applicability_rate": null,
+      "paragraph_overlap_rate": null,
+      "formal_window_applicability_rate": null,
+      "formal_window_rate": null,
+      "document_context_rate": 0.3333333333333333,
+      "retrieval_context_rate": 0.9333333333333333,
+      "source_provenance_rate": 0.9333333333333333,
+      "parent_linkage_rate": null,
+      "semantic_unit_rate": null,
+      "index_schema_rate": null,
+      "content_integrity_rate": 0.9333333333333333,
+      "token_safe_rate": 0.9333333333333333,
+      "table_coverage_rate": null,
+      "image_metadata_rate": null,
+      "average_chunk_chars": 99,
+      "chunk_char_distribution": {
+        "min": 40,
+        "p50": 107,
+        "p90": 133,
+        "max": 183
+      },
+      "oversized_chunk_rate": 0.0,
+      "missing_page_chunk_count": 0,
+      "missing_section_chunk_count": 7,
+      "dataset_quality": {
+        "schema_version": "ingestion_dataset_quality_v2",
+        "pass": false,
+        "score": 0.058823529411764705,
+        "checks": {
+          "sample_count": false,
+          "document_count": false,
+          "min_samples_per_document": false,
+          "document_class_count": true,
+          "language_count": false,
+          "evaluation_scope_count": false,
+          "hard_record_count": false,
+          "enterprise_technical_plan_count": false,
+          "government_formal_or_standard_count": false,
+          "rag_research_reference_count": false,
+          "table_record_count": false,
+          "image_record_count": false,
+          "multimodal_record_count": false,
+          "section_metadata_record_count": false,
+          "deep_chunk_record_count": false,
+          "focus_tag_count": false,
+          "required_metadata_core": false
+        },
+        "sample_count": 30,
+        "document_count": 30,
+        "min_samples_per_document": 1,
+        "document_class_count": 15,
+        "language_count": 1,
+        "evaluation_scope_count": 1,
+        "hard_record_count": 0,
+        "focus_tag_count": 18,
+        "table_record_count": 0,
+        "image_record_count": 0,
+        "multimodal_record_count": 0,
+        "deep_chunk_record_count": 0
+      },
+      "scope_metrics": {
+        "current_product_asset_integrity": {
+          "sample_count": 30,
+          "pass_rate": 0.3333333333333333,
+          "confidence_interval_95": {
+            "low": 0.192303,
+            "high": 0.512203,
+            "successes": 10,
+            "total": 30
+          }
+        }
+      },
+      "document_class_metrics": {
+        "chart": {
+          "sample_count": 2,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.657628,
+            "successes": 0,
+            "total": 2
+          }
+        },
+        "dataset_note": {
+          "sample_count": 1,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.206543,
+            "high": 1.0,
+            "successes": 1,
+            "total": 1
+          }
+        },
+        "decision": {
+          "sample_count": 1,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.206543,
+            "high": 1.0,
+            "successes": 1,
+            "total": 1
+          }
+        },
+        "experiment_config": {
+          "sample_count": 4,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.4899,
+            "successes": 0,
+            "total": 4
+          }
+        },
+        "experiment_note": {
+          "sample_count": 2,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.657628,
+            "successes": 0,
+            "total": 2
+          }
+        },
+        "experiment_report": {
+          "sample_count": 5,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.565509,
+            "high": 1.0,
+            "successes": 5,
+            "total": 5
+          }
+        },
+        "meeting_minutes": {
+          "sample_count": 2,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.657628,
+            "successes": 0,
+            "total": 2
+          }
+        },
+        "metrics": {
+          "sample_count": 5,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.434491,
+            "successes": 0,
+            "total": 5
+          }
+        },
+        "presentation_template": {
+          "sample_count": 1,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.793457,
+            "successes": 0,
+            "total": 1
+          }
+        },
+        "report_template": {
+          "sample_count": 1,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.793457,
+            "successes": 0,
+            "total": 1
+          }
+        },
+        "requirement": {
+          "sample_count": 1,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.206543,
+            "high": 1.0,
+            "successes": 1,
+            "total": 1
+          }
+        },
+        "screenshot": {
+          "sample_count": 1,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.793457,
+            "successes": 0,
+            "total": 1
+          }
+        },
+        "task_list": {
+          "sample_count": 1,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.793457,
+            "successes": 0,
+            "total": 1
+          }
+        },
+        "technical_plan": {
+          "sample_count": 2,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.342372,
+            "high": 1.0,
+            "successes": 2,
+            "total": 2
+          }
+        },
+        "training_log": {
+          "sample_count": 1,
+          "pass_rate": 0.0,
+          "confidence_interval_95": {
+            "low": 0.0,
+            "high": 0.793457,
+            "successes": 0,
+            "total": 1
+          }
+        }
+      },
+      "difficulty_metrics": {
+        "medium": {
+          "sample_count": 30,
+          "pass_rate": 0.3333333333333333,
+          "confidence_interval_95": {
+            "low": 0.192303,
+            "high": 0.512203,
+            "successes": 10,
+            "total": 30
+          }
+        }
+      },
+      "overall_ingestion_quality_rate": 0.3333333333333333
+    },
+    "ocr": {
+      "status": "archived_fixed_center",
+      "schema_version": "screenspot_metrics_v0.1",
+      "sample_count": 1272,
+      "accuracy": 0.026729559748427674,
+      "by_platform": {
+        "mobile": 0.035856573705179286,
+        "desktop": 0.02694610778443114,
+        "web": 0.016055045871559634
+      },
+      "by_type": {
+        "text": 0.03299856527977044,
+        "icon": 0.019130434782608695
+      },
+      "missing_predictions": 0,
+      "latency_ms": {
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "official_rule": "normalized predicted point lies inside pixel bbox converted from [x,y,width,height]",
+      "limitations": []
+    },
+    "runtime": {
+      "status": "fresh_smoke_only",
+      "schema_version": "souldrive_pc_mmi_media_runtime_metrics_v0.2",
+      "dataset_id": "SoulDrive-PC-MMI-media-480-v0.2",
+      "dataset_sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+      "evaluated_split": "test",
+      "evaluated_count": 1,
+      "full_test": false,
+      "selection_policy": "frozen test file order; no test labels used for threshold/model selection",
+      "threshold": {
+        "value": 0.7,
+        "source": "validation-only selection from B1/Candidate harness"
+      },
+      "b1_original_transcript_test": {
+        "sample_count": 1,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_binding_accuracy_on_targeted": 0.0,
+        "conflict_accuracy": 1.0,
+        "action_accuracy": 0.0,
+        "clarification_accuracy": 0.0
+      },
+      "candidate_actual_asr_ocr_soulalign_test": {
+        "sample_count": 1,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_binding_accuracy_on_targeted": 1.0,
+        "conflict_accuracy": 1.0,
+        "action_accuracy": 1.0,
+        "clarification_accuracy": 1.0
+      },
+      "runtime": {
+        "status_before": {
+          "schema_version": "souldrive_topic5_runtime_status_v0.1",
+          "mode": "lazy_local",
+          "gpu": {
+            "installed": true,
+            "cuda_available": true,
+            "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            "memory_gib": 7.96
+          },
+          "dependencies": {
+            "funasr": true,
+            "rapidocr": true,
+            "transformers": true,
+            "qwen_vl_utils": false,
+            "bitsandbytes": false,
+            "pillow": true
+          },
+          "assets": {
+            "sensevoice_small": {
+              "ready": true,
+              "name": "SenseVoiceSmall"
+            },
+            "rapidocr": {
+              "ready": true,
+              "name": "RapidOCR"
+            },
+            "qwen2.5_vl_3b": {
+              "ready": true,
+              "name": "Qwen2.5-VL-3B-Instruct"
+            }
+          },
+          "loaded": {
+            "sensevoice_small": false,
+            "rapidocr": false,
+            "qwen2.5_vl_3b": false
+          },
+          "policy": {
+            "asr_requires_cuda": true,
+            "vlm_requires_cuda": true,
+            "media_scope": "workspace-relative-only",
+            "max_audio_seconds": 15,
+            "max_image_bytes": 8388608
+          }
+        },
+        "vlm_smoke_count": 0,
+        "stage_summary": {
+          "asr": {
+            "statuses": {
+              "pass": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 16367.051,
+              "p95": 16367.051,
+              "max": 16367.051
+            }
+          },
+          "ocr": {
+            "statuses": {
+              "pass": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 3243.14,
+              "p95": 3243.14,
+              "max": 3243.14
+            }
+          },
+          "vlm": {
+            "statuses": {
+              "skipped": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "soulalign": {
+            "statuses": {
+              "pass": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 12.876,
+              "p95": 12.876,
+              "max": 12.876
+            }
+          }
+        },
+        "runtime_total_latency_ms": {
+          "count": 1,
+          "p50": 19624.488,
+          "p95": 19624.488,
+          "max": 19624.488
+        },
+        "wall_clock_latency_ms": {
+          "count": 1,
+          "p50": 19624.548,
+          "p95": 19624.548,
+          "max": 19624.548
+        },
+        "cold_start": {
+          "episode_id": "MMI-TE-SELE-0000",
+          "runtime_total_ms": 19624.488,
+          "wall_clock_ms": 19624.548
+        },
+        "fast_path_all_latency_ms": {
+          "runtime": {
+            "count": 1,
+            "p50": 19624.488,
+            "p95": 19624.488,
+            "max": 19624.488
+          },
+          "wall_clock": {
+            "count": 1,
+            "p50": 19624.548,
+            "p95": 19624.548,
+            "max": 19624.548
+          }
+        },
+        "fast_path_hot_latency_ms": {
+          "runtime": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          },
+          "wall_clock": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          }
+        },
+        "vlm_sample_latency_ms": {
+          "runtime": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          },
+          "wall_clock": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          }
+        },
+        "gpu_peak_allocated_mib": {
+          "count": 1,
+          "p50": 937.84,
+          "p95": 937.84,
+          "max": 937.84
+        }
+      },
+      "failure_count": 0,
+      "limitations": [
+        "This is an actual local SenseVoice + RapidOCR + SoulAlign runtime run on synthetic TTS/UI media, not a Huawei Topic 5 competition score.",
+        "The test split is used only once for post-hoc evaluation. Threshold 0.7 is fixed before this run from validation; no test-driven tuning is permitted.",
+        "B1 sees the provided synthetic transcript; Candidate transcribes local WAV and reads local synthetic screenshots. The two scores do not measure a public benchmark or human interaction quality.",
+        "VLM is sampled only on a fixed prefix when requested. Fast-path P95 and VLM-sampled P95 must be reported separately and cannot be averaged into a competition claim."
+      ]
+    },
+    "runtime_repeat": {
+      "status": "fresh_local_media_fixture",
+      "schema_version": "souldrive_runtime_repeat_benchmark_v0.2",
+      "dataset_id": "SoulDrive-PC-MMI-media-runtime-smoke-v0.1",
+      "dataset_sha256": "5e1499bad9bb33f45baa814e4cb78d02bda49fba22fd71aa6a7d4acd0356c6e3",
+      "unique_episode_count": 3,
+      "repeat_count": 11,
+      "measurement_count": 33,
+      "cold_start_measurement_count": 1,
+      "warm_measurement_count": 32,
+      "latency_ms": {
+        "warm_wall_clock": {
+          "count": 32,
+          "p50": 982.6275,
+          "p95": 1039.994,
+          "max": 1097.452
+        },
+        "warm_runtime_total": {
+          "count": 32,
+          "p50": 982.6015,
+          "p95": 1039.974,
+          "max": 1097.421
+        }
+      },
+      "stage_latency_ms": {
+        "asr": {
+          "count": 32,
+          "p50": 80.703,
+          "p95": 137.912,
+          "max": 147.598
+        },
+        "ocr": {
+          "count": 32,
+          "p50": 899.813,
+          "p95": 944.534,
+          "max": 946.855
+        },
+        "soulalign": {
+          "count": 32,
+          "p50": 0.5495000000000001,
+          "p95": 1.065,
+          "max": 1.127
+        }
+      },
+      "pipeline_coverage": {
+        "perception": "measured",
+        "retrieval": "not_integrated",
+        "first_token": "not_integrated",
+        "complete_response": "not_integrated"
+      },
+      "records": [
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 1,
+          "status": "pass",
+          "wall_clock_latency_ms": 16689.899,
+          "runtime_latency_ms": 16689.889,
+          "stage_latency_ms": {
+            "asr": 14163.26,
+            "ocr": 2489.906,
+            "vlm": 0.0,
+            "soulalign": 8.804
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 1,
+          "status": "pass",
+          "wall_clock_latency_ms": 962.966,
+          "runtime_latency_ms": 962.945,
+          "stage_latency_ms": {
+            "asr": 82.544,
+            "ocr": 878.042,
+            "vlm": 0.0,
+            "soulalign": 0.523
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 1,
+          "status": "pass",
+          "wall_clock_latency_ms": 990.051,
+          "runtime_latency_ms": 990.033,
+          "stage_latency_ms": {
+            "asr": 70.326,
+            "ocr": 917.564,
+            "vlm": 0.0,
+            "soulalign": 0.396
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 2,
+          "status": "pass",
+          "wall_clock_latency_ms": 980.273,
+          "runtime_latency_ms": 980.234,
+          "stage_latency_ms": {
+            "asr": 74.953,
+            "ocr": 903.161,
+            "vlm": 0.0,
+            "soulalign": 0.655
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 2,
+          "status": "pass",
+          "wall_clock_latency_ms": 984.989,
+          "runtime_latency_ms": 984.966,
+          "stage_latency_ms": {
+            "asr": 82.963,
+            "ocr": 899.148,
+            "vlm": 0.0,
+            "soulalign": 0.594
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 2,
+          "status": "pass",
+          "wall_clock_latency_ms": 974.897,
+          "runtime_latency_ms": 974.881,
+          "stage_latency_ms": {
+            "asr": 72.427,
+            "ocr": 900.478,
+            "vlm": 0.0,
+            "soulalign": 0.433
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 3,
+          "status": "pass",
+          "wall_clock_latency_ms": 999.818,
+          "runtime_latency_ms": 999.797,
+          "stage_latency_ms": {
+            "asr": 137.912,
+            "ocr": 859.969,
+            "vlm": 0.0,
+            "soulalign": 0.488
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 3,
+          "status": "pass",
+          "wall_clock_latency_ms": 1022.84,
+          "runtime_latency_ms": 1022.804,
+          "stage_latency_ms": {
+            "asr": 118.458,
+            "ocr": 902.176,
+            "vlm": 0.0,
+            "soulalign": 0.554
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 3,
+          "status": "pass",
+          "wall_clock_latency_ms": 1028.136,
+          "runtime_latency_ms": 1028.097,
+          "stage_latency_ms": {
+            "asr": 80.374,
+            "ocr": 944.534,
+            "vlm": 0.0,
+            "soulalign": 0.574
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 4,
+          "status": "pass",
+          "wall_clock_latency_ms": 951.843,
+          "runtime_latency_ms": 951.813,
+          "stage_latency_ms": {
+            "asr": 76.067,
+            "ocr": 873.351,
+            "vlm": 0.0,
+            "soulalign": 0.706
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 4,
+          "status": "pass",
+          "wall_clock_latency_ms": 947.664,
+          "runtime_latency_ms": 947.643,
+          "stage_latency_ms": {
+            "asr": 79.127,
+            "ocr": 865.471,
+            "vlm": 0.0,
+            "soulalign": 0.429
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 4,
+          "status": "pass",
+          "wall_clock_latency_ms": 1097.452,
+          "runtime_latency_ms": 1097.421,
+          "stage_latency_ms": {
+            "asr": 147.598,
+            "ocr": 946.855,
+            "vlm": 0.0,
+            "soulalign": 0.587
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 5,
+          "status": "pass",
+          "wall_clock_latency_ms": 954.873,
+          "runtime_latency_ms": 954.841,
+          "stage_latency_ms": {
+            "asr": 80.962,
+            "ocr": 871.664,
+            "vlm": 0.0,
+            "soulalign": 0.481
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 5,
+          "status": "pass",
+          "wall_clock_latency_ms": 936.658,
+          "runtime_latency_ms": 936.595,
+          "stage_latency_ms": {
+            "asr": 70.855,
+            "ocr": 863.099,
+            "vlm": 0.0,
+            "soulalign": 1.065
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 5,
+          "status": "pass",
+          "wall_clock_latency_ms": 1023.463,
+          "runtime_latency_ms": 1023.436,
+          "stage_latency_ms": {
+            "asr": 117.241,
+            "ocr": 903.571,
+            "vlm": 0.0,
+            "soulalign": 0.428
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 6,
+          "status": "pass",
+          "wall_clock_latency_ms": 997.136,
+          "runtime_latency_ms": 997.109,
+          "stage_latency_ms": {
+            "asr": 79.211,
+            "ocr": 915.857,
+            "vlm": 0.0,
+            "soulalign": 0.459
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 6,
+          "status": "pass",
+          "wall_clock_latency_ms": 977.46,
+          "runtime_latency_ms": 977.431,
+          "stage_latency_ms": {
+            "asr": 73.185,
+            "ocr": 902.003,
+            "vlm": 0.0,
+            "soulalign": 0.579
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 6,
+          "status": "pass",
+          "wall_clock_latency_ms": 979.142,
+          "runtime_latency_ms": 979.117,
+          "stage_latency_ms": {
+            "asr": 80.878,
+            "ocr": 895.682,
+            "vlm": 0.0,
+            "soulalign": 0.571
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 7,
+          "status": "pass",
+          "wall_clock_latency_ms": 993.891,
+          "runtime_latency_ms": 993.87,
+          "stage_latency_ms": {
+            "asr": 124.082,
+            "ocr": 867.54,
+            "vlm": 0.0,
+            "soulalign": 0.673
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 7,
+          "status": "pass",
+          "wall_clock_latency_ms": 983.772,
+          "runtime_latency_ms": 983.75,
+          "stage_latency_ms": {
+            "asr": 74.222,
+            "ocr": 907.554,
+            "vlm": 0.0,
+            "soulalign": 0.477
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 7,
+          "status": "pass",
+          "wall_clock_latency_ms": 1039.994,
+          "runtime_latency_ms": 1039.974,
+          "stage_latency_ms": {
+            "asr": 109.934,
+            "ocr": 928.051,
+            "vlm": 0.0,
+            "soulalign": 0.495
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 8,
+          "status": "pass",
+          "wall_clock_latency_ms": 954.874,
+          "runtime_latency_ms": 954.852,
+          "stage_latency_ms": {
+            "asr": 80.832,
+            "ocr": 871.954,
+            "vlm": 0.0,
+            "soulalign": 0.457
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 8,
+          "status": "pass",
+          "wall_clock_latency_ms": 940.313,
+          "runtime_latency_ms": 940.285,
+          "stage_latency_ms": {
+            "asr": 73.261,
+            "ocr": 864.998,
+            "vlm": 0.0,
+            "soulalign": 0.516
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 8,
+          "status": "pass",
+          "wall_clock_latency_ms": 1021.875,
+          "runtime_latency_ms": 1021.821,
+          "stage_latency_ms": {
+            "asr": 79.061,
+            "ocr": 940.58,
+            "vlm": 0.0,
+            "soulalign": 0.743
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 9,
+          "status": "pass",
+          "wall_clock_latency_ms": 999.186,
+          "runtime_latency_ms": 999.154,
+          "stage_latency_ms": {
+            "asr": 83.73,
+            "ocr": 912.234,
+            "vlm": 0.0,
+            "soulalign": 0.81
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 9,
+          "status": "pass",
+          "wall_clock_latency_ms": 946.398,
+          "runtime_latency_ms": 946.37,
+          "stage_latency_ms": {
+            "asr": 78.182,
+            "ocr": 865.697,
+            "vlm": 0.0,
+            "soulalign": 0.799
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 9,
+          "status": "pass",
+          "wall_clock_latency_ms": 972.524,
+          "runtime_latency_ms": 972.502,
+          "stage_latency_ms": {
+            "asr": 80.574,
+            "ocr": 889.902,
+            "vlm": 0.0,
+            "soulalign": 0.427
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 10,
+          "status": "pass",
+          "wall_clock_latency_ms": 1009.329,
+          "runtime_latency_ms": 1009.302,
+          "stage_latency_ms": {
+            "asr": 126.719,
+            "ocr": 879.417,
+            "vlm": 0.0,
+            "soulalign": 1.127
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 10,
+          "status": "pass",
+          "wall_clock_latency_ms": 1007.726,
+          "runtime_latency_ms": 1007.702,
+          "stage_latency_ms": {
+            "asr": 79.216,
+            "ocr": 925.885,
+            "vlm": 0.0,
+            "soulalign": 0.551
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 10,
+          "status": "pass",
+          "wall_clock_latency_ms": 980.446,
+          "runtime_latency_ms": 980.422,
+          "stage_latency_ms": {
+            "asr": 84.992,
+            "ocr": 893.398,
+            "vlm": 0.0,
+            "soulalign": 0.501
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-01",
+          "repeat": 11,
+          "status": "pass",
+          "wall_clock_latency_ms": 964.075,
+          "runtime_latency_ms": 964.047,
+          "stage_latency_ms": {
+            "asr": 81.068,
+            "ocr": 881.063,
+            "vlm": 0.0,
+            "soulalign": 0.556
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-02",
+          "repeat": 11,
+          "status": "pass",
+          "wall_clock_latency_ms": 981.483,
+          "runtime_latency_ms": 981.453,
+          "stage_latency_ms": {
+            "asr": 73.985,
+            "ocr": 904.936,
+            "vlm": 0.0,
+            "soulalign": 0.514
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        },
+        {
+          "episode_id": "MMI-MEDIA-SMOKE-03",
+          "repeat": 11,
+          "status": "pass",
+          "wall_clock_latency_ms": 1027.537,
+          "runtime_latency_ms": 1027.51,
+          "stage_latency_ms": {
+            "asr": 83.153,
+            "ocr": 942.113,
+            "vlm": 0.0,
+            "soulalign": 0.548
+          },
+          "retrieval": {
+            "status": "not_integrated"
+          },
+          "first_token": {
+            "status": "not_integrated"
+          },
+          "complete_response": {
+            "status": "not_integrated"
+          }
+        }
+      ],
+      "limitations": [
+        "重复运行不增加独立 episode 数；固定 fixture 仅用于本机 Runtime 回归。",
+        "仅测量真实 ASR + OCR + SoulAlign 快路径。",
+        "检索、首 token 和完整回答尚未接入该 Harness，不能据此宣称赛题五完整 P95。",
+        "不是公开数据集成绩，也不是华为隐藏集成绩。"
+      ]
+    },
+    "image_ocr_smoke": {
+      "status": "fresh_local_product_smoke",
+      "schema_version": "souldrive_image_ocr_eval_v1",
+      "sample_count": 3,
+      "parsed_count": 3,
+      "parse_success_rate": 1.0,
+      "expected_term_count": 9,
+      "matched_term_count": 9,
+      "term_recall": 1.0,
+      "all_terms_sample_rate": 1.0,
+      "expected_region_count": 0,
+      "localized_region_count": 0,
+      "localization_accuracy_at_iou": 0.0,
+      "ocr_mean_confidence": 0.99235,
+      "latency_ms": {
+        "mean": 955.33,
+        "p50": 606,
+        "p95": 1667,
+        "max": 1667
+      },
+      "under_5s_rate": 1.0
+    },
+    "ppt": {
+      "status": "fresh_smoke",
+      "schema_version": "souldrive_ppt_smoke_metrics_v0.1",
+      "sample_count": 3,
+      "valid_count": 3,
+      "valid_rate": 1.0,
+      "latency_ms": {
+        "mean": 3.211,
+        "max": 3.763
+      }
+    }
+  },
+  "sample_count": 1948,
+  "failure_count": 86,
+  "provenance_policy": "Archived components are not fresh end-to-end replays; smoke components are not competition scores."
+}

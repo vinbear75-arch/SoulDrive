@@ -1,0 +1,42 @@
+{
+  "schema_version": "rag_retrieval_feedback_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow/blob/main/docs/guides/dataset/run_retrieval_test.md",
+      "adopted": "可检查分块、检索测试和显式调试入口"
+    },
+    {
+      "project": "CRAG",
+      "url": "https://arxiv.org/abs/2401.15884",
+      "adopted": "检索质量评估后再进行有界纠错"
+    }
+  ],
+  "implemented": {
+    "storage": "加密 retrieval_feedback 表，查询摘要使用工作区密钥，负载保存原查询和用户确认改写",
+    "scope": ["global", "project"],
+    "application": ["chat", "retrieval_diagnostics"],
+    "revoke": "DELETE with explicit confirm=true",
+    "bounds": {
+      "max_feedback_variants_per_query": 3,
+      "match": "casefolded normalized exact query digest",
+      "semantic_generalization": false,
+      "document_index_mutation": false
+    },
+    "citation_gate": "original user query remains the evidence sufficiency and citation validation query"
+  },
+  "verification": {
+    "backend_full": "773 passed, 1 warning",
+    "frontend_tests": "passed",
+    "frontend_build": "passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "targeted_feedback_and_answer_quality": "passed"
+  },
+  "limits": [
+    "没有真实用户反馈样本，因此未计算反馈前后 Recall@K、MRR、nDCG 或答案准确率",
+    "当前只做精确查询复用，不声称相似问题语义泛化收益",
+    "长论文/标准真实加密工作区重建、多模态 30 条 episode、事实级 NLI 语义验证和 sealed-test 仍未完成"
+  ]
+}

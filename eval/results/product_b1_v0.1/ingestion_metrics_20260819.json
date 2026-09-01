@@ -1,0 +1,315 @@
+{
+  "schema_version": "souldrive_product_b1_ingestion_metrics_v0.1",
+  "sample_count": 30,
+  "current_format_support_rate": 1.0,
+  "asset_file_integrity_rate": 1.0,
+  "catalog_registration_rate": 0.0,
+  "supported_format_catalog_rate": 0.0,
+  "latency_ms": {
+    "p50": 0.268,
+    "p95": 0.822
+  },
+  "unsupported_extensions": [],
+  "rows": [
+    {
+      "asset_id": "sd_requirement",
+      "filename": "01_requirement.pdf",
+      "asset_type": "requirement",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 89.83
+    },
+    {
+      "asset_id": "sd_architecture",
+      "filename": "02_architecture.pdf",
+      "asset_type": "technical_plan",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.593
+    },
+    {
+      "asset_id": "sd_dataset",
+      "filename": "03_dataset_audit.pdf",
+      "asset_type": "dataset_note",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.953
+    },
+    {
+      "asset_id": "sd_baseline_report",
+      "filename": "07_baseline_report.pdf",
+      "asset_type": "experiment_report",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.628
+    },
+    {
+      "asset_id": "sd_baseline_config",
+      "filename": "07_baseline_config.yaml",
+      "asset_type": "experiment_config",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.279
+    },
+    {
+      "asset_id": "sd_baseline_metrics",
+      "filename": "07_baseline_metrics.csv",
+      "asset_type": "metrics",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.219
+    },
+    {
+      "asset_id": "sd_baseline_log",
+      "filename": "07_baseline_training.log",
+      "asset_type": "training_log",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.34
+    },
+    {
+      "asset_id": "sd_ui_report",
+      "filename": "08_ui_context_report.pdf",
+      "asset_type": "experiment_report",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.822
+    },
+    {
+      "asset_id": "sd_ui_config",
+      "filename": "08_ui_context_config.json",
+      "asset_type": "experiment_config",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.346
+    },
+    {
+      "asset_id": "sd_ui_metrics",
+      "filename": "08_ui_context_metrics.xlsx",
+      "asset_type": "metrics",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.257
+    },
+    {
+      "asset_id": "sd_opt_report",
+      "filename": "08_alignment_report.pdf",
+      "asset_type": "experiment_report",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.521
+    },
+    {
+      "asset_id": "sd_opt_config",
+      "filename": "08_alignment_config.yaml",
+      "asset_type": "experiment_config",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.233
+    },
+    {
+      "asset_id": "sd_opt_metrics",
+      "filename": "08_alignment_metrics.csv",
+      "asset_type": "metrics",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.181
+    },
+    {
+      "asset_id": "sd_meeting",
+      "filename": "08_review_minutes.docx",
+      "asset_type": "meeting_minutes",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.512
+    },
+    {
+      "asset_id": "sd_decision",
+      "filename": "08_decision.pdf",
+      "asset_type": "decision",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.482
+    },
+    {
+      "asset_id": "sd_task",
+      "filename": "08_tasks.md",
+      "asset_type": "task_list",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.179
+    },
+    {
+      "asset_id": "sd_screen",
+      "filename": "08_selection_ui.png",
+      "asset_type": "screenshot",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.19
+    },
+    {
+      "asset_id": "sd_chart",
+      "filename": "08_metrics_chart.png",
+      "asset_type": "chart",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.257
+    },
+    {
+      "asset_id": "sd_ppt_template",
+      "filename": "presentation_template.pptx",
+      "asset_type": "presentation_template",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.152
+    },
+    {
+      "asset_id": "sd_report_template",
+      "filename": "report_template.md",
+      "asset_type": "report_template",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.156
+    },
+    {
+      "asset_id": "vis_plan",
+      "filename": "vision_plan.pdf",
+      "asset_type": "technical_plan",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.411
+    },
+    {
+      "asset_id": "vis_jul_report",
+      "filename": "vision_july_report.pdf",
+      "asset_type": "experiment_report",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.572
+    },
+    {
+      "asset_id": "vis_jul_config",
+      "filename": "vision_july_config.yaml",
+      "asset_type": "experiment_config",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.388
+    },
+    {
+      "asset_id": "vis_jul_metrics",
+      "filename": "vision_july_metrics.csv",
+      "asset_type": "metrics",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.168
+    },
+    {
+      "asset_id": "vis_aug_report",
+      "filename": "vision_august_report.pdf",
+      "asset_type": "experiment_report",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.325
+    },
+    {
+      "asset_id": "vis_aug_metrics",
+      "filename": "vision_august_metrics.xlsx",
+      "asset_type": "metrics",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.171
+    },
+    {
+      "asset_id": "vis_meeting",
+      "filename": "vision_review.docx",
+      "asset_type": "meeting_minutes",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.244
+    },
+    {
+      "asset_id": "vis_screen",
+      "filename": "vision_confusion_matrix.png",
+      "asset_type": "chart",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.208
+    },
+    {
+      "asset_id": "missing_date",
+      "filename": "undated_note.txt",
+      "asset_type": "experiment_note",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.148
+    },
+    {
+      "asset_id": "ambiguous_metric",
+      "filename": "ambiguous_metric.txt",
+      "asset_type": "experiment_note",
+      "supported_by_current_indexer": true,
+      "file_exists": true,
+      "content_hash_matches": true,
+      "catalog_registered": false,
+      "elapsed_ms": 0.146
+    }
+  ]
+}

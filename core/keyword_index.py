@@ -66,25 +66,38 @@ class KeywordIndex:
         )
         self.conn.commit()
 
-    def search(self, query: str, limit: int = 12) -> list[KeywordSearchResult]:
+    def search(
+        self,
+        query: str,
+        limit: int = 12,
+        project_id: str | None = None,
+        global_only: bool = False,
+        document_names: list[str] | None = None,
+    ) -> list[KeywordSearchResult]:
         match_query = self._build_match_query(query)
         if not match_query:
             return []
 
         cursor = self.conn.cursor()
+        where_clauses = ["search_text MATCH ?"]
+        parameters: list[Any] = [match_query]
+        scoped = project_id is not None or global_only or bool(document_names)
         try:
-            cursor.execute("""
+            query_sql = f"""
                 SELECT doc_id, content, metadata_json,
                        bm25(keyword_documents_v2, 0.0, 0.0, 1.0, 0.0) AS score
                 FROM keyword_documents_v2
-                WHERE search_text MATCH ?
+                WHERE {' AND '.join(where_clauses)}
                 ORDER BY score ASC
-                LIMIT ?
-            """, (match_query, limit))
+            """
+            if not scoped:
+                query_sql += " LIMIT ?"
+                parameters.append(limit)
+            cursor.execute(query_sql, parameters)
         except sqlite3.OperationalError:
             return []
 
-        return [
+        results = [
             KeywordSearchResult(
                 doc_id=row[0],
                 content=row[1],
@@ -93,6 +106,25 @@ class KeywordIndex:
             )
             for row in cursor.fetchall()
         ]
+        if project_id is not None:
+            results = [
+                result
+                for result in results
+                if str(result.metadata.get("project_id") or "") == str(project_id)
+            ]
+        elif global_only:
+            results = [
+                result
+                for result in results
+                if not str(result.metadata.get("project_id") or "").strip()
+            ]
+        if document_names:
+            results = [
+                result
+                for result in results
+                if _document_name_matches(result.metadata, document_names)
+            ]
+        return results[:max(0, int(limit))]
 
     def close(self):
         self.conn.close()
@@ -124,3 +156,20 @@ def lexical_tokens(text: str) -> list[str]:
                 continue
             tokens.extend(value[index : index + size] for index in range(len(value) - size + 1))
     return tokens
+
+
+def _document_name_matches(metadata: dict[str, Any], document_names: list[str]) -> bool:
+    if not document_names:
+        return True
+    expected = {
+        " ".join(str(item or "").strip().split()).casefold()
+        for item in document_names
+        if " ".join(str(item or "").strip().split())
+    }
+    identities = set()
+    for key in ("source_filename", "document_name", "catalog_file_ref"):
+        value = " ".join(str((metadata or {}).get(key) or "").strip().split())
+        if value:
+            identities.add(value.casefold())
+            identities.add(value.replace("\\", "/").rsplit("/", 1)[-1].casefold())
+    return bool(identities & expected)

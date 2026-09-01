@@ -1,0 +1,8 @@
+{
+  "schema_version": "souldrive_public_data_provenance_v0.1",
+  "dataset": "ScreenSpot",
+  "source_run": "eval/results/screenspot_b0_center_20260818/data_provenance.json",
+  "candidate": "CANDIDATE_RAPIDOCR_TEXT_MATCH",
+  "model": "RapidOCR PP-OCRv6 small + token overlap; icon tasks use fixed-center fallback",
+  "evaluation_boundary": "Candidate result is a local OCR grounding experiment, not a voice, personalization, VLM, or competition score."
+}

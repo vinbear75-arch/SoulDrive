@@ -1,0 +1,3540 @@
+{
+  "schema_version": "rag_pipeline_diagnostics_v1",
+  "generated_at": "2026-08-31T04:26:10.785557+00:00",
+  "dataset": "eval\\fixtures\\product_b1_current_v0.1\\product_rag_eval_v0.1.jsonl",
+  "workspace": "eval\\runtime\\product_b1_candidate\\SoulDrive",
+  "top_k": 6,
+  "graph_enabled": false,
+  "stage_order": [
+    "dense",
+    "keyword",
+    "source_title",
+    "merged",
+    "graph_boosted",
+    "reranked_pool",
+    "final"
+  ],
+  "sample_count": 3,
+  "positive_sample_count": 3,
+  "stage_summary": {
+    "dense": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 34.0,
+      "max_candidate_count": 34,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "keyword": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 16.0,
+      "max_candidate_count": 24,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "source_title": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "merged": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 34.0,
+      "max_candidate_count": 34,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "graph_boosted": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 34.0,
+      "max_candidate_count": 34,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "reranked_pool": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "final": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    }
+  },
+  "failure_bucket_counts": {
+    "final_hit": 3
+  },
+  "transition_summary": {
+    "dense->keyword": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "keyword->source_title": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "source_title->merged": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "merged->graph_boosted": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "graph_boosted->reranked_pool": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "reranked_pool->final": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    }
+  },
+  "type_summary": {
+    "current_product_corpus_lookup": {
+      "sample_count": 3,
+      "final_any_hit_rate": 1.0,
+      "final_all_hit_rate": 1.0,
+      "final_average_source_coverage": 1.0
+    }
+  },
+  "expected_source_summary": {
+    "01_requirement.pdf": {
+      "expected_count": 1,
+      "dense_hit_count": 1,
+      "keyword_hit_count": 1,
+      "source_title_hit_count": 1,
+      "merged_hit_count": 1,
+      "graph_boosted_hit_count": 1,
+      "reranked_pool_hit_count": 1,
+      "final_hit_count": 1,
+      "dense_hit_rate": 1.0,
+      "keyword_hit_rate": 1.0,
+      "source_title_hit_rate": 1.0,
+      "merged_hit_rate": 1.0,
+      "graph_boosted_hit_rate": 1.0,
+      "reranked_pool_hit_rate": 1.0,
+      "final_hit_rate": 1.0
+    },
+    "02_architecture.pdf": {
+      "expected_count": 1,
+      "dense_hit_count": 1,
+      "keyword_hit_count": 1,
+      "source_title_hit_count": 1,
+      "merged_hit_count": 1,
+      "graph_boosted_hit_count": 1,
+      "reranked_pool_hit_count": 1,
+      "final_hit_count": 1,
+      "dense_hit_rate": 1.0,
+      "keyword_hit_rate": 1.0,
+      "source_title_hit_rate": 1.0,
+      "merged_hit_rate": 1.0,
+      "graph_boosted_hit_rate": 1.0,
+      "reranked_pool_hit_rate": 1.0,
+      "final_hit_rate": 1.0
+    },
+    "03_dataset_audit.pdf": {
+      "expected_count": 1,
+      "dense_hit_count": 1,
+      "keyword_hit_count": 1,
+      "source_title_hit_count": 1,
+      "merged_hit_count": 1,
+      "graph_boosted_hit_count": 1,
+      "reranked_pool_hit_count": 1,
+      "final_hit_count": 1,
+      "dense_hit_rate": 1.0,
+      "keyword_hit_rate": 1.0,
+      "source_title_hit_rate": 1.0,
+      "merged_hit_rate": 1.0,
+      "graph_boosted_hit_rate": 1.0,
+      "reranked_pool_hit_rate": 1.0,
+      "final_hit_rate": 1.0
+    }
+  },
+  "recall_depth_summary": {
+    "dense": {
+      "18": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 18.0,
+        "max_candidate_count": 18,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "30": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 30.0,
+        "max_candidate_count": 30,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "60": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "100": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      }
+    },
+    "keyword": {
+      "18": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 14.0,
+        "max_candidate_count": 18,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "30": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 16.0,
+        "max_candidate_count": 24,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "60": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 16.0,
+        "max_candidate_count": 24,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "100": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 16.0,
+        "max_candidate_count": 24,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      }
+    },
+    "merged_pool": {
+      "18": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 23.666667,
+        "max_candidate_count": 25,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "30": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 31.666667,
+        "max_candidate_count": 33,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "60": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      },
+      "100": {
+        "sample_count": 3,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 3,
+        "missed_source_mentions": 0
+      }
+    }
+  },
+  "final_k_summary": {
+    "3": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "5": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    },
+    "6": {
+      "sample_count": 3,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 3,
+      "missed_source_mentions": 0
+    }
+  },
+  "samples": [
+    {
+      "id": "CP-RAG-001",
+      "question": "请从当前项目语料中查找“端侧多模态智能体需求说明”里关于“项目目标：在 PC 端完成语音、选区和项目上下文理解。验收目标为单轮 P95 小于 5 秒，所有”的记录。",
+      "type": "current_product_corpus_lookup",
+      "expected_sources": [
+        "01_requirement.pdf"
+      ],
+      "requires_multi_doc": false,
+      "graph_relevant": false,
+      "allows_title_reference": false,
+      "query_variants": [
+        "请从当前项目语料中查找“端侧多模态智能体需求说明”里关于“项目目标：在 PC 端完成语音、选区和项目上下文理解。验收目标为单轮 P95 小于 5 秒，所有”的记录。"
+      ],
+      "matched_entities": [],
+      "graph_context_count": 0,
+      "stages": {
+        "dense": {
+          "candidate_count": 34,
+          "top_sources": [
+            "01_requirement.pdf",
+            "vision_plan.pdf",
+            "08_decision.pdf",
+            "08_metrics_chart.png",
+            "vision_july_report.pdf",
+            "08_tasks.md",
+            "vision_review.docx",
+            "vision_july_config.yaml",
+            "07_baseline_training.log",
+            "vision_august_report.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2691490948200226,
+              "keyword_score": 109.86299199393468,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 2,
+              "vector_distance": 0.7685229778289795,
+              "keyword_score": 13.87736432618681,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 3,
+              "vector_distance": 0.829249918460846,
+              "keyword_score": 11.030709930767978,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.8843873739242554,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_report.pdf",
+              "parent_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": null,
+              "vector_distance": 0.9072977304458618,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": 4,
+              "vector_distance": 0.9118704199790955,
+              "keyword_score": 10.950017936058227,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": null,
+              "vector_distance": 0.9126863479614258,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": null,
+              "vector_distance": 0.9247090816497803,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_training.log",
+              "parent_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9452660083770752,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "7eb19d6caf51b67d20fe46cdfd992343_ff8a26bbab33_schema_12_parent_0_child_0",
+              "source_filename": "vision_august_report.pdf",
+              "parent_id": "7eb19d6caf51b67d20fe46cdfd992343_ff8a26bbab33_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9560070633888245,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "keyword": {
+          "candidate_count": 16,
+          "top_sources": [
+            "01_requirement.pdf",
+            "vision_plan.pdf",
+            "08_decision.pdf",
+            "08_tasks.md",
+            "02_architecture.pdf",
+            "08_ui_context_report.pdf",
+            "03_dataset_audit.pdf",
+            "presentation_template.pptx",
+            "report_template.md",
+            "report_template.md"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 1,
+              "vector_distance": null,
+              "keyword_score": 109.86299199393468,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 2,
+              "vector_distance": null,
+              "keyword_score": 13.87736432618681,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 3,
+              "vector_distance": null,
+              "keyword_score": 11.030709930767978,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 4,
+              "vector_distance": null,
+              "keyword_score": 10.950017936058227,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 5,
+              "vector_distance": null,
+              "keyword_score": 5.238359602769234,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_report.pdf",
+              "parent_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 6,
+              "vector_distance": null,
+              "keyword_score": 3.9709717821100887,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 7,
+              "vector_distance": null,
+              "keyword_score": 2.6849044658312216,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5e112f984099c90a028587843ed2940c_3f0bddcc473b_schema_12_parent_0_child_0",
+              "source_filename": "presentation_template.pptx",
+              "parent_id": "5e112f984099c90a028587843ed2940c_3f0bddcc473b_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 8,
+              "vector_distance": null,
+              "keyword_score": 1.566212030038359,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "79a56543a1ab70dfca783439a929f104_0704e8be26e8_schema_12_parent_0_child_1",
+              "source_filename": "report_template.md",
+              "parent_id": "79a56543a1ab70dfca783439a929f104_0704e8be26e8_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 9,
+              "vector_distance": null,
+              "keyword_score": 1.14460298057349,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "79a56543a1ab70dfca783439a929f104_0704e8be26e8_schema_12_parent_0_child_0",
+              "source_filename": "report_template.md",
+              "parent_id": "79a56543a1ab70dfca783439a929f104_0704e8be26e8_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 10,
+              "vector_distance": null,
+              "keyword_score": 1.1367728955475604,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "source_title": {
+          "candidate_count": 1,
+          "top_sources": [
+            "01_requirement.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": null,
+              "vector_distance": null,
+              "keyword_score": 1.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "merged": {
+          "candidate_count": 34,
+          "top_sources": [
+            "01_requirement.pdf",
+            "vision_plan.pdf",
+            "08_decision.pdf",
+            "08_metrics_chart.png",
+            "vision_july_report.pdf",
+            "08_tasks.md",
+            "vision_review.docx",
+            "vision_july_config.yaml",
+            "07_baseline_training.log",
+            "vision_august_report.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2691490948200226,
+              "keyword_score": 109.86299199393468,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 2,
+              "vector_distance": 0.7685229778289795,
+              "keyword_score": 13.87736432618681,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 3,
+              "vector_distance": 0.829249918460846,
+              "keyword_score": 11.030709930767978,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.8843873739242554,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_report.pdf",
+              "parent_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": null,
+              "vector_distance": 0.9072977304458618,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": 4,
+              "vector_distance": 0.9118704199790955,
+              "keyword_score": 10.950017936058227,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": null,
+              "vector_distance": 0.9126863479614258,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": null,
+              "vector_distance": 0.9247090816497803,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_training.log",
+              "parent_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9452660083770752,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "7eb19d6caf51b67d20fe46cdfd992343_ff8a26bbab33_schema_12_parent_0_child_0",
+              "source_filename": "vision_august_report.pdf",
+              "parent_id": "7eb19d6caf51b67d20fe46cdfd992343_ff8a26bbab33_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9560070633888245,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "graph_boosted": {
+          "candidate_count": 34,
+          "top_sources": [
+            "01_requirement.pdf",
+            "vision_plan.pdf",
+            "08_decision.pdf",
+            "08_metrics_chart.png",
+            "vision_july_report.pdf",
+            "08_tasks.md",
+            "vision_review.docx",
+            "vision_july_config.yaml",
+            "07_baseline_training.log",
+            "vision_august_report.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2691490948200226,
+              "keyword_score": 109.86299199393468,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 2,
+              "vector_distance": 0.7685229778289795,
+              "keyword_score": 13.87736432618681,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 3,
+              "vector_distance": 0.829249918460846,
+              "keyword_score": 11.030709930767978,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.8843873739242554,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_report.pdf",
+              "parent_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": null,
+              "vector_distance": 0.9072977304458618,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": 4,
+              "vector_distance": 0.9118704199790955,
+              "keyword_score": 10.950017936058227,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": null,
+              "vector_distance": 0.9126863479614258,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": null,
+              "vector_distance": 0.9247090816497803,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_training.log",
+              "parent_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9452660083770752,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "7eb19d6caf51b67d20fe46cdfd992343_ff8a26bbab33_schema_12_parent_0_child_0",
+              "source_filename": "vision_august_report.pdf",
+              "parent_id": "7eb19d6caf51b67d20fe46cdfd992343_ff8a26bbab33_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9560070633888245,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "reranked_pool": {
+          "candidate_count": 1,
+          "top_sources": [
+            "01_requirement.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2691490948200226,
+              "keyword_score": 279.89919177807496,
+              "graph_score": 0.0,
+              "rerank_score": 1.0,
+              "final_score": 0.6977049180327869,
+              "score_breakdown": {
+                "rrf": 0.04918,
+                "lexical_rerank": 0.654034,
+                "semantic_rerank": 1.0,
+                "graph": 0.0,
+                "keyword": 279.899192,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 1.0,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.697705
+              }
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "final": {
+          "candidate_count": 1,
+          "top_sources": [
+            "01_requirement.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2691490948200226,
+              "keyword_score": 279.89919177807496,
+              "graph_score": 0.0,
+              "rerank_score": 1.0,
+              "final_score": 0.6977049180327869,
+              "score_breakdown": {
+                "rrf": 0.04918,
+                "lexical_rerank": 0.654034,
+                "semantic_rerank": 1.0,
+                "graph": 0.0,
+                "keyword": 279.899192,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 1.0,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.697705
+              }
+            }
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "elapsed_ms": 1470,
+      "recall_depth_scan": {
+        "dense": {
+          "18": {
+            "candidate_count": 18,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 30,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "keyword": {
+          "18": {
+            "candidate_count": 16,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "report_template.md",
+              "report_template.md"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 16,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "report_template.md",
+              "report_template.md"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 16,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "report_template.md",
+              "report_template.md"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 16,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "report_template.md",
+              "report_template.md"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "merged_pool": {
+          "18": {
+            "candidate_count": 24,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 31,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "08_decision.pdf",
+              "08_metrics_chart.png",
+              "vision_july_report.pdf",
+              "08_tasks.md",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "07_baseline_training.log",
+              "vision_august_report.pdf"
+            ],
+            "hit_sources": [
+              "01_requirement.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        }
+      },
+      "final_k_scan": {
+        "3": {
+          "candidate_count": 1,
+          "top_sources": [
+            "01_requirement.pdf"
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "5": {
+          "candidate_count": 1,
+          "top_sources": [
+            "01_requirement.pdf"
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "6": {
+          "candidate_count": 1,
+          "top_sources": [
+            "01_requirement.pdf"
+          ],
+          "hit_sources": [
+            "01_requirement.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "failure_buckets": [
+        "final_hit"
+      ]
+    },
+    {
+      "id": "CP-RAG-002",
+      "question": "请从当前项目语料中查找“SoulAlign 技术方案”里关于“采用语音、系统选区和当前窗口三类输入。先做结构化项目过滤，再做证据检索；低置信度或冲突时主动澄清”的记录。",
+      "type": "current_product_corpus_lookup",
+      "expected_sources": [
+        "02_architecture.pdf"
+      ],
+      "requires_multi_doc": false,
+      "graph_relevant": false,
+      "allows_title_reference": false,
+      "query_variants": [
+        "请从当前项目语料中查找“SoulAlign 技术方案”里关于“采用语音、系统选区和当前窗口三类输入。先做结构化项目过滤，再做证据检索；低置信度或冲突时主动澄清”的记录。"
+      ],
+      "matched_entities": [],
+      "graph_context_count": 0,
+      "stages": {
+        "dense": {
+          "candidate_count": 34,
+          "top_sources": [
+            "02_architecture.pdf",
+            "08_selection_ui.png",
+            "vision_confusion_matrix.png",
+            "08_metrics_chart.png",
+            "vision_plan.pdf",
+            "vision_review.docx",
+            "vision_july_config.yaml",
+            "08_decision.pdf",
+            "08_alignment_config.yaml",
+            "08_ui_context_config.json"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2912820279598236,
+              "keyword_score": 105.24805164690382,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": null,
+              "vector_distance": 0.7377809882164001,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0_child_0",
+              "source_filename": "vision_confusion_matrix.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": null,
+              "vector_distance": 0.7603302597999573,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.7783418893814087,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": 3,
+              "vector_distance": 0.8510849475860596,
+              "keyword_score": 21.116577739119457,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": null,
+              "vector_distance": 0.8982654213905334,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": null,
+              "vector_distance": 0.9414353370666504,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": 2,
+              "vector_distance": 0.9476881623268127,
+              "keyword_score": 25.52089973724131,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "e0d92ffed1daf485c28a212207e6a5a8_15a325025517_schema_12_parent_0_child_0",
+              "source_filename": "08_alignment_config.yaml",
+              "parent_id": "e0d92ffed1daf485c28a212207e6a5a8_15a325025517_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9898868203163147,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "011428e21f22336d4ba69859004dd708_2405be52c47a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_config.json",
+              "parent_id": "011428e21f22336d4ba69859004dd708_2405be52c47a_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9906009435653687,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "keyword": {
+          "candidate_count": 8,
+          "top_sources": [
+            "02_architecture.pdf",
+            "08_decision.pdf",
+            "vision_plan.pdf",
+            "08_ui_context_report.pdf",
+            "01_requirement.pdf",
+            "03_dataset_audit.pdf",
+            "presentation_template.pptx",
+            "08_tasks.md"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 1,
+              "vector_distance": null,
+              "keyword_score": 105.24805164690382,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 2,
+              "vector_distance": null,
+              "keyword_score": 25.52089973724131,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 3,
+              "vector_distance": null,
+              "keyword_score": 21.116577739119457,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_report.pdf",
+              "parent_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 4,
+              "vector_distance": null,
+              "keyword_score": 12.866465329153922,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 5,
+              "vector_distance": null,
+              "keyword_score": 10.775962382028855,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 6,
+              "vector_distance": null,
+              "keyword_score": 1.92099538552588,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5e112f984099c90a028587843ed2940c_3f0bddcc473b_schema_12_parent_0_child_0",
+              "source_filename": "presentation_template.pptx",
+              "parent_id": "5e112f984099c90a028587843ed2940c_3f0bddcc473b_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 7,
+              "vector_distance": null,
+              "keyword_score": 1.566212030038359,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 8,
+              "vector_distance": null,
+              "keyword_score": 1.5574559277410558,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "source_title": {
+          "candidate_count": 1,
+          "top_sources": [
+            "02_architecture.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": null,
+              "vector_distance": null,
+              "keyword_score": 1.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "merged": {
+          "candidate_count": 34,
+          "top_sources": [
+            "02_architecture.pdf",
+            "08_selection_ui.png",
+            "vision_confusion_matrix.png",
+            "08_metrics_chart.png",
+            "vision_plan.pdf",
+            "vision_review.docx",
+            "vision_july_config.yaml",
+            "08_decision.pdf",
+            "08_alignment_config.yaml",
+            "08_ui_context_config.json"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2912820279598236,
+              "keyword_score": 105.24805164690382,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": null,
+              "vector_distance": 0.7377809882164001,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0_child_0",
+              "source_filename": "vision_confusion_matrix.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": null,
+              "vector_distance": 0.7603302597999573,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.7783418893814087,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": 3,
+              "vector_distance": 0.8510849475860596,
+              "keyword_score": 21.116577739119457,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": null,
+              "vector_distance": 0.8982654213905334,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": null,
+              "vector_distance": 0.9414353370666504,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": 2,
+              "vector_distance": 0.9476881623268127,
+              "keyword_score": 25.52089973724131,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "e0d92ffed1daf485c28a212207e6a5a8_15a325025517_schema_12_parent_0_child_0",
+              "source_filename": "08_alignment_config.yaml",
+              "parent_id": "e0d92ffed1daf485c28a212207e6a5a8_15a325025517_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9898868203163147,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "011428e21f22336d4ba69859004dd708_2405be52c47a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_config.json",
+              "parent_id": "011428e21f22336d4ba69859004dd708_2405be52c47a_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9906009435653687,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "graph_boosted": {
+          "candidate_count": 34,
+          "top_sources": [
+            "02_architecture.pdf",
+            "08_selection_ui.png",
+            "vision_confusion_matrix.png",
+            "08_metrics_chart.png",
+            "vision_plan.pdf",
+            "vision_review.docx",
+            "vision_july_config.yaml",
+            "08_decision.pdf",
+            "08_alignment_config.yaml",
+            "08_ui_context_config.json"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2912820279598236,
+              "keyword_score": 105.24805164690382,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": null,
+              "vector_distance": 0.7377809882164001,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0_child_0",
+              "source_filename": "vision_confusion_matrix.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": null,
+              "vector_distance": 0.7603302597999573,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.7783418893814087,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": 3,
+              "vector_distance": 0.8510849475860596,
+              "keyword_score": 21.116577739119457,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": null,
+              "vector_distance": 0.8982654213905334,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": null,
+              "vector_distance": 0.9414353370666504,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": 2,
+              "vector_distance": 0.9476881623268127,
+              "keyword_score": 25.52089973724131,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "e0d92ffed1daf485c28a212207e6a5a8_15a325025517_schema_12_parent_0_child_0",
+              "source_filename": "08_alignment_config.yaml",
+              "parent_id": "e0d92ffed1daf485c28a212207e6a5a8_15a325025517_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9898868203163147,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "011428e21f22336d4ba69859004dd708_2405be52c47a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_config.json",
+              "parent_id": "011428e21f22336d4ba69859004dd708_2405be52c47a_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9906009435653687,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "reranked_pool": {
+          "candidate_count": 1,
+          "top_sources": [
+            "02_architecture.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2912820279598236,
+              "keyword_score": 299.91770696641026,
+              "graph_score": 0.0,
+              "rerank_score": 1.0,
+              "final_score": 0.6977049180327869,
+              "score_breakdown": {
+                "rrf": 0.04918,
+                "lexical_rerank": 0.666986,
+                "semantic_rerank": 1.0,
+                "graph": 0.0,
+                "keyword": 299.917707,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 1.0,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.697705
+              }
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "final": {
+          "candidate_count": 1,
+          "top_sources": [
+            "02_architecture.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.2912820279598236,
+              "keyword_score": 299.91770696641026,
+              "graph_score": 0.0,
+              "rerank_score": 1.0,
+              "final_score": 0.6977049180327869,
+              "score_breakdown": {
+                "rrf": 0.04918,
+                "lexical_rerank": 0.666986,
+                "semantic_rerank": 1.0,
+                "graph": 0.0,
+                "keyword": 299.917707,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 1.0,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.697705
+              }
+            }
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "elapsed_ms": 920,
+      "recall_depth_scan": {
+        "dense": {
+          "18": {
+            "candidate_count": 18,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 30,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "keyword": {
+          "18": {
+            "candidate_count": 8,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_decision.pdf",
+              "vision_plan.pdf",
+              "08_ui_context_report.pdf",
+              "01_requirement.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "08_tasks.md"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 8,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_decision.pdf",
+              "vision_plan.pdf",
+              "08_ui_context_report.pdf",
+              "01_requirement.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "08_tasks.md"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 8,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_decision.pdf",
+              "vision_plan.pdf",
+              "08_ui_context_report.pdf",
+              "01_requirement.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "08_tasks.md"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 8,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_decision.pdf",
+              "vision_plan.pdf",
+              "08_ui_context_report.pdf",
+              "01_requirement.pdf",
+              "03_dataset_audit.pdf",
+              "presentation_template.pptx",
+              "08_tasks.md"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "merged_pool": {
+          "18": {
+            "candidate_count": 22,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 31,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "02_architecture.pdf",
+              "08_selection_ui.png",
+              "vision_confusion_matrix.png",
+              "08_metrics_chart.png",
+              "vision_plan.pdf",
+              "vision_review.docx",
+              "vision_july_config.yaml",
+              "08_decision.pdf",
+              "08_alignment_config.yaml",
+              "08_ui_context_config.json"
+            ],
+            "hit_sources": [
+              "02_architecture.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        }
+      },
+      "final_k_scan": {
+        "3": {
+          "candidate_count": 1,
+          "top_sources": [
+            "02_architecture.pdf"
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "5": {
+          "candidate_count": 1,
+          "top_sources": [
+            "02_architecture.pdf"
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "6": {
+          "candidate_count": 1,
+          "top_sources": [
+            "02_architecture.pdf"
+          ],
+          "hit_sources": [
+            "02_architecture.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "failure_buckets": [
+        "final_hit"
+      ]
+    },
+    {
+      "id": "CP-RAG-003",
+      "question": "请从当前项目语料中查找“MIntRec2.0 与 ScreenSpot 数据审计”里关于“公开主基准为 MIntRec2.0，ScreenSpot 只用于屏幕目标定位。两者不用于证明私有”的记录。",
+      "type": "current_product_corpus_lookup",
+      "expected_sources": [
+        "03_dataset_audit.pdf"
+      ],
+      "requires_multi_doc": false,
+      "graph_relevant": false,
+      "allows_title_reference": false,
+      "query_variants": [
+        "请从当前项目语料中查找“MIntRec2.0 与 ScreenSpot 数据审计”里关于“公开主基准为 MIntRec2.0，ScreenSpot 只用于屏幕目标定位。两者不用于证明私有”的记录。"
+      ],
+      "matched_entities": [],
+      "graph_context_count": 0,
+      "stages": {
+        "dense": {
+          "candidate_count": 34,
+          "top_sources": [
+            "03_dataset_audit.pdf",
+            "08_tasks.md",
+            "ambiguous_metric.txt",
+            "vision_review.docx",
+            "07_baseline_training.log",
+            "08_decision.pdf",
+            "07_baseline_report.pdf",
+            "vision_july_report.pdf",
+            "08_ui_context_metrics.xlsx",
+            "07_baseline_config.yaml"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.21821370720863342,
+              "keyword_score": 106.63370985705271,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 3,
+              "vector_distance": 0.8556058406829834,
+              "keyword_score": 4.647078318172241,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0_child_0",
+              "source_filename": "ambiguous_metric.txt",
+              "parent_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 5,
+              "vector_distance": 0.942712664604187,
+              "keyword_score": 3.237746286871286,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.9477647542953491,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_training.log",
+              "parent_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": 21,
+              "vector_distance": 0.9688038229942322,
+              "keyword_score": 1.4926207498948595e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": null,
+              "vector_distance": 0.9718973636627197,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_report.pdf",
+              "parent_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": 10,
+              "vector_distance": 0.9827473163604736,
+              "keyword_score": 2.099739486181738,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_report.pdf",
+              "parent_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": 24,
+              "vector_distance": 0.9972094893455505,
+              "keyword_score": 1.304133006959009e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2f780601df4930628ad0453f4ba27de0_544a1c37a8be_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_metrics.xlsx",
+              "parent_id": "2f780601df4930628ad0453f4ba27de0_544a1c37a8be_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": 12,
+              "vector_distance": 0.9987351894378662,
+              "keyword_score": 1.8528659376493408e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": 6,
+              "vector_distance": 0.9992987513542175,
+              "keyword_score": 2.968003522707407,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "keyword": {
+          "candidate_count": 24,
+          "top_sources": [
+            "03_dataset_audit.pdf",
+            "02_architecture.pdf",
+            "08_tasks.md",
+            "08_ui_context_report.pdf",
+            "ambiguous_metric.txt",
+            "07_baseline_config.yaml",
+            "undated_note.txt",
+            "01_requirement.pdf",
+            "vision_plan.pdf",
+            "07_baseline_report.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 1,
+              "vector_distance": null,
+              "keyword_score": 106.63370985705271,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 2,
+              "vector_distance": null,
+              "keyword_score": 5.238359602769234,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 3,
+              "vector_distance": null,
+              "keyword_score": 4.647078318172241,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_report.pdf",
+              "parent_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 4,
+              "vector_distance": null,
+              "keyword_score": 3.3361912592473084,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0_child_0",
+              "source_filename": "ambiguous_metric.txt",
+              "parent_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 5,
+              "vector_distance": null,
+              "keyword_score": 3.237746286871286,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 6,
+              "vector_distance": null,
+              "keyword_score": 2.968003522707407,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0_child_0",
+              "source_filename": "undated_note.txt",
+              "parent_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 7,
+              "vector_distance": null,
+              "keyword_score": 2.6627974395207277,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 8,
+              "vector_distance": null,
+              "keyword_score": 2.4482949984402893,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 9,
+              "vector_distance": null,
+              "keyword_score": 2.2770293648954176,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_report.pdf",
+              "parent_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 10,
+              "vector_distance": null,
+              "keyword_score": 2.099739486181738,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "source_title": {
+          "candidate_count": 1,
+          "top_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": null,
+              "vector_distance": null,
+              "keyword_score": 1.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "merged": {
+          "candidate_count": 34,
+          "top_sources": [
+            "03_dataset_audit.pdf",
+            "08_tasks.md",
+            "ambiguous_metric.txt",
+            "vision_review.docx",
+            "07_baseline_training.log",
+            "08_decision.pdf",
+            "07_baseline_report.pdf",
+            "vision_july_report.pdf",
+            "08_ui_context_metrics.xlsx",
+            "07_baseline_config.yaml"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.21821370720863342,
+              "keyword_score": 106.63370985705271,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 3,
+              "vector_distance": 0.8556058406829834,
+              "keyword_score": 4.647078318172241,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0_child_0",
+              "source_filename": "ambiguous_metric.txt",
+              "parent_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 5,
+              "vector_distance": 0.942712664604187,
+              "keyword_score": 3.237746286871286,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.9477647542953491,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_training.log",
+              "parent_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": 21,
+              "vector_distance": 0.9688038229942322,
+              "keyword_score": 1.4926207498948595e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": null,
+              "vector_distance": 0.9718973636627197,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_report.pdf",
+              "parent_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": 10,
+              "vector_distance": 0.9827473163604736,
+              "keyword_score": 2.099739486181738,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_report.pdf",
+              "parent_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": 24,
+              "vector_distance": 0.9972094893455505,
+              "keyword_score": 1.304133006959009e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2f780601df4930628ad0453f4ba27de0_544a1c37a8be_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_metrics.xlsx",
+              "parent_id": "2f780601df4930628ad0453f4ba27de0_544a1c37a8be_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": 12,
+              "vector_distance": 0.9987351894378662,
+              "keyword_score": 1.8528659376493408e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": 6,
+              "vector_distance": 0.9992987513542175,
+              "keyword_score": 2.968003522707407,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "graph_boosted": {
+          "candidate_count": 34,
+          "top_sources": [
+            "03_dataset_audit.pdf",
+            "08_tasks.md",
+            "ambiguous_metric.txt",
+            "vision_review.docx",
+            "07_baseline_training.log",
+            "08_decision.pdf",
+            "07_baseline_report.pdf",
+            "vision_july_report.pdf",
+            "08_ui_context_metrics.xlsx",
+            "07_baseline_config.yaml"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.21821370720863342,
+              "keyword_score": 106.63370985705271,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 3,
+              "vector_distance": 0.8556058406829834,
+              "keyword_score": 4.647078318172241,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0_child_0",
+              "source_filename": "ambiguous_metric.txt",
+              "parent_id": "a1e8dbbf0c115571a2ac389e0238ca36_d32ccd90b8bf_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 5,
+              "vector_distance": 0.942712664604187,
+              "keyword_score": 3.237746286871286,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0_child_0",
+              "source_filename": "vision_review.docx",
+              "parent_id": "c8141ef11c10fc261ae69566430cf332_bfda42cbd9d0_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": null,
+              "vector_distance": 0.9477647542953491,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_training.log",
+              "parent_id": "6a48192aa173fea2baa81a2a229be341_57a3dbc2c98f_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": 21,
+              "vector_distance": 0.9688038229942322,
+              "keyword_score": 1.4926207498948595e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": null,
+              "vector_distance": 0.9718973636627197,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_report.pdf",
+              "parent_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": 10,
+              "vector_distance": 0.9827473163604736,
+              "keyword_score": 2.099739486181738,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_report.pdf",
+              "parent_id": "09d57846f1df900581c3326f933a825b_db2bc73386ed_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": 24,
+              "vector_distance": 0.9972094893455505,
+              "keyword_score": 1.304133006959009e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2f780601df4930628ad0453f4ba27de0_544a1c37a8be_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_metrics.xlsx",
+              "parent_id": "2f780601df4930628ad0453f4ba27de0_544a1c37a8be_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": 12,
+              "vector_distance": 0.9987351894378662,
+              "keyword_score": 1.8528659376493408e-06,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": 6,
+              "vector_distance": 0.9992987513542175,
+              "keyword_score": 2.968003522707407,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "reranked_pool": {
+          "candidate_count": 1,
+          "top_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.21821370720863342,
+              "keyword_score": 222.57595543907507,
+              "graph_score": 0.0,
+              "rerank_score": 0.99609375,
+              "final_score": 0.6967674180327869,
+              "score_breakdown": {
+                "rrf": 0.04918,
+                "lexical_rerank": 0.606907,
+                "semantic_rerank": 0.996094,
+                "graph": 0.0,
+                "keyword": 222.575955,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 1.0,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.696767
+              }
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "final": {
+          "candidate_count": 1,
+          "top_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 1,
+              "vector_distance": 0.21821370720863342,
+              "keyword_score": 222.57595543907507,
+              "graph_score": 0.0,
+              "rerank_score": 0.99609375,
+              "final_score": 0.6967674180327869,
+              "score_breakdown": {
+                "rrf": 0.04918,
+                "lexical_rerank": 0.606907,
+                "semantic_rerank": 0.996094,
+                "graph": 0.0,
+                "keyword": 222.575955,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 1.0,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.696767
+              }
+            }
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "elapsed_ms": 903,
+      "recall_depth_scan": {
+        "dense": {
+          "18": {
+            "candidate_count": 18,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 30,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "keyword": {
+          "18": {
+            "candidate_count": 18,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "02_architecture.pdf",
+              "08_tasks.md",
+              "08_ui_context_report.pdf",
+              "ambiguous_metric.txt",
+              "07_baseline_config.yaml",
+              "undated_note.txt",
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 24,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "02_architecture.pdf",
+              "08_tasks.md",
+              "08_ui_context_report.pdf",
+              "ambiguous_metric.txt",
+              "07_baseline_config.yaml",
+              "undated_note.txt",
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 24,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "02_architecture.pdf",
+              "08_tasks.md",
+              "08_ui_context_report.pdf",
+              "ambiguous_metric.txt",
+              "07_baseline_config.yaml",
+              "undated_note.txt",
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 24,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "02_architecture.pdf",
+              "08_tasks.md",
+              "08_ui_context_report.pdf",
+              "ambiguous_metric.txt",
+              "07_baseline_config.yaml",
+              "undated_note.txt",
+              "01_requirement.pdf",
+              "vision_plan.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "merged_pool": {
+          "18": {
+            "candidate_count": 25,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 33,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "03_dataset_audit.pdf",
+              "08_tasks.md",
+              "ambiguous_metric.txt",
+              "vision_review.docx",
+              "07_baseline_training.log",
+              "08_decision.pdf",
+              "07_baseline_report.pdf",
+              "vision_july_report.pdf",
+              "08_ui_context_metrics.xlsx",
+              "07_baseline_config.yaml"
+            ],
+            "hit_sources": [
+              "03_dataset_audit.pdf"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        }
+      },
+      "final_k_scan": {
+        "3": {
+          "candidate_count": 1,
+          "top_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "5": {
+          "candidate_count": 1,
+          "top_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "6": {
+          "candidate_count": 1,
+          "top_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "hit_sources": [
+            "03_dataset_audit.pdf"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "failure_buckets": [
+        "final_hit"
+      ]
+    }
+  ]
+}

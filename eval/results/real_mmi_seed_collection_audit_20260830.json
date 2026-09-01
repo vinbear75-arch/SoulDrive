@@ -1,0 +1,47 @@
+{
+  "schema_version": "souldrive_real_mmi_collection_audit_v0.1",
+  "collection_root": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\fixtures\\souldrive_pc_mmi_seed_v0.2",
+  "dataset_id": "SoulDrive-PC-MMI-seed-v0.2",
+  "episode_count": 30,
+  "manifest_episode_count": 30,
+  "require_media": false,
+  "require_real_capture": false,
+  "require_reviewed": false,
+  "requirements": {
+    "minimum_episode_count": true,
+    "unique_episode_ids": true,
+    "unique_task_coverage": true,
+    "schema_valid": true,
+    "media_valid": true
+  },
+  "diversity": {
+    "speakers": {},
+    "resolutions": {},
+    "projects": {
+      "project_souldrive_agent": 30
+    },
+    "applications": {},
+    "target_kinds": {}
+  },
+  "split_counts": {
+    "seed": 30
+  },
+  "difficulty_coverage": {
+    "text_target": false,
+    "icon_target": false,
+    "chart_target": false,
+    "time_misalignment": true,
+    "project_conflict": true,
+    "low_confidence": true,
+    "out_of_scope": true
+  },
+  "errors": [],
+  "warnings": [],
+  "error_count": 0,
+  "warning_count": 0,
+  "valid": true,
+  "limitations": [
+    "集合审计只能证明数据契约和覆盖条件，不能证明模型准确率或端到端延迟。",
+    "真实样本必须由用户主动授权采集；审计器不会生成、补齐或修改媒体与标签。"
+  ]
+}

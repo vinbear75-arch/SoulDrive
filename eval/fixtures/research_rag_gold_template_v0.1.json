@@ -1,0 +1,13 @@
+{
+  "schema_version": "souldrive_research_rag_gold_template_v0.1",
+  "status": "requires_human_evidence_confirmation",
+  "instructions": "每题的 gold_page、gold_section、gold_chunk_ids 必须由人工在当前重建索引中核验填写；未填写不得参与指标汇总。答案要点仅用于人工审阅，不可由模型自动回填。",
+  "questions": [
+    {"id":"RGOLD-01","type":"single_document_fact","question":"GraphRAG 的社区报告在全局检索中承担什么作用？","allowed_sources":["07_GraphRAG原理源码及应用介绍_Gitee.pdf"],"expected_points":["社区发现形成主题子图","社区报告压缩跨文档主题","全局检索使用摘要导航","原文仍是最终事实证据"],"should_refuse":false,"gold_page":null,"gold_section":null,"gold_chunk_ids":[]},
+    {"id":"RGOLD-02","type":"cross_document_synthesis","question":"比较检索、重排与生成的共同优化思路，并区分资料已有结论和待验证假设。","allowed_sources":["01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf","02_面向知识密集型任务的检索增强生成技术综述.pdf","06_检索增强生成_SciOpen.pdf"],"expected_points":["检索提高证据覆盖与相关性","重排提高上下文质量","生成受证据约束","无直接实验结果时不得宣称性能提升"],"should_refuse":false,"gold_page":null,"gold_section":null,"gold_chunk_ids":[]},
+    {"id":"RGOLD-03","type":"graph_relationship","question":"实体、关系、Leiden 社区和社区报告如何构成 GraphRAG 索引期链路？","allowed_sources":["07_GraphRAG原理源码及应用介绍_Gitee.pdf"],"expected_points":["抽取实体和关系","构建知识图","社区发现","社区报告","全局搜索"],"should_refuse":false,"gold_page":null,"gold_section":null,"gold_chunk_ids":[]},
+    {"id":"RGOLD-04","type":"evidence_boundary","question":"当前资料是否给出了某个不存在数据集上的 RAG 准确率？","allowed_sources":[],"expected_points":["明确缺少可靠证据","不得编造准确率","提示需要导入实验结果或指标表"],"should_refuse":true,"gold_page":null,"gold_section":null,"gold_chunk_ids":[]},
+    {"id":"RGOLD-05","type":"source_precision","question":"RAG 的基础流程包含哪些阶段？","allowed_sources":["04_RAG技术解析_让AI更可靠的知识调用系统.pdf","06_检索增强生成_SciOpen.pdf"],"expected_points":["知识/文档处理","检索","生成","引用或证据约束"],"should_refuse":false,"gold_page":null,"gold_section":null,"gold_chunk_ids":[]},
+    {"id":"RGOLD-06","type":"graph_route_boundary","question":"什么时候应该使用 GraphRAG，什么时候混合检索已经足够？","allowed_sources":["02_面向知识密集型任务的检索增强生成技术综述.pdf","07_GraphRAG原理源码及应用介绍_Gitee.pdf"],"expected_points":["简单事实查询优先混合检索","跨文档综合或多跳关系使用图谱","图谱增加索引和查询成本","路由原因可审计"],"should_refuse":false,"gold_page":null,"gold_section":null,"gold_chunk_ids":[]}
+  ]
+}

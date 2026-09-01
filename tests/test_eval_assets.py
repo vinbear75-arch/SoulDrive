@@ -8,6 +8,7 @@ from unittest.mock import patch
 from contextlib import redirect_stderr, redirect_stdout
 
 from scripts import eval_rag
+from scripts.audit_eval_leakage import audit_records
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -239,6 +240,12 @@ class EvalAssetsTests(unittest.TestCase):
             self.assertNotIn("??", question)
             self.assertGreaterEqual(len(searchable_chars), 12)
 
+    def test_blind_retrieval_v03_is_a_sealed_nonleaking_gate(self):
+        records = _load_jsonl(BLIND_RETRIEVAL_V3_DATASET_PATH)
+
+        self.assertEqual({record.get("split") for record in records}, {"sealed_test"})
+        self.assertTrue(audit_records(records)["pass"])
+
     def test_corpus_manifest_v02_covers_local_and_candidate_documents(self):
         manifest = _load_json(CORPUS_MANIFEST_V2_PATH)
         documents = manifest["documents"]
@@ -406,6 +413,124 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertIn("拒答正确率: 100.0%", output)
         self.assertIn("答案关键词覆盖率: 100.0%", output)
 
+    def test_eval_results_fail_fast_when_dataset_ids_do_not_match(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="DEV-01",
+                question="dev question",
+                expected_sources=["dev.pdf"],
+                type="single_doc",
+                rubric=[],
+                expected_keywords=[],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+            )
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result_path = Path(temp_dir) / "results.jsonl"
+            result_path.write_text(
+                json.dumps({"id": "SEALED-01", "evidence": []}) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "ID 不匹配"):
+                eval_rag.load_results(result_path, records)
+
+    def test_project_scoped_results_require_matching_project_id(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="SCOPED-01",
+                question="项目内问题",
+                expected_sources=["project.pdf"],
+                type="single_doc",
+                rubric=[],
+                expected_keywords=[],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+                project_id="project-a",
+            )
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result_path = Path(temp_dir) / "results.jsonl"
+            result_path.write_text(
+                json.dumps({"id": "SCOPED-01", "evidence": []}) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "project_id"):
+                eval_rag.load_results(result_path, records)
+
+    def test_live_retrieval_propagates_record_project_scope(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="SCOPED-01",
+                question="项目内问题",
+                expected_sources=["project.pdf"],
+                type="single_doc",
+                rubric=[],
+                expected_keywords=[],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+                project_id="project-a",
+            )
+        ]
+        captured = []
+
+        class FakeKnowledgeBase:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+            def search_with_evidence(self, query, *, top_k, project_id=None):
+                captured.append((query, top_k, project_id))
+                return {"evidence": []}
+
+            def close(self):
+                pass
+
+        with patch("core.knowledge_base.LocalKnowledgeBase", FakeKnowledgeBase):
+            results = eval_rag.run_retrieval(records, workspace="unused", top_k=3)
+
+        self.assertEqual(captured, [("项目内问题", 3, "project-a")])
+        self.assertEqual(results[0].project_id, "project-a")
+
+    def test_project_scoped_score_rejects_foreign_project_evidence(self):
+        record = eval_rag.EvalRecord(
+            id="SCOPED-02",
+            question="项目内问题",
+            expected_sources=["project.pdf"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+            project_id="project-a",
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="项目证据 [E1]。",
+            evidence=[
+                {
+                    "id": "E1",
+                    "source_filename": "project.pdf",
+                    "project_id": "project-b",
+                    "context": "项目证据。",
+                }
+            ],
+            elapsed_ms=10,
+            project_id="project-a",
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+
+        self.assertTrue(row["wrong_project"])
+        self.assertFalse(row["scope_ok"])
+        self.assertFalse(row["answerable_pass"])
+
     def test_miss_analyzer_groups_unhit_sources_and_partial_multi_doc_records(self):
         from scripts import analyze_rag_eval_misses
 
@@ -510,6 +635,7 @@ class EvalAssetsTests(unittest.TestCase):
                             "id": "E1",
                             "source_filename": "数据安全法.pdf",
                             "score": 0.2,
+                            "context": "企业知识库需要审计日志来支持审计和追溯。",
                         }
                     ],
                     elapsed_ms=1200,
@@ -600,7 +726,11 @@ class EvalAssetsTests(unittest.TestCase):
                 question=records[0].question,
                 expected_sources=records[0].expected_sources,
                 answer="企业知识库需要审计日志来支持审计和追溯 [E1]。",
-                evidence=[{"id": "E1", "source_filename": "数据安全法.pdf"}],
+                evidence=[{
+                    "id": "E1",
+                    "source_filename": "数据安全法.pdf",
+                    "context": "企业知识库需要审计日志来支持审计和追溯。",
+                }],
                 elapsed_ms=1000,
             ),
             eval_rag.EvalResult(
@@ -628,12 +758,51 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertEqual(report["refusal_leak_rate"], 0.5)
         self.assertEqual(report["overall_reliability_rate"], 2 / 3)
         self.assertEqual(report["invalid_citation_rate"], 1 / 3)
+        self.assertEqual(report["citation_support_valid_rate"], 1.0)
+        self.assertEqual(report["claim_support_checked_count"], 1)
+        self.assertEqual(report["claim_support_unsupported_claim_count"], 0)
         self.assertEqual(
             report["retrieval_confidence_intervals_95"][
                 "retrieval_all_hit_rate"
             ]["total"],
             1,
         )
+
+    def test_answer_quality_summary_rejects_citation_without_body_support(self):
+        record = eval_rag.EvalRecord(
+            id="UNSUPPORTED-01",
+            question="当前系统的准确率是多少？",
+            expected_sources=["metrics"],
+            type="single_doc",
+            rubric=["数字必须有证据"],
+            expected_keywords=["准确率"],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="当前系统的准确率为 99%。[E1]",
+            evidence=[{
+                "id": "E1",
+                "source_filename": "metrics.pdf",
+                "context": "当前系统记录了运行时间，但没有准确率数字。",
+            }],
+            elapsed_ms=100,
+        )
+
+        report = eval_rag.summarize([record], [result], top_k=3)
+
+        self.assertEqual(report["citation_valid_rate"], 1.0)
+        self.assertEqual(report["citation_support_valid_rate"], 0.0)
+        self.assertEqual(report["claim_support_checked_count"], 1)
+        self.assertEqual(report["claim_support_unsupported_claim_count"], 1)
+        self.assertEqual(report["answerable_pass_rate"], 0.0)
+
+    def test_evidence_gap_language_counts_as_a_refusal(self):
+        self.assertTrue(eval_rag.answer_refuses("资料中未包含该产品的价格信息，无法依据现有文档回答。"))
 
     def test_eval_script_prints_comparison_report_from_saved_answer_results(self):
         fixture = [
@@ -949,6 +1118,53 @@ class EvalAssetsTests(unittest.TestCase):
                 self.assertIsNotNone(get_workspace_keys(workspace.root_path))
             finally:
                 clear_workspace_keys(workspace.root_path)
+
+    def test_eval_script_auto_selects_ollama_when_llama_cpp_is_missing(self):
+        with patch.object(eval_rag.importlib.util, "find_spec", return_value=None), patch.dict(
+            os.environ,
+            {
+                "SOULDRIVE_CHAT_PROVIDER": "",
+                "SOULDRIVE_OLLAMA_MODEL": "",
+                "SOULDRIVE_OLLAMA_URL": "",
+            },
+            clear=False,
+        ):
+            eval_rag.configure_answer_generation_backend()
+            self.assertEqual(os.environ.get("SOULDRIVE_CHAT_PROVIDER"), "ollama")
+            self.assertEqual(os.environ.get("SOULDRIVE_OLLAMA_MODEL"), "qwen3.5:9b")
+            self.assertEqual(os.environ.get("SOULDRIVE_OLLAMA_URL"), "http://127.0.0.1:11434")
+
+    def test_eval_script_falls_back_to_extractable_answer_when_generation_fails(self):
+        class FakeKB:
+            def search_with_evidence(self, **kwargs):
+                return {
+                    "evidence": [
+                        {
+                            "id": "E1",
+                            "section": "核心流程",
+                            "snippet": "RAG 的核心流程一般包括检索、重排和生成三个阶段。",
+                            "context": "RAG 的核心流程一般包括检索、重排和生成三个阶段。",
+                        }
+                    ]
+                }
+
+        class FakeRag:
+            kb = FakeKB()
+            graph_db = object()
+
+            def generate_response_stream(self, *args, **kwargs):
+                raise ModuleNotFoundError("llama_cpp")
+
+        answer, evidence = eval_rag.generate_answer_with_fallback(
+            FakeRag(),
+            "RAG 的核心流程是什么？",
+            project_id=None,
+            top_k=3,
+        )
+
+        self.assertTrue(answer)
+        self.assertEqual(evidence[0]["id"], "E1")
+        self.assertIn("[E1]", answer)
 
 
 def _load_dataset():

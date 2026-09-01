@@ -1,0 +1,29 @@
+{
+  "schema_version": "rag_hierarchy_coverage_recheck_v0.1",
+  "performed_at": "2026-08-30T01:35:05+08:00",
+  "change": "multi_quoted_topic_structure_coverage",
+  "dataset": "eval/fixtures/rag_cn_raw_v0.1/dev.jsonl",
+  "workspace": "runtime/rag-cn-hierarchy-recheck-20260830",
+  "workspace_scope": "six raw RAG Chinese PDFs, isolated plaintext index",
+  "indexed_child_count": 637,
+  "sample_count": 16,
+  "comparison": {
+    "before_result": "eval/results/retrieval_dev_hierarchy_recheck_20260830.jsonl",
+    "candidate_result": "eval/results/retrieval_dev_hierarchy_coverage_recheck_20260830.jsonl",
+    "retrieval_all_hit_at_6": {"before": 1.0, "candidate": 1.0},
+    "retrieval_any_hit_at_6": {"before": 1.0, "candidate": 1.0},
+    "first_hit_at_1": {"before": 1.0, "candidate": 1.0},
+    "mrr_at_6": {"before": 1.0, "candidate": 1.0},
+    "source_coverage_at_6": {"before": 1.0, "candidate": 1.0},
+    "mean_retrieval_ms": {"before": 1737, "candidate": 1748},
+    "changed_evidence_order_count": 3,
+    "paired_all_hit_changes": {"improved": 0, "regressed": 0, "unchanged": 16}
+  },
+  "interpretation": "The candidate preserves the matched dev retrieval metrics and changes three evidence orders; this is a ranking regression check, not evidence of an accuracy gain.",
+  "limitations": [
+    "The dev set has no multi-document or answer-generation samples, so coverage quality is not fully measured.",
+    "The isolated index was rebuilt from the six raw PDFs with graph extraction skipped; it is not the encrypted production workspace.",
+    "No sealed-test data, model, retrieval weight, or metric definition was changed.",
+    "The PageIndex-style document-tree route and full answer/citation evaluation remain incomplete."
+  ]
+}

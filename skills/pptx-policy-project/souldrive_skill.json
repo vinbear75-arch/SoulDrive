@@ -1,0 +1,44 @@
+{
+  "schema_version": "souldrive_skill_adapter_v1",
+  "source_sha256": "builtin-pptx-policy-project-v1",
+  "target": "presentation",
+  "compatibility_status": "verified",
+  "validation": {
+    "passed": true,
+    "mode": "deterministic_static_contract",
+    "scripts_ignored": true
+  },
+  "title": "政策项目汇报",
+  "intent": "政策项目汇报",
+  "applicability": "用于政策研究、政府项目、公共管理和项目申报汇报。用户提到政策汇报、项目汇报、政策依据、实施措施或成效评估时使用。按现状—政策依据—问题—措施—成效指标组织可编辑 PPTX。",
+  "triggers": [],
+  "steps": [
+    "政策项目汇报",
+    "先说明事实和政策依据，再提出问题与措施，避免把建议写成已经发生的结果。",
+    "页面流程",
+    "按现状与背景、政策依据、关键问题、实施措施、成效指标与评估、资料来源组织页面。",
+    "内容规则",
+    "区分政策原文、事实判断、建议措施和待验证假设。"
+  ],
+  "content": "1. 政策项目汇报\n2. 先说明事实和政策依据，再提出问题与措施，避免把建议写成已经发生的结果。\n3. 页面流程\n4. 按现状与背景、政策依据、关键问题、实施措施、成效指标与评估、资料来源组织页面。\n5. 内容规则\n6. 区分政策原文、事实判断、建议措施和待验证假设。",
+  "output_contract": "生成证据可追溯、结构清晰且可编辑的 PPTX 大纲与演示文稿。",
+  "success_criteria": [
+    "每个事实页保留来源映射。",
+    "输出通过 PPTX 结构校验。",
+    "不执行原 Skill 中的脚本或安装命令。"
+  ],
+  "presentation_contract": {
+    "schema_version": "souldrive_presentation_contract_v1",
+    "source_format": "pptx",
+    "local_output_format": "pptx",
+    "adaptation": "native_pptx",
+    "layout_profile": "editable_evidence",
+    "business_profile": "policy",
+    "section_sequence": ["现状与背景", "政策依据", "关键问题", "实施措施", "成效指标与评估"],
+    "stage_keywords": [["现状", "背景", "形势"], ["政策", "依据", "法规"], ["问题", "挑战", "短板"], ["措施", "实施", "机制"], ["指标", "成效", "评估"]],
+    "point_limit": 3,
+    "source_policy": "every_content_slide",
+    "scripts": "ignored",
+    "compatibility_notes": []
+  }
+}

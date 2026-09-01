@@ -1,0 +1,44 @@
+{
+  "schema_version": "souldrive_skill_adapter_v1",
+  "source_sha256": "builtin-pptx-research-paper-v1",
+  "target": "presentation",
+  "compatibility_status": "verified",
+  "validation": {
+    "passed": true,
+    "mode": "deterministic_static_contract",
+    "scripts_ignored": true
+  },
+  "title": "论文研究汇报",
+  "intent": "论文研究汇报",
+  "applicability": "用于中文论文、科研项目和实验结果汇报。用户提到论文答辩、研究汇报、实验汇报、文献汇报或研究进展时使用。按问题—方法—实验—结论—局限组织可编辑 PPTX，所有事实页必须绑定本地证据。",
+  "triggers": [],
+  "steps": [
+    "论文研究汇报",
+    "面向论文研究汇报，优先让听众理解研究问题、方法可信度和实验结论，而不是堆叠原文。",
+    "页面流程",
+    "按以下顺序组织页面：问题定义、研究方法、实验设计、核心结论、局限与下一步、资料来源。证据不足的部分明确标记“证据不足”，不得猜测补齐。",
+    "内容规则",
+    "每页最多 3 个要点，每个要点只表达一个判断。"
+  ],
+  "content": "1. 论文研究汇报\n2. 面向论文研究汇报，优先让听众理解研究问题、方法可信度和实验结论，而不是堆叠原文。\n3. 页面流程\n4. 按以下顺序组织页面：问题定义、研究方法、实验设计、核心结论、局限与下一步、资料来源。证据不足的部分明确标记“证据不足”，不得猜测补齐。\n5. 内容规则\n6. 每页最多 3 个要点，每个要点只表达一个判断。",
+  "output_contract": "生成证据可追溯、结构清晰且可编辑的 PPTX 大纲与演示文稿。",
+  "success_criteria": [
+    "每个事实页保留来源映射。",
+    "输出通过 PPTX 结构校验。",
+    "不执行原 Skill 中的脚本或安装命令。"
+  ],
+  "presentation_contract": {
+    "schema_version": "souldrive_presentation_contract_v1",
+    "source_format": "pptx",
+    "local_output_format": "pptx",
+    "adaptation": "native_pptx",
+    "layout_profile": "editable_evidence",
+    "business_profile": "research",
+    "section_sequence": ["问题定义", "研究方法", "实验设计", "核心结论", "局限与下一步"],
+    "stage_keywords": [["问题", "目标", "背景"], ["方法", "模型", "算法"], ["实验", "数据", "指标"], ["结果", "结论", "发现"], ["局限", "不足", "未来"]],
+    "point_limit": 3,
+    "source_policy": "every_content_slide",
+    "scripts": "ignored",
+    "compatibility_notes": []
+  }
+}

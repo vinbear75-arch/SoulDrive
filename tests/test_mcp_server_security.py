@@ -261,6 +261,27 @@ class McpServerSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 423)
         self.assertEqual(response.json()["reason"], "workspace passphrase required")
 
+    def test_graphrag_diagnostics_rejects_stale_unlocked_state_without_memory_keys(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = str(Path(temp_dir) / "runtime_state.json")
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            with patch.object(runtime_state, "STATE_PATH", state_path), patch.object(
+                mcp_server,
+                "current_workspace",
+                return_value=workspace,
+            ), patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False):
+                runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+                runtime_state.mark_software_unlocked()
+                response = TestClient(mcp_server.app).get(
+                    "/diagnostics/graphrag",
+                    headers={"X-SoulDrive-Token": "test-token"},
+                )
+
+        self.assertEqual(response.status_code, 423)
+        self.assertEqual(response.json()["status"], "locked")
+        self.assertEqual(response.json()["reason"], "workspace passphrase required")
+
 
 if __name__ == "__main__":
     unittest.main()

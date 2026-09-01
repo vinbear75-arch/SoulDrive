@@ -1,0 +1,49 @@
+{
+  "schema_version": "souldrive_personalization_pair_eval_v0.1",
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "pass_rate": 1.0,
+    "preference_adherence": 1.0,
+    "factual_invariance": 1.0,
+    "citation_invariance": 1.0,
+    "irrelevant_preference_rejection": 1.0,
+    "cross_project_leakage_rate": 1.0
+  },
+  "results": [
+    {
+      "pair_id": "PREF-SEED-001",
+      "baseline_citations": [
+        "M1"
+      ],
+      "personalized_citations": [
+        "M1"
+      ],
+      "factual_invariance": true,
+      "factual_coverage": true,
+      "citation_invariance": true,
+      "preference_adherence": true,
+      "irrelevant_preference_rejection": true,
+      "cross_project_leakage": false,
+      "passed": true
+    },
+    {
+      "pair_id": "PREF-SEED-002",
+      "baseline_citations": [
+        "E1",
+        "M2"
+      ],
+      "personalized_citations": [
+        "E1",
+        "M2"
+      ],
+      "factual_invariance": true,
+      "factual_coverage": true,
+      "citation_invariance": true,
+      "preference_adherence": true,
+      "irrelevant_preference_rejection": true,
+      "cross_project_leakage": false,
+      "passed": true
+    }
+  ]
+}

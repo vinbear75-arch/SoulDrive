@@ -1,0 +1,65 @@
+{
+  "schema_version": "souldrive_rag_empty_recall_correction_recheck_v0.1",
+  "performed_at": "2026-08-30T19:36:07+08:00",
+  "design_basis": [
+    {
+      "name": "CRAG",
+      "url": "https://arxiv.org/abs/2401.15884",
+      "applied_principle": "先评估检索质量，再执行有界纠错重检索"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "保留可追溯证据并把检索过程作为可诊断链路"
+    }
+  ],
+  "scope": "RAGEngine 生成前的文档证据纠错，不改变证据门、不改变索引和默认检索权重",
+  "implementation": {
+    "empty_first_recall": "首轮没有可采纳文档证据时，若不是空内容、过短片段或低置信 OCR，则触发一次确定性查询变体/扩大 Top-K 重检索",
+    "fail_closed": "二次检索仍不足时继续拒答；低置信 OCR、空内容和过短片段不做无效重试",
+    "bounded_passes": 2,
+    "audit_fields": [
+      "correction_triggered",
+      "correction_mode",
+      "query_changed",
+      "used"
+    ]
+  },
+  "verification": {
+    "targeted_tests": "104 passed",
+    "full_backend_tests": "830 passed, 1 warning",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "frozen_retrieval_recheck": {
+    "dataset": "eval/retrieval_quality_blind_v0.3.jsonl",
+    "workspace": "runtime/rag-eval-workspace-v4",
+    "sample_count": 360,
+    "top_k": 3,
+    "index_write": false,
+    "candidate_result": "eval/results/retrieval_primary_empty_recall_candidate_20260830.jsonl",
+    "baseline_result": "eval/results/retrieval_primary_isolated_baseline2_20260830.jsonl",
+    "metrics": {
+      "all_hit_at_3": 0.962963,
+      "any_hit_at_3": 0.984568,
+      "first_hit_at_1": 0.92284,
+      "mrr_at_3": 0.9490740740740741,
+      "average_source_coverage_at_3": 0.9737654320987654,
+      "cross_document_all_hit_at_3": 0.935185,
+      "graph_relevant_any_hit_at_3": 0.9822695035460993,
+      "average_retrieval_ms": 3490
+    },
+    "paired_change": {
+      "improved": 0,
+      "regressed": 0,
+      "unchanged": 360,
+      "exact_mcnemar_p": 1.0
+    }
+  },
+  "decision": "保留可靠性修复，不宣称检索精度提升；冻结检索评测逐条无变化，因该评测不执行 RAGEngine 生成前纠错分支",
+  "limitations": [
+    "当前证据只证明空召回纠错契约和全量回归无副作用，不证明真实业务答案准确率提升",
+    "冻结检索评测是检索层评测，未覆盖模型生成、事实级语义/NLI 或完整端到端延迟",
+    "正式加密工作区仍锁定，未据此宣称生产索引或 GraphRAG 验收完成"
+  ]
+}

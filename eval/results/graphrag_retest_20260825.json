@@ -1,0 +1,94 @@
+{
+  "schema_version": "souldrive_graphrag_retest_v1",
+  "created_at": "2026-08-25T15:55:03+0800",
+  "purpose": "GraphRAG 当前中文语料项目的独立复验记录；结果只代表本机本次运行，不是竞赛成绩",
+  "project_id": "rag-cn-demo-20260824",
+  "models": {
+    "chat": "qwen3.5:9b",
+    "embedding": "qwen3-embedding:4b",
+    "provider": "ollama"
+  },
+  "corpus": {
+    "document_count": 6,
+    "legacy_english_pdfs_in_scope": 0,
+    "source_policy": "当前项目限定为 6 篇中文 RAG/GraphRAG PDF",
+    "source_files": [
+      "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+      "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "03_检索增强生成_BIMSA.pdf",
+      "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "06_检索增强生成_SciOpen.pdf",
+      "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+    ]
+  },
+  "index": {
+    "ready": true,
+    "index_name": "project:rag-cn-demo-20260824",
+    "document_count": 6,
+    "entity_count": 174,
+    "relationship_count": 241,
+    "community_count": 4,
+    "algorithm": "leiden_v1_local_move_refine",
+    "target_community_range": [3, 4],
+    "target_range_ok": true,
+    "memory_policy": "document_derived_index_only; user_memory_is_not_graph_data"
+  },
+  "unit_tests": {
+    "command": "pytest -q tests/test_graph_rag.py tests/test_graph_store.py tests/test_indexer_scope.py",
+    "passed": 27,
+    "failed": 0
+  },
+  "real_ollama_runs": [
+    {
+      "route": "hybrid",
+      "graph_enabled": false,
+      "reason": "single_evidence_lookup",
+      "elapsed_ms": 126941,
+      "status": "pass",
+      "answer_chars": 331,
+      "has_citation": true,
+      "refusal": false
+    },
+    {
+      "route": "global",
+      "graph_enabled": true,
+      "community_reports": 4,
+      "reason": "cross_document_or_global_synthesis",
+      "elapsed_ms": 143810,
+      "status": "pass",
+      "answer_chars": 395,
+      "has_citation": true,
+      "refusal": false
+    },
+    {
+      "route": "local",
+      "graph_enabled": true,
+      "community_reports": 4,
+      "reason": "entity_relation_or_multi_hop_question",
+      "elapsed_ms": 142658,
+      "status": "pass",
+      "answer_chars": 508,
+      "has_citation": true,
+      "refusal": false
+    }
+  ],
+  "acceptance": {
+    "index_ready": true,
+    "leiden_community_target_ok": true,
+    "ordinary_query_keeps_hybrid_without_graph": true,
+    "global_graph_route_enabled": true,
+    "local_graph_route_enabled": true,
+    "all_three_answers_completed": true,
+    "all_three_answers_cited": true,
+    "all_three_answers_not_refused": true,
+    "project_scope_verified": true,
+    "tauri_cold_restart_verified_in_this_run": false,
+    "competition_latency_ready": false
+  },
+  "performance_note": {
+    "sample_count": 3,
+    "elapsed_range_ms": [126941, 143810],
+    "conclusion": "功能链路已跑通，但本机 Qwen3.5 9B 单条回答约 127-144 秒；样本数不足以宣称正式 P95，也明显未达到竞赛级交互延迟。"
+  },
+  "full_run_artifact": "eval/results/graphrag_acceptance_project_rag_cn_retest_20260825.json"
+}

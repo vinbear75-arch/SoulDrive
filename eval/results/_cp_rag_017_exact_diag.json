@@ -1,0 +1,1424 @@
+{
+  "schema_version": "rag_pipeline_diagnostics_v1",
+  "generated_at": "2026-08-31T04:31:45.877867+00:00",
+  "dataset": "eval\\results\\_cp_rag_017_exact.jsonl",
+  "workspace": "eval\\runtime\\product_b1_candidate\\SoulDrive",
+  "top_k": 6,
+  "graph_enabled": false,
+  "stage_order": [
+    "dense",
+    "keyword",
+    "source_title",
+    "merged",
+    "graph_boosted",
+    "reranked_pool",
+    "final"
+  ],
+  "sample_count": 1,
+  "positive_sample_count": 1,
+  "stage_summary": {
+    "dense": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 34.0,
+      "max_candidate_count": 34,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "keyword": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 12.0,
+      "max_candidate_count": 12,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "source_title": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "merged": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 34.0,
+      "max_candidate_count": 34,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "graph_boosted": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 34.0,
+      "max_candidate_count": 34,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "reranked_pool": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "final": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    }
+  },
+  "failure_bucket_counts": {
+    "final_hit": 1
+  },
+  "transition_summary": {
+    "dense->keyword": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "keyword->source_title": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "source_title->merged": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "merged->graph_boosted": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "graph_boosted->reranked_pool": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    },
+    "reranked_pool->final": {
+      "lost_sample_count": 0,
+      "lost_source_mentions": 0,
+      "gained_sample_count": 0,
+      "gained_source_mentions": 0
+    }
+  },
+  "type_summary": {
+    "current_product_corpus_lookup": {
+      "sample_count": 1,
+      "final_any_hit_rate": 1.0,
+      "final_all_hit_rate": 1.0,
+      "final_average_source_coverage": 1.0
+    }
+  },
+  "expected_source_summary": {
+    "08_selection_ui.png": {
+      "expected_count": 1,
+      "dense_hit_count": 1,
+      "keyword_hit_count": 1,
+      "source_title_hit_count": 1,
+      "merged_hit_count": 1,
+      "graph_boosted_hit_count": 1,
+      "reranked_pool_hit_count": 1,
+      "final_hit_count": 1,
+      "dense_hit_rate": 1.0,
+      "keyword_hit_rate": 1.0,
+      "source_title_hit_rate": 1.0,
+      "merged_hit_rate": 1.0,
+      "graph_boosted_hit_rate": 1.0,
+      "reranked_pool_hit_rate": 1.0,
+      "final_hit_rate": 1.0
+    }
+  },
+  "recall_depth_summary": {
+    "dense": {
+      "18": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 18.0,
+        "max_candidate_count": 18,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "30": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 30.0,
+        "max_candidate_count": 30,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "60": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "100": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      }
+    },
+    "keyword": {
+      "18": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 12.0,
+        "max_candidate_count": 12,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "30": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 12.0,
+        "max_candidate_count": 12,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "60": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 12.0,
+        "max_candidate_count": 12,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "100": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 12.0,
+        "max_candidate_count": 12,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      }
+    },
+    "merged_pool": {
+      "18": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 24.0,
+        "max_candidate_count": 24,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "30": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 31.0,
+        "max_candidate_count": 31,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "60": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      },
+      "100": {
+        "sample_count": 1,
+        "any_hit_rate": 1.0,
+        "all_hit_rate": 1.0,
+        "average_source_coverage": 1.0,
+        "miss_count": 0,
+        "zero_candidate_count": 0,
+        "avg_candidate_count": 34.0,
+        "max_candidate_count": 34,
+        "hit_source_mentions": 1,
+        "missed_source_mentions": 0
+      }
+    }
+  },
+  "final_k_summary": {
+    "3": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "5": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    },
+    "6": {
+      "sample_count": 1,
+      "any_hit_rate": 1.0,
+      "all_hit_rate": 1.0,
+      "average_source_coverage": 1.0,
+      "miss_count": 0,
+      "zero_candidate_count": 0,
+      "avg_candidate_count": 1.0,
+      "max_candidate_count": 1,
+      "hit_source_mentions": 1,
+      "missed_source_mentions": 0
+    }
+  },
+  "samples": [
+    {
+      "id": "CP-RAG-017",
+      "question": "请从当前项目语料中查找“选区绑定界面示意”里关于“界面截图：当前项目为端侧多模态智能体优化项目，用户选中实验指标表中的 target_bindin”的记录。",
+      "type": "current_product_corpus_lookup",
+      "expected_sources": [
+        "08_selection_ui.png"
+      ],
+      "requires_multi_doc": false,
+      "graph_relevant": false,
+      "allows_title_reference": false,
+      "query_variants": [
+        "请从当前项目语料中查找“选区绑定界面示意”里关于“界面截图：当前项目为端侧多模态智能体优化项目，用户选中实验指标表中的 target_bindin”的记录。"
+      ],
+      "matched_entities": [],
+      "graph_context_count": 0,
+      "stages": {
+        "dense": {
+          "candidate_count": 34,
+          "top_sources": [
+            "01_requirement.pdf",
+            "08_decision.pdf",
+            "08_selection_ui.png",
+            "vision_plan.pdf",
+            "08_metrics_chart.png",
+            "08_tasks.md",
+            "undated_note.txt",
+            "vision_july_config.yaml",
+            "07_baseline_config.yaml",
+            "vision_confusion_matrix.png"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 2,
+              "vector_distance": 0.6345083713531494,
+              "keyword_score": 21.655670132502472,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 5,
+              "vector_distance": 0.7748729586601257,
+              "keyword_score": 5.8076704905534715,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 1,
+              "vector_distance": 0.7825686931610107,
+              "keyword_score": 46.44916614966948,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": 8,
+              "vector_distance": 0.8407518267631531,
+              "keyword_score": 2.2770293648954176,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": null,
+              "vector_distance": 0.8816142082214355,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": 6,
+              "vector_distance": 0.8871279954910278,
+              "keyword_score": 4.688309930513446,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0_child_0",
+              "source_filename": "undated_note.txt",
+              "parent_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": 7,
+              "vector_distance": 0.891357958316803,
+              "keyword_score": 2.3939503252054055,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": null,
+              "vector_distance": 0.8951205015182495,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9075366258621216,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0_child_0",
+              "source_filename": "vision_confusion_matrix.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9090282917022705,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "keyword": {
+          "candidate_count": 12,
+          "top_sources": [
+            "08_selection_ui.png",
+            "01_requirement.pdf",
+            "02_architecture.pdf",
+            "08_ui_context_report.pdf",
+            "08_decision.pdf",
+            "08_tasks.md",
+            "undated_note.txt",
+            "vision_plan.pdf",
+            "03_dataset_audit.pdf",
+            "07_baseline_report.pdf"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 1,
+              "vector_distance": null,
+              "keyword_score": 46.44916614966948,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 2,
+              "vector_distance": null,
+              "keyword_score": 21.655670132502472,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0_child_0",
+              "source_filename": "02_architecture.pdf",
+              "parent_id": "78cb1d7457099ad4a763155922e053f9_f1be81e9537f_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 3,
+              "vector_distance": null,
+              "keyword_score": 7.547895119220511,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0_child_0",
+              "source_filename": "08_ui_context_report.pdf",
+              "parent_id": "f67b4dcd68eafac47dffc90ce89532b3_fb5d579daf0a_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 4,
+              "vector_distance": null,
+              "keyword_score": 7.3348089075251615,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 5,
+              "vector_distance": null,
+              "keyword_score": 5.8076704905534715,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 6,
+              "vector_distance": null,
+              "keyword_score": 4.688309930513446,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0_child_0",
+              "source_filename": "undated_note.txt",
+              "parent_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 7,
+              "vector_distance": null,
+              "keyword_score": 2.3939503252054055,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 8,
+              "vector_distance": null,
+              "keyword_score": 2.2770293648954176,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0_child_0",
+              "source_filename": "03_dataset_audit.pdf",
+              "parent_id": "f239db8db6295f20fab3482d05ed4ead_382bb144eb26_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 9,
+              "vector_distance": null,
+              "keyword_score": 1.92099538552588,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_report.pdf",
+              "parent_id": "4f87ce4d7034b98b8b791595c1d6dd97_e6bc53a74479_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": 10,
+              "vector_distance": null,
+              "keyword_score": 1.8429752231284946,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "source_title": {
+          "candidate_count": 1,
+          "top_sources": [
+            "08_selection_ui.png"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": null,
+              "sparse_rank": null,
+              "vector_distance": null,
+              "keyword_score": 1.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "merged": {
+          "candidate_count": 34,
+          "top_sources": [
+            "01_requirement.pdf",
+            "08_decision.pdf",
+            "08_selection_ui.png",
+            "vision_plan.pdf",
+            "08_metrics_chart.png",
+            "08_tasks.md",
+            "undated_note.txt",
+            "vision_july_config.yaml",
+            "07_baseline_config.yaml",
+            "vision_confusion_matrix.png"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 2,
+              "vector_distance": 0.6345083713531494,
+              "keyword_score": 21.655670132502472,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 5,
+              "vector_distance": 0.7748729586601257,
+              "keyword_score": 5.8076704905534715,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 1,
+              "vector_distance": 0.7825686931610107,
+              "keyword_score": 46.44916614966948,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": 8,
+              "vector_distance": 0.8407518267631531,
+              "keyword_score": 2.2770293648954176,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": null,
+              "vector_distance": 0.8816142082214355,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": 6,
+              "vector_distance": 0.8871279954910278,
+              "keyword_score": 4.688309930513446,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0_child_0",
+              "source_filename": "undated_note.txt",
+              "parent_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": 7,
+              "vector_distance": 0.891357958316803,
+              "keyword_score": 2.3939503252054055,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": null,
+              "vector_distance": 0.8951205015182495,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9075366258621216,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0_child_0",
+              "source_filename": "vision_confusion_matrix.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9090282917022705,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "graph_boosted": {
+          "candidate_count": 34,
+          "top_sources": [
+            "01_requirement.pdf",
+            "08_decision.pdf",
+            "08_selection_ui.png",
+            "vision_plan.pdf",
+            "08_metrics_chart.png",
+            "08_tasks.md",
+            "undated_note.txt",
+            "vision_july_config.yaml",
+            "07_baseline_config.yaml",
+            "vision_confusion_matrix.png"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0_child_0",
+              "source_filename": "01_requirement.pdf",
+              "parent_id": "c1ba7653eafb107efbe9d8da11a031aa_af48c2e54a6c_schema_12_parent_0",
+              "dense_rank": 1,
+              "sparse_rank": 2,
+              "vector_distance": 0.6345083713531494,
+              "keyword_score": 21.655670132502472,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0_child_0",
+              "source_filename": "08_decision.pdf",
+              "parent_id": "18649860ea53db54447a7cf60dee7142_d0eea5a997f8_schema_12_parent_0",
+              "dense_rank": 2,
+              "sparse_rank": 5,
+              "vector_distance": 0.7748729586601257,
+              "keyword_score": 5.8076704905534715,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 1,
+              "vector_distance": 0.7825686931610107,
+              "keyword_score": 46.44916614966948,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0_child_0",
+              "source_filename": "vision_plan.pdf",
+              "parent_id": "2bd9745bd78eab09dd861b20974d7b22_92c60072c784_schema_12_parent_0",
+              "dense_rank": 4,
+              "sparse_rank": 8,
+              "vector_distance": 0.8407518267631531,
+              "keyword_score": 2.2770293648954176,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0_child_0",
+              "source_filename": "08_metrics_chart.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_b766f092181c_schema_12_parent_0",
+              "dense_rank": 5,
+              "sparse_rank": null,
+              "vector_distance": 0.8816142082214355,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0_child_0",
+              "source_filename": "08_tasks.md",
+              "parent_id": "47dade3b869c2c7038210da3b3fe018c_94ea9d245478_schema_12_parent_0",
+              "dense_rank": 6,
+              "sparse_rank": 6,
+              "vector_distance": 0.8871279954910278,
+              "keyword_score": 4.688309930513446,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0_child_0",
+              "source_filename": "undated_note.txt",
+              "parent_id": "5340d5884d84e48290fbf292d662a2d3_47d8c5f4086c_schema_12_parent_0",
+              "dense_rank": 7,
+              "sparse_rank": 7,
+              "vector_distance": 0.891357958316803,
+              "keyword_score": 2.3939503252054055,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0_child_0",
+              "source_filename": "vision_july_config.yaml",
+              "parent_id": "3cc307c10fca8023b73a2e153740cfa8_d604776a674e_schema_12_parent_0",
+              "dense_rank": 8,
+              "sparse_rank": null,
+              "vector_distance": 0.8951205015182495,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0_child_0",
+              "source_filename": "07_baseline_config.yaml",
+              "parent_id": "f6d1040bfd69076ccf77ab828e89ed74_8d74983b6a7e_schema_12_parent_0",
+              "dense_rank": 9,
+              "sparse_rank": null,
+              "vector_distance": 0.9075366258621216,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            },
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0_child_0",
+              "source_filename": "vision_confusion_matrix.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_fe4d29c5389f_schema_12_parent_0",
+              "dense_rank": 10,
+              "sparse_rank": null,
+              "vector_distance": 0.9090282917022705,
+              "keyword_score": 0.0,
+              "graph_score": 0.0,
+              "rerank_score": 0.0,
+              "final_score": 0.0,
+              "score_breakdown": {}
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "reranked_pool": {
+          "candidate_count": 1,
+          "top_sources": [
+            "08_selection_ui.png"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 2,
+              "vector_distance": 0.7825686931610107,
+              "keyword_score": 53.168764455430605,
+              "graph_score": 0.0,
+              "rerank_score": 0.392578125,
+              "final_score": 0.5208411266714512,
+              "score_breakdown": {
+                "rrf": 0.048395,
+                "lexical_rerank": 0.153931,
+                "semantic_rerank": 0.392578,
+                "graph": 0.0,
+                "keyword": 53.168764,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 0.78,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.520841
+              }
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "final": {
+          "candidate_count": 1,
+          "top_sources": [
+            "08_selection_ui.png"
+          ],
+          "top_candidates": [
+            {
+              "candidate_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0_child_0",
+              "source_filename": "08_selection_ui.png",
+              "parent_id": "a04a7ecec337375e49d6816c2c7adf6f_6ec163d859c7_schema_12_parent_0",
+              "dense_rank": 3,
+              "sparse_rank": 2,
+              "vector_distance": 0.7825686931610107,
+              "keyword_score": 53.168764455430605,
+              "graph_score": 0.0,
+              "rerank_score": 0.392578125,
+              "final_score": 0.5208411266714512,
+              "score_breakdown": {
+                "rrf": 0.048395,
+                "lexical_rerank": 0.153931,
+                "semantic_rerank": 0.392578,
+                "graph": 0.0,
+                "keyword": 53.168764,
+                "source": 1.0,
+                "source_profile": 0.0,
+                "structure": 0.78,
+                "knowledge_weight": 1.0,
+                "project_focus": 1.0,
+                "final": 0.520841
+              }
+            }
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "elapsed_ms": 1454,
+      "recall_depth_scan": {
+        "dense": {
+          "18": {
+            "candidate_count": 18,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 30,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "keyword": {
+          "18": {
+            "candidate_count": 12,
+            "top_sources": [
+              "08_selection_ui.png",
+              "01_requirement.pdf",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_plan.pdf",
+              "03_dataset_audit.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 12,
+            "top_sources": [
+              "08_selection_ui.png",
+              "01_requirement.pdf",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_plan.pdf",
+              "03_dataset_audit.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 12,
+            "top_sources": [
+              "08_selection_ui.png",
+              "01_requirement.pdf",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_plan.pdf",
+              "03_dataset_audit.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 12,
+            "top_sources": [
+              "08_selection_ui.png",
+              "01_requirement.pdf",
+              "02_architecture.pdf",
+              "08_ui_context_report.pdf",
+              "08_decision.pdf",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_plan.pdf",
+              "03_dataset_audit.pdf",
+              "07_baseline_report.pdf"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        },
+        "merged_pool": {
+          "18": {
+            "candidate_count": 24,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "30": {
+            "candidate_count": 31,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "60": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          },
+          "100": {
+            "candidate_count": 34,
+            "top_sources": [
+              "01_requirement.pdf",
+              "08_decision.pdf",
+              "08_selection_ui.png",
+              "vision_plan.pdf",
+              "08_metrics_chart.png",
+              "08_tasks.md",
+              "undated_note.txt",
+              "vision_july_config.yaml",
+              "07_baseline_config.yaml",
+              "vision_confusion_matrix.png"
+            ],
+            "hit_sources": [
+              "08_selection_ui.png"
+            ],
+            "missing_sources": [],
+            "any_hit": true,
+            "all_hit": true,
+            "source_coverage": 1.0
+          }
+        }
+      },
+      "final_k_scan": {
+        "3": {
+          "candidate_count": 1,
+          "top_sources": [
+            "08_selection_ui.png"
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "5": {
+          "candidate_count": 1,
+          "top_sources": [
+            "08_selection_ui.png"
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        },
+        "6": {
+          "candidate_count": 1,
+          "top_sources": [
+            "08_selection_ui.png"
+          ],
+          "hit_sources": [
+            "08_selection_ui.png"
+          ],
+          "missing_sources": [],
+          "any_hit": true,
+          "all_hit": true,
+          "source_coverage": 1.0
+        }
+      },
+      "failure_buckets": [
+        "final_hit"
+      ]
+    }
+  ]
+}

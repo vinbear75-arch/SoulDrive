@@ -1,0 +1,54 @@
+{
+  "schema_version": "multimodal_auto_warmup_recheck_v0.1",
+  "performed_at": "2026-08-30T03:31:00+08:00",
+  "status": "implemented_increment",
+  "change": "known_automatic_slow_route_triggers_background_vlm_warmup",
+  "design_basis": [
+    {
+      "name": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adapted_mechanism": "先把屏幕解析成结构化 UI 候选，再把需要空间理解的任务交给视觉模型；本增量只提前加载已知需要慢视觉的路径。"
+    },
+    {
+      "name": "Qwen2.5-VL",
+      "url": "https://github.com/QwenLM-corp/Qwen2.5-VL",
+      "adapted_mechanism": "保留图片/问题/结构化 grounding 的分层输入，不因预热而扩大图片授权范围或改变视觉证据契约。"
+    },
+    {
+      "name": "SoulDrive roadmap S3",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "优先优化模型预热、裁剪、缓存和路由，且保留授权边界与失败降级。"
+    },
+    {
+      "name": "existing local measurement",
+      "path": "eval/results/multimodal_vlm_warmup_recheck_20260830.json",
+      "adapted_mechanism": "冷启动约 13.2 秒，显式预热后的视觉请求约 2.66 秒；将已知加载成本移出交互请求。"
+    }
+  ],
+  "contract": {
+    "trigger": "存在用户授权图片时，用户明确选择 visualMode=slow、打开 targetGrounding、当前已审核工作流声明 slow，或 auto 模式的问题/UI 目标命中后端已有的图表/图标/布局等慢路由提示时自动触发。",
+    "scope": "只请求本地 /multimodal/runtime/warmup；不上传图片、不扩大屏幕授权、不执行外部动作。",
+    "deduplication": "同一 File 对象在当前页面只自动预热一次；失败清除标记，保留手动按钮重试。",
+    "interaction": "预热期间沿用 mediaBusy，阻止并发感知/清除，避免模型加载竞态；完成后恢复交互。",
+    "fallback": "预热失败不伪造视觉结果，仍显示错误并允许原有快路径或手动重试。"
+  },
+  "verification": {
+    "frontend_tests": "npm test passed",
+    "frontend_build": "npm run build passed; existing bundle-size warning retained",
+    "typescript": "passed",
+    "backend_regression_reference": "732 passed, 1 warning before this UI-only increment",
+    "performance_reference": {
+      "cold_without_explicit_warmup_ms": 13234.199,
+      "warm_inference_after_explicit_warmup_ms": 2661.241,
+      "source": "eval/results/multimodal_vlm_warmup_recheck_20260830.json"
+    },
+    "browser_episode_measurement": "not_run"
+  },
+  "interpretation": "本增量证明前端会在明确深度视觉意图后自动把 VLM 预热纳入当前交互生命周期，并通过构建与现有测试；性能数字是既有单样本参考，不是本增量的新 P50/P95 或准确率结论。",
+  "limitations": [
+    "尚未在真实跨应用 episode 上验证自动预热是否覆盖用户实际等待路径。",
+    "OCR 低置信度等必须先运行 OCR 才能知道的慢路由仍可能承担冷启动；前后端提示集合变化时也需同步维护。",
+    "预热成本仍然存在，且端到端回答还包括 ASR/OCR、RAG、生成和引用校验，完整 P95<5 秒未达标。",
+    "未修改 VLM 权重、提示词、评测数据或竞赛指标口径。"
+  ]
+}

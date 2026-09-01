@@ -1,0 +1,34 @@
+{
+  "schema_version": "rag_section_tree_route_recheck_v0.1",
+  "performed_at": "2026-08-30T01:46:56+08:00",
+  "change": "section_path_node_route_and_metadata_preservation",
+  "dataset": "eval/fixtures/rag_cn_raw_v0.1/dev.jsonl",
+  "workspace": "runtime/rag-cn-hierarchy-recheck-20260830",
+  "workspace_scope": "six raw RAG Chinese PDFs, isolated plaintext index",
+  "indexed_child_count": 637,
+  "sample_count": 16,
+  "comparison": {
+    "before_result": "eval/results/retrieval_dev_hierarchy_coverage_recheck_20260830.jsonl",
+    "candidate_result": "eval/results/retrieval_dev_section_route_metadata_recheck_20260830.jsonl",
+    "retrieval_all_hit_at_6": {"before": 1.0, "candidate": 1.0},
+    "retrieval_any_hit_at_6": {"before": 1.0, "candidate": 1.0},
+    "first_hit_at_1": {"before": 1.0, "candidate": 1.0},
+    "mrr_at_6": {"before": 1.0, "candidate": 1.0},
+    "source_coverage_at_6": {"before": 1.0, "candidate": 1.0},
+    "mean_retrieval_ms": {"before": 1748, "candidate": 1784},
+    "changed_candidate_order_count": 6,
+    "routed_sample_count": 15,
+    "route_mode_counts_in_evidence": {
+      "exact_node": 9,
+      "heading_fallback": 16,
+      "none": 67
+    }
+  },
+  "interpretation": "The minimal section-path route is present in evidence metadata and preserves the matched dev metrics; this is a no-regression and observability result, not evidence of an accuracy gain.",
+  "limitations": [
+    "The dev set has no multi-document or answer-generation samples, so tree coverage and citation validity are not fully measured.",
+    "The isolated index was rebuilt from the six raw PDFs with graph extraction skipped; it is not the encrypted production workspace.",
+    "This increment routes through indexed section paths but does not yet persist a PageIndex-style node summary or perform a model-based tree traversal.",
+    "No sealed-test data, model, retrieval weight, or metric definition was changed."
+  ]
+}

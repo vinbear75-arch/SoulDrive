@@ -4,6 +4,7 @@ import hmac
 import json
 import math
 import os
+import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,23 @@ CHILD_METADATA_AAD = b"SoulDrive secure child metadata v1"
 CHILD_EMBEDDING_AAD = b"SoulDrive secure child embedding v1"
 KEYWORD_POSTING_AAD = b"SoulDrive secure keyword posting v1"
 MAX_KEYWORD_TOKENS = 4096
+
+
+def _document_name_matches(metadata: dict[str, Any], document_names: list[str]) -> bool:
+    if not document_names:
+        return True
+    expected = {
+        " ".join(str(item or "").strip().split()).casefold()
+        for item in document_names
+        if " ".join(str(item or "").strip().split())
+    }
+    identities = set()
+    for key in ("source_filename", "document_name", "catalog_file_ref"):
+        value = " ".join(str((metadata or {}).get(key) or "").strip().split())
+        if value:
+            identities.add(value.casefold())
+            identities.add(value.replace("\\", "/").rsplit("/", 1)[-1].casefold())
+    return bool(identities & expected)
 
 
 @dataclass(frozen=True)
@@ -146,6 +164,13 @@ class SecureVectorStore:
             ),
         }
 
+    def get_adjacent_parent(self, parent_id: str, offset: int = 1):
+        match = re.match(r"^(.*)_parent_(\d+)$", str(parent_id or ""))
+        if not match:
+            return None
+        target_id = f"{match.group(1)}_parent_{int(match.group(2)) + int(offset)}"
+        return self.get_parent(target_id)
+
     def add_chunks(self, ids: list[str], documents: list[str], metadatas: list[dict[str, Any]], embeddings: list[list[float]]):
         cursor = self.conn.cursor()
         for child_id, content, metadata, embedding in zip(ids, documents, metadatas, embeddings):
@@ -219,10 +244,21 @@ class SecureVectorStore:
             "distances": [distances],
         }
 
-    def dense_candidates(self, query_embedding: list[float], limit: int = 80) -> list[SecureCandidate]:
+    def count(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM child_chunks").fetchone()[0])
+
+    def dense_candidates(
+        self,
+        query_embedding: list[float],
+        limit: int = 80,
+        project_id: str | None = None,
+        global_only: bool = False,
+        document_names: list[str] | None = None,
+    ) -> list[SecureCandidate]:
         rows = self.conn.execute(
             """
-            SELECT child_id, embedding_nonce, embedding_ciphertext
+            SELECT child_id, embedding_nonce, embedding_ciphertext,
+                   metadata_nonce, metadata_ciphertext
             FROM child_chunks
             ORDER BY child_id ASC
             """
@@ -230,6 +266,20 @@ class SecureVectorStore:
         ranked = []
         for row in rows:
             child_id = row[0]
+            if project_id is not None or global_only or document_names:
+                metadata = self._decrypt_json(
+                    self.keys.metadata_key,
+                    row[3],
+                    row[4],
+                    CHILD_METADATA_AAD + child_id.encode("utf-8"),
+                )
+                metadata_project_id = str(metadata.get("project_id") or "").strip()
+                if project_id is not None and metadata_project_id != str(project_id):
+                    continue
+                if global_only and metadata_project_id:
+                    continue
+                if document_names and not _document_name_matches(metadata, document_names):
+                    continue
             embedding = self._decrypt_json(
                 self.keys.index_key,
                 row[1],
@@ -277,7 +327,14 @@ class SecureVectorStore:
             )
         return loaded
 
-    def keyword_candidates(self, query: str, limit: int = 80) -> list[SecureCandidate]:
+    def keyword_candidates(
+        self,
+        query: str,
+        limit: int = 80,
+        project_id: str | None = None,
+        global_only: bool = False,
+        document_names: list[str] | None = None,
+    ) -> list[SecureCandidate]:
         scores: dict[str, float] = {}
         total_documents = max(
             1,
@@ -310,6 +367,27 @@ class SecureVectorStore:
                 scores[chunk_id] = scores.get(chunk_id, 0.0) + (
                     inverse_frequency * (1.0 + math.log(max(1.0, float(count))))
                 )
+        if project_id is not None or global_only or document_names:
+            metadata_by_id = self._metadata_for_child_ids(scores)
+            if project_id is not None:
+                scores = {
+                    chunk_id: score
+                    for chunk_id, score in scores.items()
+                    if str((metadata_by_id.get(chunk_id) or {}).get("project_id") or "")
+                    == str(project_id)
+                }
+            elif global_only:
+                scores = {
+                    chunk_id: score
+                    for chunk_id, score in scores.items()
+                    if not str((metadata_by_id.get(chunk_id) or {}).get("project_id") or "").strip()
+                }
+            if document_names:
+                scores = {
+                    chunk_id: score
+                    for chunk_id, score in scores.items()
+                    if _document_name_matches(metadata_by_id.get(chunk_id) or {}, document_names)
+                }
         ranked = [SecureCandidate(chunk_id=chunk_id, score=score) for chunk_id, score in scores.items()]
         ranked.sort(key=lambda item: (-item.score, item.chunk_id))
         return ranked[:limit]
@@ -429,6 +507,29 @@ class SecureVectorStore:
             if metadata.get(key) != value:
                 return False
         return True
+
+    def _metadata_for_child_ids(self, chunk_ids) -> dict[str, dict[str, Any]]:
+        ordered_ids = [str(chunk_id) for chunk_id in chunk_ids if str(chunk_id)]
+        if not ordered_ids:
+            return {}
+        placeholders = ",".join("?" for _ in ordered_ids)
+        rows = self.conn.execute(
+            f"""
+            SELECT child_id, metadata_nonce, metadata_ciphertext
+            FROM child_chunks
+            WHERE child_id IN ({placeholders})
+            """,
+            tuple(ordered_ids),
+        ).fetchall()
+        return {
+            row[0]: self._decrypt_json(
+                self.keys.metadata_key,
+                row[1],
+                row[2],
+                CHILD_METADATA_AAD + row[0].encode("utf-8"),
+            )
+            for row in rows
+        }
 
     def _upsert_keyword_postings(self, chunk_id: str, content: str) -> None:
         counts: dict[str, int] = {}
@@ -554,8 +655,14 @@ class _SecureCollectionAdapter:
     def add(self, embeddings, documents, metadatas, ids):
         self.store.add_chunks(ids=ids, documents=documents, metadatas=metadatas, embeddings=embeddings)
 
+    def upsert(self, embeddings, documents, metadatas, ids):
+        self.store.add_chunks(ids=ids, documents=documents, metadatas=metadatas, embeddings=embeddings)
+
     def query(self, query_embeddings, n_results, include):
         return self.store.query(query_embeddings=query_embeddings, n_results=n_results, include=include)
+
+    def count(self):
+        return self.store.count()
 
     def get(self, where=None, include=None, ids=None):
         return self.store.get(where=where, include=include, ids=ids)

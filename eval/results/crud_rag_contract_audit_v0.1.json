@@ -1,0 +1,166 @@
+{
+  "schema_version": "souldrive_crud_rag_contract_audit_v0.1",
+  "created_at": "2026-08-24T13:08:03.651895+00:00",
+  "source": "https://github.com/IAAR-Shanghai/CRUD_RAG",
+  "commit": "1aace383994e1f68efa12cf2a8e2dadfb4102ceb",
+  "code_license_signal": "README declares Apache-2.0",
+  "license_file_present": false,
+  "data_license_status": "unresolved: repository has no LICENSE file; do not redistribute data without a separate data license confirmation",
+  "tasks": {
+    "event_summary": {
+      "sample_count": 2000,
+      "fields": [
+        "ID",
+        "event",
+        "summary",
+        "text",
+        "time",
+        "title",
+        "url"
+      ],
+      "document_fields": [
+        "text"
+      ],
+      "has_reference_answer": true,
+      "has_gold_document_id": false
+    },
+    "continuing_writing": {
+      "sample_count": 1999,
+      "fields": [
+        "ID",
+        "beginning",
+        "continuing",
+        "event",
+        "summary"
+      ],
+      "document_fields": [
+        "beginning",
+        "continuing"
+      ],
+      "has_reference_answer": true,
+      "has_gold_document_id": false
+    },
+    "hallu_modified": {
+      "sample_count": 1268,
+      "fields": [
+        "ID",
+        "allKeywords",
+        "appearedKeywords",
+        "broadcastDate",
+        "generatedBy",
+        "hallucinatedContinuation",
+        "hallucinatedMod",
+        "headLine",
+        "newsBeginning",
+        "newsRemainder",
+        "realContinuation",
+        "type"
+      ],
+      "document_fields": [
+        "newsBeginning",
+        "newsRemainder",
+        "hallucinatedContinuation"
+      ],
+      "has_reference_answer": true,
+      "has_gold_document_id": false
+    },
+    "questanswer_1doc": {
+      "sample_count": 800,
+      "fields": [
+        "ID",
+        "answers",
+        "event",
+        "news1",
+        "questions"
+      ],
+      "document_fields": [
+        "news1"
+      ],
+      "has_reference_answer": true,
+      "has_gold_document_id": false
+    },
+    "questanswer_2docs": {
+      "sample_count": 797,
+      "fields": [
+        "ID",
+        "answers",
+        "event",
+        "news1",
+        "news2",
+        "questions",
+        "thoughts"
+      ],
+      "document_fields": [
+        "news1",
+        "news2"
+      ],
+      "has_reference_answer": true,
+      "has_gold_document_id": false
+    },
+    "questanswer_3docs": {
+      "sample_count": 797,
+      "fields": [
+        "ID",
+        "answers",
+        "event",
+        "news1",
+        "news2",
+        "news3",
+        "questions",
+        "thoughts"
+      ],
+      "document_fields": [
+        "news1",
+        "news2",
+        "news3"
+      ],
+      "has_reference_answer": true,
+      "has_gold_document_id": false
+    }
+  },
+  "total_samples": 7661,
+  "evaluation_boundary": {
+    "allowed_first_round": [
+      "answer_reference_metrics",
+      "summary_reference_metrics",
+      "hallucination_detection_metrics"
+    ],
+    "not_allowed_without_added_gold": [
+      "Recall@K",
+      "MRR",
+      "nDCG"
+    ],
+    "reason": "official split rows contain source texts and references but no gold retrieval document IDs/qrels"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5540,
+      "sha256": "38bcda1d590678f520b9b9bfd3b49700acd63369a522d0ebd13a924e2ac73d4c"
+    },
+    {
+      "path": "README.zh_CN.md",
+      "bytes": 4809,
+      "sha256": "ae290bfe84beb8752e8ee58addfb77f5064cb51d1ea988ab09cd4d5e34f7c054"
+    },
+    {
+      "path": "data/crud/CRUD_Data.zip",
+      "bytes": 41462589,
+      "sha256": "2c9ccf22283e90ac3dc26c0326dbf8d9bc1f6053b1e9560abc4ac4c42be420cb"
+    },
+    {
+      "path": "data/crud/merged.zip",
+      "bytes": 41550920,
+      "sha256": "e7acd5ec2133fa43f9df629b120ad86e4d9f8c6c089b1a2b17283fba88814d2c"
+    },
+    {
+      "path": "data/crud_split/split_merged.json",
+      "bytes": 26954047,
+      "sha256": "04ca93a935b8b6da3f4bc62e8b9f903aa4fbeb3b465ae79720baa75e2e40b082"
+    }
+  ],
+  "notes": [
+    "This audit reads JSON and file metadata only; it executes no third-party code.",
+    "CRUD-RAG remains outside the SoulDrive product workspace and is not mixed into GraphRAG documents."
+  ]
+}

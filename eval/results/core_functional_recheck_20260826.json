@@ -1,0 +1,98 @@
+{
+  "schema_version": "souldrive_core_functional_recheck_v1",
+  "created_at": "2026-08-26T02:24:00+08:00",
+  "scope": "Windows 本机单用户模式；优先验收功能通路，不替代准确率、召回率或竞赛成绩",
+  "runtime": {
+    "sidecar_health": "pass",
+    "sidecar_ready": "pass",
+    "degraded": false,
+    "file_archive": "ok",
+    "redis": "ok",
+    "redis_vector_index": "ready",
+    "postgres": "ok",
+    "outbox_pending": 0,
+    "evidence": "GET /health and GET /ready on 127.0.0.1:52576"
+  },
+  "rag": {
+    "status": "pass",
+    "route": "hybrid",
+    "completed_answer": true,
+    "has_citation": true,
+    "refused": false,
+    "elapsed_ms": 130484,
+    "evidence": "eval/results/graphrag_acceptance_recheck_20260826_live2.json"
+  },
+  "graphrag": {
+    "status": "pass",
+    "algorithm": "leiden_v1_local_move_refine",
+    "document_count": 6,
+    "entity_count": 174,
+    "relationship_count": 241,
+    "community_count": 4,
+    "hybrid_route_without_graph": true,
+    "global_route_with_graph": true,
+    "local_route_with_graph": true,
+    "all_three_answers_completed_and_cited": true,
+    "evidence": "eval/results/graphrag_acceptance_recheck_20260826_live2.json"
+  },
+  "multimodal": {
+    "status": "pass_for_runtime",
+    "evaluated_count": 3,
+    "failure_count": 0,
+    "asr_ocr_soulalign": "3/3 pass",
+    "target_binding": "pass",
+    "conflict_and_clarification": "pass",
+    "vlm_slow_path": "1/1 pass",
+    "dataset_type": "synthetic_development_fixture",
+    "full_30_real_user_sample_gate": "not_completed",
+    "ui_file_multiselect_submission_this_run": "not_verified",
+    "evidence": "eval/results/multimodal_runtime_recheck_20260826_live2/metrics.json; eval/results/multimodal_full_path_project_rag_acceptance_20260825.json"
+  },
+  "ppt": {
+    "status": "pass",
+    "source_count": 3,
+    "slide_count": 7,
+    "renderer": "SoulDrive OpenXML",
+    "outline_source": "extractive",
+    "selected_source_coverage": 1.0,
+    "evidence_slide_coverage": 1.0,
+    "openxml_validation": true,
+    "overflow_check": true,
+    "visual_render_check": true,
+    "output": "runtime/workspace/data/presentations/核心链路复核：中文 RAG 与 GraphRAG-e84cc953.pptx",
+    "evidence": "eval/results/presentation_core_recheck_20260826.json; eval/results/core_ppt_render_check_20260826"
+  },
+  "email": {
+    "provider": "qq",
+    "sender": "1342325858@qq.com",
+    "smtp_configured": true,
+    "smtp_login_handshake": "pass",
+    "mock_mime_and_confirmation_gate": "pass",
+    "historical_real_send_audit": "pass",
+    "real_send_this_run": false,
+    "mailbox_receipt": "not_verified",
+    "reason_not_sent_this_run": "真实外发保留用户在界面确认后的人工门",
+    "evidence": "eval/results/qq_smtp_login_recheck_20260826.json; eval/results/email_audit_recheck_20260826.json; eval/results/artifact_smoke_core_recheck_20260826.json"
+  },
+  "storage": {
+    "redis_session_roundtrip": true,
+    "redis_only_hot_recovery": true,
+    "redis_vectorset_roundtrip": true,
+    "postgresql_control_plane": true,
+    "file_archive_roundtrip": true,
+    "session_project_binding": true,
+    "evidence": "eval/results/redis_session_runtime_recheck_20260826_live.json; GET /health"
+  },
+  "frontend": {
+    "tests": "17 passed",
+    "production_build": "pass",
+    "project_switch_and_history_reload": "pass",
+    "evidence": "npm.cmd run test; npm.cmd run build; live SoulDrive window observation"
+  },
+  "known_functional_boundaries": [
+    "全量中文 RAG 质量探针因当前重排/嵌入链路持续占用数分钟未完成，本轮已停止；单条 hybrid 与 GraphRAG 三路由真实回答均已完成。",
+    "多模态当前运行验收为 3 条合成媒体样本，不等于 30 条真实授权样本。",
+    "QQ SMTP 本轮只做无投递登录握手；历史审计存在真实 email.sent，收件箱回执仍需用户查看。",
+    "PPT 通路已通过，但抽取式大纲存在文本密度和原始 # 标记问题，属于后续质量优化。"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": "souldrive_rag_sidecar_acceptance_v1",
+  "created_at": "2026-08-25T14:20:00+08:00",
+  "purpose": "通过真实本机 sidecar /chat 入口复核项目级 RAG 检索、生成、引用与 GraphRAG 路由；不是竞赛成绩",
+  "endpoint": "http://127.0.0.1:54656/chat",
+  "project_id": "rag-cn-demo-20260824",
+  "corpus_state": "pre_cleanup_legacy_english_present",
+  "superseded_by": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\results\\graphrag_acceptance_project_rag_cn_clean_20260825.json",
+  "models": {
+    "chat": "qwen3.5:9b",
+    "embedding": "qwen3-embedding:4b"
+  },
+  "security": {
+    "request_without_local_token": {
+      "status_code": 401,
+      "passed": true
+    },
+    "request_with_local_token": {
+      "token_value_recorded": false,
+      "passed": true
+    }
+  },
+  "corpus_audit": {
+    "project_asset_count": 11,
+    "all_retrieved_sources_belong_to_project": true,
+    "retrieved_source_count": 7,
+    "legacy_english_source_seen": [
+      "05_rag_survey_2023.pdf"
+    ],
+    "vector_evidence_project_filter": "passed",
+    "graph_index_scope": "global_workspace_index_observed",
+    "open_issue": "中文 RAG 项目目录仍保留旧英文资产，且 GraphRAG 社区索引当前按工作区维度统计；清理语料和按项目构建图索引需要单独处理。"
+  },
+  "runs": [
+    {
+      "request_type": "ordinary_hybrid",
+      "query": "RAG 的核心流程包括哪些阶段？",
+      "status_code": 200,
+      "elapsed_ms": 77939,
+      "response_chars": 6691,
+      "retrieval_progress": true,
+      "generation_progress": true,
+      "has_citation": true,
+      "has_evidence_block": true,
+      "refusal": false,
+      "passed": true
+    },
+    {
+      "request_type": "global_graphrag",
+      "query": "请从这些中文资料总结 RAG 检索、重排与生成的共同优化思路。",
+      "status_code": 200,
+      "elapsed_ms": 134511,
+      "response_chars": 7133,
+      "retrieval_progress": true,
+      "generation_progress": true,
+      "has_citation": true,
+      "has_evidence_block": true,
+      "refusal": false,
+      "passed": true
+    }
+  ],
+  "acceptance": {
+    "authenticated_chat_works": true,
+    "ordinary_rag_works": true,
+    "global_graphrag_works": true,
+    "citation_gate_visible": true,
+    "no_refusal_on_supported_queries": true,
+    "latency_competition_ready": false,
+    "latency_note": "本机 qwen3.5:9b + 当前重排/证据校验链路约 77.9-134.5 秒，当前只能判定功能通路通过，不能判定为竞赛级性能。"
+  }
+}

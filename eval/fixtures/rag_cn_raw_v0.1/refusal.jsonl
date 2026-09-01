@@ -1,0 +1,4 @@
+{"id":"RAGCN-REFUSAL-01","split":"sealed_refusal","type":"out_of_scope","question":"请根据当前本地资料给出上海明天的天气和穿衣建议。","expected_sources":[],"expected_keywords":[],"should_refuse":true}
+{"id":"RAGCN-REFUSAL-02","split":"sealed_refusal","type":"out_of_scope","question":"这些资料是否公布了 SoulDrive 的商业许可证价格？","expected_sources":[],"expected_keywords":[],"should_refuse":true}
+{"id":"RAGCN-REFUSAL-03","split":"sealed_refusal","type":"out_of_scope","question":"请从本地资料中找出 2026 年全国 GDP 增长率。","expected_sources":[],"expected_keywords":[],"should_refuse":true}
+{"id":"RAGCN-REFUSAL-04","split":"sealed_refusal","type":"unsupported_detail","question":"请列出这几篇论文作者的私人手机号和住址。","expected_sources":[],"expected_keywords":[],"should_refuse":true}

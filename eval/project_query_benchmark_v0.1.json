@@ -1,0 +1,196 @@
+{
+  "schema_version": "souldrive_project_query_benchmark_v0.1",
+  "description": "WP1 项目、时间和版本语义的固定最小基准；内容为合成科研项目记录，不用于模型训练。",
+  "assets": [
+    {
+      "asset_id": "vis_report_jul",
+      "version_id": "vis_report_jul_v1",
+      "project_id": "project_vision",
+      "title": "七月基线实验报告",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-07-11T09:00:00+08:00",
+      "imported_at": "2026-07-12T18:00:00+08:00",
+      "valid_from": "2026-07-12T18:00:00+08:00",
+      "text": "七月基线实验使用验证集 v2，准确率 88.9%，推理批大小为 8。"
+    },
+    {
+      "asset_id": "battery_report_jul",
+      "version_id": "battery_report_jul_v1",
+      "project_id": "project_battery",
+      "title": "七月基线实验报告",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-07-12T09:00:00+08:00",
+      "imported_at": "2026-08-10T18:00:00+08:00",
+      "valid_from": "2026-08-10T18:00:00+08:00",
+      "text": "七月基线实验使用测试集 v2，容量保持率初稿为 89.4%，循环次数为 500。"
+    },
+    {
+      "asset_id": "battery_report_jul",
+      "version_id": "battery_report_jul_v2",
+      "project_id": "project_battery",
+      "title": "七月基线实验报告（校正版）",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-07-12T09:00:00+08:00",
+      "imported_at": "2026-08-15T10:00:00+08:00",
+      "valid_from": "2026-08-15T10:00:00+08:00",
+      "text": "七月基线实验使用测试集 v2，容量保持率校正为 88.9%，循环次数为 500；初稿数值作废。"
+    },
+    {
+      "asset_id": "vis_report_aug",
+      "version_id": "vis_report_aug_v1",
+      "project_id": "project_vision",
+      "title": "八月优化实验报告",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-08-05T14:00:00+08:00",
+      "imported_at": "2026-08-06T10:00:00+08:00",
+      "valid_from": "2026-08-06T10:00:00+08:00",
+      "text": "八月优化实验准确率 92.1%，验证集 v2，推理批大小为 8。"
+    },
+    {
+      "asset_id": "battery_report_aug",
+      "version_id": "battery_report_aug_v1",
+      "project_id": "project_battery",
+      "title": "八月优化实验报告",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-08-05T10:00:00+08:00",
+      "imported_at": "2026-08-05T18:00:00+08:00",
+      "valid_from": "2026-08-05T18:00:00+08:00",
+      "text": "八月优化实验容量保持率 92.1%，测试集 v2，循环次数为 500。"
+    },
+    {
+      "asset_id": "battery_report_jun",
+      "version_id": "battery_report_jun_v1",
+      "project_id": "project_battery",
+      "title": "六月实验记录",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-06-18T10:00:00+08:00",
+      "imported_at": "2026-06-19T09:00:00+08:00",
+      "valid_from": "2026-06-19T09:00:00+08:00",
+      "text": "六月实验容量保持率 91.2%，测试集 v1，循环次数为 300。"
+    },
+    {
+      "asset_id": "vis_report_jun",
+      "version_id": "vis_report_jun_v1",
+      "project_id": "project_vision",
+      "title": "六月实验记录",
+      "asset_type": "experiment_report",
+      "performed_at": "2026-06-17T10:00:00+08:00",
+      "imported_at": "2026-06-18T09:00:00+08:00",
+      "valid_from": "2026-06-18T09:00:00+08:00",
+      "text": "六月实验准确率 91.2%，验证集 v1，推理批大小为 4。"
+    },
+    {
+      "asset_id": "battery_decision_jul",
+      "version_id": "battery_decision_jul_v1",
+      "project_id": "project_battery",
+      "title": "七月评审决策",
+      "asset_type": "decision",
+      "performed_at": null,
+      "imported_at": "2026-07-20T17:00:00+08:00",
+      "valid_from": "2026-07-20T17:00:00+08:00",
+      "text": "评审决定后续实验固定循环次数 500，并继续使用测试集 v2。"
+    }
+  ],
+  "queries": [
+    {
+      "id": "PQ-001",
+      "project_id": "project_battery",
+      "query": "找出上个月的七月基线实验报告",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-07-01T00:00:00+08:00",
+      "performed_to": "2026-08-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["battery_report_jul_v2"]
+    },
+    {
+      "id": "PQ-002",
+      "project_id": "project_vision",
+      "query": "找出上个月的七月基线实验报告",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-07-01T00:00:00+08:00",
+      "performed_to": "2026-08-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["vis_report_jul_v1"]
+    },
+    {
+      "id": "PQ-003",
+      "project_id": "project_battery",
+      "query": "当前项目最新的八月优化实验是什么",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-08-01T00:00:00+08:00",
+      "performed_to": "2026-08-18T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["battery_report_aug_v1"]
+    },
+    {
+      "id": "PQ-004",
+      "project_id": "project_vision",
+      "query": "当前项目最新的八月优化实验是什么",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-08-01T00:00:00+08:00",
+      "performed_to": "2026-08-18T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["vis_report_aug_v1"]
+    },
+    {
+      "id": "PQ-005",
+      "project_id": "project_battery",
+      "query": "六月实验记录中的容量保持率",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-06-01T00:00:00+08:00",
+      "performed_to": "2026-07-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["battery_report_jun_v1"]
+    },
+    {
+      "id": "PQ-006",
+      "project_id": "project_vision",
+      "query": "六月实验记录中的准确率",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-06-01T00:00:00+08:00",
+      "performed_to": "2026-07-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["vis_report_jun_v1"]
+    },
+    {
+      "id": "PQ-007",
+      "project_id": "project_battery",
+      "query": "七月基线实验校正后的容量保持率",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-07-01T00:00:00+08:00",
+      "performed_to": "2026-08-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["battery_report_jul_v2"]
+    },
+    {
+      "id": "PQ-008",
+      "project_id": "project_battery",
+      "query": "七月评审决定后续循环次数是多少",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": null,
+      "performed_to": null,
+      "asset_type": "decision",
+      "expected_version_ids": ["battery_decision_jul_v1"]
+    },
+    {
+      "id": "PQ-009",
+      "project_id": "project_battery",
+      "query": "找出上个月容量保持率优化实验，不能使用本月实验",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-07-01T00:00:00+08:00",
+      "performed_to": "2026-08-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["battery_report_jul_v2"]
+    },
+    {
+      "id": "PQ-010",
+      "project_id": "project_vision",
+      "query": "找出上个月准确率优化实验，不能使用本月实验",
+      "as_of": "2026-08-17T12:00:00+08:00",
+      "performed_from": "2026-07-01T00:00:00+08:00",
+      "performed_to": "2026-08-01T00:00:00+08:00",
+      "asset_type": "experiment_report",
+      "expected_version_ids": ["vis_report_jul_v1"]
+    }
+  ]
+}

@@ -56,16 +56,71 @@ class GraphStoreTests(unittest.TestCase):
                     "支持",
                     evidence_chunk_ids=["old-chunk", "new-chunk"],
                 )
+                db.save_graphrag_index({"community_count": 1})
 
                 db.remove_chunk_ids(["old-chunk"])
                 remaining = db.recall_chunk_ids("数据中台")
+                invalidated = db.load_graphrag_index()
                 db.remove_chunk_ids(["new-chunk"])
                 removed = db.recall_chunk_ids("数据中台")
             finally:
                 db.close()
 
         self.assertEqual(remaining, ["new-chunk"])
+        self.assertIsNone(invalidated)
         self.assertEqual(removed, [])
+
+    def test_graph_snapshot_includes_document_project_id(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db = LocalGraphDB(db_path=str(Path(temp_dir) / "graph.sqlite"))
+            try:
+                db.add_document(
+                    source_filename="research.pdf",
+                    title="Research",
+                    summary="RAG evaluation notes",
+                    keywords=["RAG"],
+                    chunk_ids=["chunk-1"],
+                    project_id="project-a",
+                )
+                snapshot = db.get_graph_snapshot()
+            finally:
+                db.close()
+
+        self.assertEqual(snapshot["documents"][0]["project_id"], "project-a")
+
+    def test_graph_recall_applies_project_filter_before_limit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db = LocalGraphDB(db_path=str(Path(temp_dir) / "graph.sqlite"))
+            try:
+                db.add_document(
+                    "other.pdf",
+                    "Other",
+                    "other",
+                    chunk_ids=["other-1", "other-2"],
+                    project_id="project-other",
+                )
+                db.add_document(
+                    "current.pdf",
+                    "Current",
+                    "current",
+                    chunk_ids=["current-1"],
+                    project_id="project-current",
+                )
+                db.add_entity(
+                    "目标实体",
+                    "概念",
+                    "目标",
+                    chunk_ids=["other-1", "other-2", "current-1"],
+                )
+                project_chunks = db.recall_chunk_ids(
+                    "目标实体",
+                    limit=1,
+                    project_id="project-current",
+                )
+            finally:
+                db.close()
+
+        self.assertEqual(project_chunks, ["current-1"])
 
 
 if __name__ == "__main__":

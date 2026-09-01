@@ -11,6 +11,51 @@ from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class SecureVectorStoreTests(unittest.TestCase):
+    def test_dense_and_keyword_filters_are_applied_before_limit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["other-dense-1", "other-dense-2", "current-dense"],
+                    documents=[
+                        "zero trust device other one",
+                        "zero trust device other two",
+                        "zero trust device current project",
+                    ],
+                    metadatas=[
+                        {"project_id": "other", "source_filename": "other-1.pdf"},
+                        {"project_id": "other", "source_filename": "other-2.pdf"},
+                        {"project_id": "current", "source_filename": "current.pdf"},
+                    ],
+                    embeddings=[[1.0, 0.0], [1.0, 0.0], [0.9, 0.0]],
+                )
+                dense = store.dense_candidates([1.0, 0.0], limit=1, project_id="current")
+                keyword = store.keyword_candidates(
+                    "zero trust device",
+                    limit=1,
+                    project_id="current",
+                )
+                selected_dense = store.dense_candidates(
+                    [1.0, 0.0],
+                    limit=1,
+                    document_names=["current.pdf"],
+                )
+                selected_keyword = store.keyword_candidates(
+                    "zero trust device",
+                    limit=1,
+                    document_names=["current.pdf"],
+                )
+            finally:
+                store.close()
+
+        self.assertEqual([item.chunk_id for item in dense], ["current-dense"])
+        self.assertEqual([item.chunk_id for item in keyword], ["current-dense"])
+        self.assertEqual([item.chunk_id for item in selected_dense], ["current-dense"])
+        self.assertEqual([item.chunk_id for item in selected_keyword], ["current-dense"])
+
     def test_dense_candidates_do_not_decrypt_chunk_text_until_loaded_by_id(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -189,6 +234,46 @@ class SecureVectorStoreTests(unittest.TestCase):
         self.assertNotIn(b"GraphRAG", persisted_bytes)
         self.assertNotIn(b"graph.pdf", persisted_bytes)
 
+    def test_secure_ingestion_preserves_section_tree_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            self._prepare_embedding_model(workspace)
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+
+            try:
+                with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                    try:
+                        kb.ingest_chunks(
+                            "doc-hash-tree",
+                            [
+                                _FakeChunk(
+                                    "混合检索负责召回候选证据。",
+                                    {
+                                        "source_filename": "tree.pdf",
+                                        "page": 1,
+                                        "section_path": ["总览", "检索"],
+                                    },
+                                )
+                            ],
+                        )
+                        result = kb.search_with_evidence(
+                            "请定位“检索”的原文",
+                            top_k=1,
+                        )
+                    finally:
+                        kb.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
+        metadata = result["metadatas"][0]
+        self.assertEqual(metadata["section_tree_version"], "section_tree_v1")
+        self.assertEqual(metadata["section_node_title"], "检索")
+        self.assertEqual(metadata["section_node_depth"], 2)
+        self.assertEqual(metadata["_section_route_source"], "persisted_section_tree_v1")
+
     def test_secure_store_search_returns_matching_parent_context(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -244,8 +329,13 @@ class SecureVectorStoreTests(unittest.TestCase):
                 ), patch(
                     "core.knowledge_base.LocalReranker",
                     return_value=_FakeReranker(),
-                ):
-                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                ), patch("core.knowledge_base.document_weight") as usage_weight, patch(
+                    "core.knowledge_base.record_document_hits"
+                ) as record_hits:
+                    kb = LocalKnowledgeBase(
+                        workspace_path=workspace.root_path,
+                        enable_usage_ledger=False,
+                    )
                     try:
                         kb.ingest_chunks(
                             "doc-hash-generic",
@@ -274,6 +364,9 @@ class SecureVectorStoreTests(unittest.TestCase):
 
         self.assertEqual(result["metadatas"][0]["source_filename"], "privacy.pdf")
         self.assertIn("隐私保护", result["documents"][0])
+        usage_weight.assert_not_called()
+        record_hits.assert_not_called()
+        self.assertFalse(result["observability"]["usage_ledger_enabled"])
 
     def test_search_with_evidence_uses_source_title_signal_for_named_documents(self):
         with tempfile.TemporaryDirectory() as temp_dir:

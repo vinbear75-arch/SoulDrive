@@ -1,0 +1,45 @@
+{
+  "schema_version": "souldrive_rag_workspace_readiness_v0.1",
+  "performed_at": "2026-08-30T17:39:21+08:00",
+  "workspace": "runtime/workspace",
+  "manifest": "eval/corpus_manifest_v0.2.json",
+  "checker": {
+    "command": "scripts/check_rag_eval_workspace.py --workspace runtime/workspace --json-output",
+    "exit_code": 1,
+    "workspace_ready": true,
+    "expected_count": 36,
+    "raw_present_count": 0,
+    "raw_missing_count": 36,
+    "raw_indexed_count": 0,
+    "raw_missing_indexed_count": 36
+  },
+  "readability": {
+    "status": "locked_unknown_not_missing",
+    "secure_document_manifest_exists": true,
+    "secure_documents_locked": true,
+    "secure_vector_index_exists": true,
+    "indexed_documents_locked": true,
+    "process_workspace_keys_present": false
+  },
+  "read_only_index_observation": {
+    "secure_vector_child_count": 404,
+    "secure_vector_parent_count": 341,
+    "secure_vector_keyword_posting_count": 34467,
+    "secure_graph_store_exists": true
+  },
+  "contract": {
+    "raw_zero_counts_mean_missing_documents": false,
+    "raw_zero_counts_mean_index_is_empty": false,
+    "allowed_next_action": "通过 UI/sidecar 使用用户口令解锁后重新核验；不猜测或记录口令",
+    "rag_claim_allowed": false
+  },
+  "ui_change": {
+    "file": "souldrive-ui/src/App.tsx",
+    "behavior": "HTTP 423 locked is shown as 工作区已锁定（解锁后查看），not as unavailable or not_built",
+    "build": "pass",
+    "frontend_tests": "all existing npm test suites passed",
+    "backend_regression": "820 passed, 1 warning",
+    "python_compileall": "pass"
+  },
+  "interpretation": "当前进程没有解锁密钥，因此不能读取正式加密评测语料或宣称 GraphRAG 已完成；本记录只区分锁定态与空索引，避免误诊。"
+}

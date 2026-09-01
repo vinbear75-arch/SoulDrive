@@ -1,0 +1,784 @@
+{
+  "schema_version": "souldrive_runtime_repeat_benchmark_v0.2",
+  "dataset_id": "SoulDrive-PC-MMI-media-runtime-smoke-v0.1",
+  "dataset_sha256": "5e1499bad9bb33f45baa814e4cb78d02bda49fba22fd71aa6a7d4acd0356c6e3",
+  "unique_episode_count": 3,
+  "repeat_count": 11,
+  "measurement_count": 33,
+  "cold_start_measurement_count": 1,
+  "warm_measurement_count": 32,
+  "latency_ms": {
+    "warm_wall_clock": {
+      "count": 32,
+      "p50": 982.6275,
+      "p95": 1039.994,
+      "max": 1097.452
+    },
+    "warm_runtime_total": {
+      "count": 32,
+      "p50": 982.6015,
+      "p95": 1039.974,
+      "max": 1097.421
+    }
+  },
+  "stage_latency_ms": {
+    "asr": {
+      "count": 32,
+      "p50": 80.703,
+      "p95": 137.912,
+      "max": 147.598
+    },
+    "ocr": {
+      "count": 32,
+      "p50": 899.813,
+      "p95": 944.534,
+      "max": 946.855
+    },
+    "soulalign": {
+      "count": 32,
+      "p50": 0.5495000000000001,
+      "p95": 1.065,
+      "max": 1.127
+    }
+  },
+  "pipeline_coverage": {
+    "perception": "measured",
+    "retrieval": "not_integrated",
+    "first_token": "not_integrated",
+    "complete_response": "not_integrated"
+  },
+  "records": [
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 1,
+      "status": "pass",
+      "wall_clock_latency_ms": 16689.899,
+      "runtime_latency_ms": 16689.889,
+      "stage_latency_ms": {
+        "asr": 14163.26,
+        "ocr": 2489.906,
+        "vlm": 0.0,
+        "soulalign": 8.804
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 1,
+      "status": "pass",
+      "wall_clock_latency_ms": 962.966,
+      "runtime_latency_ms": 962.945,
+      "stage_latency_ms": {
+        "asr": 82.544,
+        "ocr": 878.042,
+        "vlm": 0.0,
+        "soulalign": 0.523
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 1,
+      "status": "pass",
+      "wall_clock_latency_ms": 990.051,
+      "runtime_latency_ms": 990.033,
+      "stage_latency_ms": {
+        "asr": 70.326,
+        "ocr": 917.564,
+        "vlm": 0.0,
+        "soulalign": 0.396
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 2,
+      "status": "pass",
+      "wall_clock_latency_ms": 980.273,
+      "runtime_latency_ms": 980.234,
+      "stage_latency_ms": {
+        "asr": 74.953,
+        "ocr": 903.161,
+        "vlm": 0.0,
+        "soulalign": 0.655
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 2,
+      "status": "pass",
+      "wall_clock_latency_ms": 984.989,
+      "runtime_latency_ms": 984.966,
+      "stage_latency_ms": {
+        "asr": 82.963,
+        "ocr": 899.148,
+        "vlm": 0.0,
+        "soulalign": 0.594
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 2,
+      "status": "pass",
+      "wall_clock_latency_ms": 974.897,
+      "runtime_latency_ms": 974.881,
+      "stage_latency_ms": {
+        "asr": 72.427,
+        "ocr": 900.478,
+        "vlm": 0.0,
+        "soulalign": 0.433
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 3,
+      "status": "pass",
+      "wall_clock_latency_ms": 999.818,
+      "runtime_latency_ms": 999.797,
+      "stage_latency_ms": {
+        "asr": 137.912,
+        "ocr": 859.969,
+        "vlm": 0.0,
+        "soulalign": 0.488
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 3,
+      "status": "pass",
+      "wall_clock_latency_ms": 1022.84,
+      "runtime_latency_ms": 1022.804,
+      "stage_latency_ms": {
+        "asr": 118.458,
+        "ocr": 902.176,
+        "vlm": 0.0,
+        "soulalign": 0.554
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 3,
+      "status": "pass",
+      "wall_clock_latency_ms": 1028.136,
+      "runtime_latency_ms": 1028.097,
+      "stage_latency_ms": {
+        "asr": 80.374,
+        "ocr": 944.534,
+        "vlm": 0.0,
+        "soulalign": 0.574
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 4,
+      "status": "pass",
+      "wall_clock_latency_ms": 951.843,
+      "runtime_latency_ms": 951.813,
+      "stage_latency_ms": {
+        "asr": 76.067,
+        "ocr": 873.351,
+        "vlm": 0.0,
+        "soulalign": 0.706
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 4,
+      "status": "pass",
+      "wall_clock_latency_ms": 947.664,
+      "runtime_latency_ms": 947.643,
+      "stage_latency_ms": {
+        "asr": 79.127,
+        "ocr": 865.471,
+        "vlm": 0.0,
+        "soulalign": 0.429
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 4,
+      "status": "pass",
+      "wall_clock_latency_ms": 1097.452,
+      "runtime_latency_ms": 1097.421,
+      "stage_latency_ms": {
+        "asr": 147.598,
+        "ocr": 946.855,
+        "vlm": 0.0,
+        "soulalign": 0.587
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 5,
+      "status": "pass",
+      "wall_clock_latency_ms": 954.873,
+      "runtime_latency_ms": 954.841,
+      "stage_latency_ms": {
+        "asr": 80.962,
+        "ocr": 871.664,
+        "vlm": 0.0,
+        "soulalign": 0.481
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 5,
+      "status": "pass",
+      "wall_clock_latency_ms": 936.658,
+      "runtime_latency_ms": 936.595,
+      "stage_latency_ms": {
+        "asr": 70.855,
+        "ocr": 863.099,
+        "vlm": 0.0,
+        "soulalign": 1.065
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 5,
+      "status": "pass",
+      "wall_clock_latency_ms": 1023.463,
+      "runtime_latency_ms": 1023.436,
+      "stage_latency_ms": {
+        "asr": 117.241,
+        "ocr": 903.571,
+        "vlm": 0.0,
+        "soulalign": 0.428
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 6,
+      "status": "pass",
+      "wall_clock_latency_ms": 997.136,
+      "runtime_latency_ms": 997.109,
+      "stage_latency_ms": {
+        "asr": 79.211,
+        "ocr": 915.857,
+        "vlm": 0.0,
+        "soulalign": 0.459
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 6,
+      "status": "pass",
+      "wall_clock_latency_ms": 977.46,
+      "runtime_latency_ms": 977.431,
+      "stage_latency_ms": {
+        "asr": 73.185,
+        "ocr": 902.003,
+        "vlm": 0.0,
+        "soulalign": 0.579
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 6,
+      "status": "pass",
+      "wall_clock_latency_ms": 979.142,
+      "runtime_latency_ms": 979.117,
+      "stage_latency_ms": {
+        "asr": 80.878,
+        "ocr": 895.682,
+        "vlm": 0.0,
+        "soulalign": 0.571
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 7,
+      "status": "pass",
+      "wall_clock_latency_ms": 993.891,
+      "runtime_latency_ms": 993.87,
+      "stage_latency_ms": {
+        "asr": 124.082,
+        "ocr": 867.54,
+        "vlm": 0.0,
+        "soulalign": 0.673
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 7,
+      "status": "pass",
+      "wall_clock_latency_ms": 983.772,
+      "runtime_latency_ms": 983.75,
+      "stage_latency_ms": {
+        "asr": 74.222,
+        "ocr": 907.554,
+        "vlm": 0.0,
+        "soulalign": 0.477
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 7,
+      "status": "pass",
+      "wall_clock_latency_ms": 1039.994,
+      "runtime_latency_ms": 1039.974,
+      "stage_latency_ms": {
+        "asr": 109.934,
+        "ocr": 928.051,
+        "vlm": 0.0,
+        "soulalign": 0.495
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 8,
+      "status": "pass",
+      "wall_clock_latency_ms": 954.874,
+      "runtime_latency_ms": 954.852,
+      "stage_latency_ms": {
+        "asr": 80.832,
+        "ocr": 871.954,
+        "vlm": 0.0,
+        "soulalign": 0.457
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 8,
+      "status": "pass",
+      "wall_clock_latency_ms": 940.313,
+      "runtime_latency_ms": 940.285,
+      "stage_latency_ms": {
+        "asr": 73.261,
+        "ocr": 864.998,
+        "vlm": 0.0,
+        "soulalign": 0.516
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 8,
+      "status": "pass",
+      "wall_clock_latency_ms": 1021.875,
+      "runtime_latency_ms": 1021.821,
+      "stage_latency_ms": {
+        "asr": 79.061,
+        "ocr": 940.58,
+        "vlm": 0.0,
+        "soulalign": 0.743
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 9,
+      "status": "pass",
+      "wall_clock_latency_ms": 999.186,
+      "runtime_latency_ms": 999.154,
+      "stage_latency_ms": {
+        "asr": 83.73,
+        "ocr": 912.234,
+        "vlm": 0.0,
+        "soulalign": 0.81
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 9,
+      "status": "pass",
+      "wall_clock_latency_ms": 946.398,
+      "runtime_latency_ms": 946.37,
+      "stage_latency_ms": {
+        "asr": 78.182,
+        "ocr": 865.697,
+        "vlm": 0.0,
+        "soulalign": 0.799
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 9,
+      "status": "pass",
+      "wall_clock_latency_ms": 972.524,
+      "runtime_latency_ms": 972.502,
+      "stage_latency_ms": {
+        "asr": 80.574,
+        "ocr": 889.902,
+        "vlm": 0.0,
+        "soulalign": 0.427
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 10,
+      "status": "pass",
+      "wall_clock_latency_ms": 1009.329,
+      "runtime_latency_ms": 1009.302,
+      "stage_latency_ms": {
+        "asr": 126.719,
+        "ocr": 879.417,
+        "vlm": 0.0,
+        "soulalign": 1.127
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 10,
+      "status": "pass",
+      "wall_clock_latency_ms": 1007.726,
+      "runtime_latency_ms": 1007.702,
+      "stage_latency_ms": {
+        "asr": 79.216,
+        "ocr": 925.885,
+        "vlm": 0.0,
+        "soulalign": 0.551
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 10,
+      "status": "pass",
+      "wall_clock_latency_ms": 980.446,
+      "runtime_latency_ms": 980.422,
+      "stage_latency_ms": {
+        "asr": 84.992,
+        "ocr": 893.398,
+        "vlm": 0.0,
+        "soulalign": 0.501
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 11,
+      "status": "pass",
+      "wall_clock_latency_ms": 964.075,
+      "runtime_latency_ms": 964.047,
+      "stage_latency_ms": {
+        "asr": 81.068,
+        "ocr": 881.063,
+        "vlm": 0.0,
+        "soulalign": 0.556
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 11,
+      "status": "pass",
+      "wall_clock_latency_ms": 981.483,
+      "runtime_latency_ms": 981.453,
+      "stage_latency_ms": {
+        "asr": 73.985,
+        "ocr": 904.936,
+        "vlm": 0.0,
+        "soulalign": 0.514
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 11,
+      "status": "pass",
+      "wall_clock_latency_ms": 1027.537,
+      "runtime_latency_ms": 1027.51,
+      "stage_latency_ms": {
+        "asr": 83.153,
+        "ocr": 942.113,
+        "vlm": 0.0,
+        "soulalign": 0.548
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    }
+  ],
+  "limitations": [
+    "重复运行不增加独立 episode 数；固定 fixture 仅用于本机 Runtime 回归。",
+    "仅测量真实 ASR + OCR + SoulAlign 快路径。",
+    "检索、首 token 和完整回答尚未接入该 Harness，不能据此宣称赛题五完整 P95。",
+    "不是公开数据集成绩，也不是华为隐藏集成绩。"
+  ]
+}

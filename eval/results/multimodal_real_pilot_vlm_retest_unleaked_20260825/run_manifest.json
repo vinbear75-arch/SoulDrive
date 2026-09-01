@@ -1,0 +1,13 @@
+{
+  "schema_version": "souldrive_run_manifest_v0.1",
+  "run_id": "multimodal_real_pilot_vlm_retest_unleaked_20260825",
+  "environment": {
+    "python": "3.12.13",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "conda_environment": "pytorch"
+  },
+  "dataset_sha256": "2a7d71fae0c232f0ae672aa1d405f4bd4179ecf2223d57c5d3ea5cb6704de76c",
+  "episode_id": "REAL-PILOT-01",
+  "visual_mode": "slow",
+  "test_used_for_model_selection": false
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": "souldrive_rag_rebuild_baseline_v0.1",
+  "baseline_level": "B0_CURRENT",
+  "status": "frozen_before_rag_rebuild",
+  "dataset": "eval/retrieval_quality_blind_v0.3.jsonl",
+  "dataset_samples": 360,
+  "corpus": "eval/corpus_manifest_v0.2.json",
+  "workspace": "E:\\SoulDrive",
+  "pipeline": {
+    "retrieval": "current hybrid dense+keyword+source-title+graph pipeline",
+    "rerank": "current lexical/semantic rerank",
+    "metadata_filter": false,
+    "project_time_version_gate": false,
+    "answer_generation": false,
+    "top_k": [3, 6]
+  },
+  "metrics": {
+    "top3": {
+      "retrieval_all_hit_rate": 0.784,
+      "retrieval_any_hit_rate": 0.920,
+      "first_hit_rate": 0.799,
+      "mrr": 0.854,
+      "average_source_coverage": 0.852,
+      "multi_doc_all_hit_rate": 0.574,
+      "graph_context_hit_rate": 0.908
+    },
+    "top6": {
+      "retrieval_all_hit_rate": 0.870,
+      "retrieval_any_hit_rate": 0.954,
+      "first_hit_rate": 0.799,
+      "mrr": 0.862,
+      "average_source_coverage": 0.912,
+      "multi_doc_all_hit_rate": 0.750,
+      "graph_context_hit_rate": 0.947
+    }
+  },
+  "diagnosis": {
+    "reranked_pool_to_final_loss": 19,
+    "rerank_loss": 6,
+    "multi_document_partial_hits": 27,
+    "keyword_recall_gap": 17
+  },
+  "source_report": "eval/results/rag_retrieval_quality_top6_readable_v0.3_summary.md",
+  "limitations": [
+    "This is retrieval quality, not a Huawei hidden-set score.",
+    "The corpus is a fixed public-document evaluation corpus, not private user data.",
+    "No candidate code has been compared against this frozen snapshot yet."
+  ]
+}

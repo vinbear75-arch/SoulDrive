@@ -1,0 +1,50 @@
+{
+  "schema_version": "rag_global_project_scope_recheck_v0.1",
+  "performed_at": "2026-08-30T17:19:34+08:00",
+  "workspace": "runtime/rag-eval-workspace-v4",
+  "query": "RAG 的核心思想是什么？",
+  "retrieval": {
+    "top_k": 3,
+    "source_profile_recall_enabled": false,
+    "same_index_and_model": true
+  },
+  "observations": [
+    {
+      "project_id": "project-vision",
+      "route": "global_fallback",
+      "evidence_count": 3,
+      "citation_sources": [
+        "大模型知识管理系统.pdf",
+        "大模型知识管理系统.pdf",
+        "LazyLLM企业级RAG方案-私有化部署与权限安全.pdf"
+      ],
+      "citation_ids": [
+        "511a2581db3791f1c3118b679d91b6eb_schema_7_parent_1_child_0",
+        "511a2581db3791f1c3118b679d91b6eb_schema_7_parent_11_child_0",
+        "5b66ac5d8b267521620455f456ac683a_schema_7_parent_81_child_0"
+      ]
+    },
+    {
+      "project_id": "project-battery",
+      "route": "global_fallback",
+      "evidence_count": 3,
+      "citation_sources": [
+        "大模型知识管理系统.pdf",
+        "大模型知识管理系统.pdf",
+        "LazyLLM企业级RAG方案-私有化部署与权限安全.pdf"
+      ],
+      "citation_ids": [
+        "511a2581db3791f1c3118b679d91b6eb_schema_7_parent_1_child_0",
+        "511a2581db3791f1c3118b679d91b6eb_schema_7_parent_11_child_0",
+        "5b66ac5d8b267521620455f456ac683a_schema_7_parent_81_child_0"
+      ]
+    }
+  ],
+  "checks": {
+    "route_consistent": true,
+    "evidence_count_consistent": true,
+    "citation_ids_consistent": true,
+    "global_documents_available_in_both_projects": true
+  },
+  "interpretation": "在没有对应项目专属资产的两个项目 ID 下，全局共享文档回退结果一致；这不是项目图谱存在时的联合检索全覆盖，也不是答案事实准确率。"
+}

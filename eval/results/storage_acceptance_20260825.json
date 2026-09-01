@@ -1,0 +1,33 @@
+{
+  "schema_version": "souldrive_storage_acceptance_v1",
+  "created_at": "2026-08-25T15:30:00+08:00",
+  "purpose": "验证文件归档、Redis 热状态和 PostgreSQL 控制面在关闭存储对象后重新打开仍能读回同一会话",
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace",
+  "project_id": "storage-acceptance-20260825",
+  "session_id": "storage_acceptance_781084eab2",
+  "archive_root": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\runtime\\history\\conversations",
+  "before_close": {
+    "redis_status": "ok",
+    "postgres_status": "ok",
+    "degraded": false
+  },
+  "after_reopen": {
+    "source": "redis+file",
+    "redis_count": 2,
+    "archive_count": 2,
+    "history_count": 2,
+    "marker_roundtrip": true,
+    "redis_status": "ok",
+    "postgres_status": "ok",
+    "degraded": false,
+    "postgres_pending_outbox": 1
+  },
+  "acceptance": {
+    "file_archive_roundtrip": true,
+    "redis_roundtrip": true,
+    "postgresql_connection_and_schema": true,
+    "cross_reopen_history_read": true,
+    "clean_outbox": false
+  },
+  "note": "1 条 pending outbox 是更早产生的历史 Redis 重放事件，因历史会话密钥不一致未强行标记完成；本次新验收会话本身读写通过。"
+}

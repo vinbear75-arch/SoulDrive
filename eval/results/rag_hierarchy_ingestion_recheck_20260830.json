@@ -1,0 +1,66 @@
+{
+  "schema_version": "rag_hierarchy_ingestion_recheck_v0.1",
+  "performed_at": "2026-08-30T01:13:49+08:00",
+  "parser": "AdvancedDocumentParser + PlainDocumentParser hierarchy increment",
+  "source_scope": "runtime/workspace/data/source_materials/rag_cn/*.pdf",
+  "results": [
+    {
+      "file": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+      "chunks": 63,
+      "max_section_depth": 2,
+      "suspicious_section_count": 0,
+      "conversion_status": "partial_success",
+      "conversion_errors": 1
+    },
+    {
+      "file": "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "chunks": 51,
+      "max_section_depth": 2,
+      "suspicious_section_count": 0,
+      "conversion_status": "success",
+      "conversion_errors": 0
+    },
+    {
+      "file": "03_检索增强生成_BIMSA.pdf",
+      "chunks": 146,
+      "max_section_depth": 2,
+      "suspicious_section_count": 0,
+      "conversion_status": "success",
+      "conversion_errors": 0
+    },
+    {
+      "file": "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "chunks": 17,
+      "max_section_depth": 2,
+      "suspicious_section_count": 0,
+      "conversion_status": "success",
+      "conversion_errors": 0
+    },
+    {
+      "file": "06_检索增强生成_SciOpen.pdf",
+      "chunks": 37,
+      "max_section_depth": 3,
+      "suspicious_section_count": 0,
+      "conversion_status": "success",
+      "conversion_errors": 0
+    },
+    {
+      "file": "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+      "chunks": 20,
+      "max_section_depth": 1,
+      "suspicious_section_count": 0,
+      "conversion_status": "success",
+      "conversion_errors": 0
+    }
+  ],
+  "validation": {
+    "targeted_tests": "58 passed",
+    "compileall": "passed"
+  },
+  "limitations": [
+    "This is an ingestion/parser recheck, not an end-to-end answer-accuracy result.",
+    "The six PDFs were parsed in one local CPU run; one document retained a Docling page-level partial_success.",
+    "No sealed-test data, retrieval weight, model, or answer metric was changed or claimed from this artifact.",
+    "A real index rebuild and matched dev retrieval comparison are still required before claiming a retrieval gain."
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "schema_version": "souldrive_product_b1_runtime_metrics_v0.1",
+  "status": "completed",
+  "discovered_files": 34,
+  "processed_files": 34,
+  "succeeded_files": 27,
+  "failed_files": 7,
+  "parse_success_rate": 0.7941176470588235,
+  "chunk_count": 27,
+  "failure_summary": {
+    "NO_PARSEABLE_CHUNKS": 2,
+    "INDEXING_FAILED": 5
+  },
+  "totals": {
+    "parse_ms": 20502,
+    "ingest_ms": 3194,
+    "graph_ms": 12,
+    "elapsed_ms": 23907,
+    "chunk_chars": 13945,
+    "child_count": 45,
+    "embedding_ms": 2361,
+    "vector_store_ms": 542,
+    "keyword_index_ms": 112,
+    "parent_store_ms": 63,
+    "child_split_ms": 57,
+    "raw_items": 36,
+    "kept_items": 36,
+    "removed_page_artifacts": 0,
+    "removed_non_content": 0,
+    "removed_duplicates": 0,
+    "table_items": 0,
+    "image_items": 3,
+    "ocr_ms": 2541,
+    "ocr_region_count": 12,
+    "ocr_mean_confidence": 0.99235,
+    "pages": 32,
+    "parent_chunks": 27,
+    "conversion_error_count": 5,
+    "converted_pages": 34,
+    "failed_page_count": 0,
+    "formal_window_count": 37,
+    "boundary_overlap_opportunity_count": 0,
+    "boundary_overlap_count": 0,
+    "boundary_overlap_truncated_count": 0,
+    "boundary_overlap_token_skip_count": 0,
+    "boundary_overlap_coverage_rate": null,
+    "max_child_tokens": 422,
+    "max_embedding_input_tokens": 440,
+    "embedding_token_limit": 512,
+    "child_strategy_counts": {
+      "dynamic_structure_overlap_v1": 8,
+      "formal_structure_paragraph_window_v2": 37
+    },
+    "conversion_status_counts": {
+      "success": 29,
+      "failed": 5
+    },
+    "modality_counts": {
+      "document": 31,
+      "image": 3
+    }
+  },
+  "failures": [
+    {
+      "source_filename": "03_dataset_audit.pdf",
+      "reason": "no parseable chunks"
+    },
+    {
+      "source_filename": "07_baseline_report.pdf",
+      "reason": "no parseable chunks"
+    },
+    {
+      "source_filename": "08_review_minutes.docx",
+      "reason": "File is not a zip file"
+    },
+    {
+      "source_filename": "08_ui_context_metrics.xlsx",
+      "reason": "File is not a zip file"
+    },
+    {
+      "source_filename": "presentation_template.pptx",
+      "reason": "File is not a zip file"
+    },
+    {
+      "source_filename": "vision_august_metrics.xlsx",
+      "reason": "File is not a zip file"
+    },
+    {
+      "source_filename": "vision_review.docx",
+      "reason": "File is not a zip file"
+    }
+  ]
+}

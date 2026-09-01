@@ -1,0 +1,50 @@
+{
+  "schema_version": "souldrive_rag_visual_citation_namespace_recheck_v0.1",
+  "performed_at": "2026-08-30T20:47:13.6841048+08:00",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "回答引用必须保持来源可追溯，视觉来源不能与文档来源混淆"
+    },
+    {
+      "name": "OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "applied_principle": "屏幕/UI 感知结果必须保留模态和目标边界，不能仅凭自然语言标签当作视觉事实"
+    }
+  ],
+  "scope": "答案引用校验中的视觉命名空间与模态元数据一致性，不改变检索排序、Top-K、项目权限或索引",
+  "implementation": {
+    "visual_citation_rule": "[V#] 必须对应 modality 为 image/image_region/ocr_region/ui_selection/ui_automation 的证据项",
+    "visual_claim_rule": "包含截图、视觉识别、当前画面/屏幕、图表/图片/图像等明确视觉声明时，至少需要一个合法 [V#]",
+    "retry_behavior": "不匹配时进入现有一次重试；重试仍失败则使用已有证据回退或拒答",
+    "legacy_failure_detected": "RAGCN-8f9f13630d1f-01 使用 [E1] 支撑‘根据本轮截图/视觉识别’，现被门禁拦截"
+  },
+  "verification": {
+    "targeted_tests": "112 passed",
+    "full_backend_tests": "837 passed, 1 warning",
+    "replayed_answer_dataset": "eval/fixtures/rag_cn_raw_v0.1/dev.jsonl",
+    "replayed_results": "eval/results/rag_cn_dev_answer_quality_gate_recheck_20260830.jsonl",
+    "replayed_sample_count": 16,
+    "replayed_valid_answers_after_all_current_gates": 14,
+    "replayed_invalid_answers_after_all_current_gates": 2,
+    "new_visual_namespace_violation": {
+      "id": "RAGCN-8f9f13630d1f-01",
+      "reason": "missing_visual_evidence",
+      "cited_ids": ["E1"]
+    },
+    "other_existing_answer_quality_violation": {
+      "id": "RAGCN-7da648f9c564-03",
+      "reason": "citation does not support answer claim",
+      "note": "由既有内容支持/范围门发现，不归因于本轮视觉门禁"
+    },
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "decision": "保留视觉命名空间门禁；它提升的是错误答案拦截与可审计性，不宣称模型准确率或多模态业务效果提升",
+  "limitations": [
+    "回放数据只有 16 条，且是历史答案，不是新的真实多模态 30 episode",
+    "本轮没有进行答案级人工/NLI 评测，不能据此宣称语义准确率",
+    "正式加密工作区仍锁定，GraphRAG 生产业务验收、完整 VLM+RAG P95 和 sealed-test 仍未完成"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "souldrive_real_mmi_pilot_metrics_v0.1",
+  "dataset_sha256": "f2edca6dd7854cfdbab07aadd67843b5b1641a26a40970f2351c240c7f10c5cd",
+  "metrics": {
+    "sample_count": 10,
+    "intent_accuracy": 0.8,
+    "target_binding_accuracy_on_targeted": 1.0,
+    "action_accuracy": 0.9,
+    "clarification_accuracy": 0.9,
+    "latency_ms": {
+      "p50": 1356.5785,
+      "p95": 14315.097,
+      "max": 14315.097
+    },
+    "cold_start_ms": 14315.097,
+    "warm_latency_ms": {
+      "count": 9,
+      "p50": 1355.844,
+      "p95": 1705.901,
+      "max": 1705.901
+    },
+    "failure_count": 2,
+    "text_only_baseline": {
+      "intent_accuracy": 0.8,
+      "target_binding_accuracy_on_targeted": 0.0,
+      "action_accuracy": 0.9,
+      "clarification_accuracy": 0.9
+    },
+    "limitations": [
+      "真实用户授权 WAV/截图，但仅 10 条 pilot；不是公开集或华为隐藏集成绩。",
+      "本轮使用快路径，未包含 VLM、完整 RAG、首 token 和完整回答生成。",
+      "PILOT-11/12 未采集，不补造样本。"
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "schema_version": "souldrive_real_e2e_validation_v1",
+  "run_date": "2026-08-24",
+  "purpose": "真实本地功能通路验证，不是竞赛正式成绩",
+  "environment": {
+    "os": "Windows 11 Pro",
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU 7.96 GiB",
+    "chat_provider": "ollama",
+    "chat_model": "qwen3.5:9b",
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding:4b",
+    "storage": {
+      "redis": "ok",
+      "postgres": "ok",
+      "file_archive": "ok",
+      "root": "D:/AI_AGENTS/SoulDrive-main/runtime/workspace"
+    }
+  },
+  "rag_index": {
+    "source_audit": "docs/rag_cn_source_audit_v0.1.json",
+    "documents": 4,
+    "pages": 111,
+    "parent_chunks": 283,
+    "child_chunks": 333,
+    "conversion_errors": 0,
+    "failed_pages": 0,
+    "elapsed_ms": 225555,
+    "strategy": "formal_structure_paragraph_window_v2"
+  },
+  "chat": [
+    {
+      "session_id": "rag-cn-e2e-20260824",
+      "request_id": "rag-cn-q1-20260824",
+      "query": "RAG 的核心流程包括哪些阶段？",
+      "http_status": 200,
+      "elapsed_ms": 73402,
+      "evidence_count": 6,
+      "cited_sources": 4,
+      "answer_status": "evidence_grounded"
+    },
+    {
+      "session_id": "rag-cn-e2e-20260824",
+      "request_id": "rag-cn-q2-20260824",
+      "query": "基于刚才的回答，请进一步说明检索阶段为什么是 RAG 的关键。",
+      "http_status": 200,
+      "elapsed_ms": 56609,
+      "evidence_count": 5,
+      "cited_sources": 3,
+      "answer_status": "evidence_grounded"
+    }
+  ],
+  "persistence": {
+    "after_restart": true,
+    "history_source": "redis+file",
+    "history_records": 4,
+    "postgres_session_latest_sequence": 4,
+    "postgres_message_rows": 4,
+    "encrypted_archive": "runtime/workspace/runtime/history/conversations/rag-cn-e2e-20260824/messages.jsonl.enc"
+  },
+  "multimodal": {
+    "fast_path": {
+      "status": "pass",
+      "asr": "SenseVoiceSmall",
+      "ocr": "RapidOCR",
+      "soulalign": "pass",
+      "elapsed_ms": 131385.977
+    },
+    "slow_path": {
+      "status": "pass",
+      "ocr": "RapidOCR",
+      "vlm": "Qwen2.5-VL-3B-Instruct",
+      "soulalign": "pass",
+      "elapsed_ms": 24417.108
+    }
+  },
+  "artifacts": {
+    "ppt_status": "completed",
+    "ppt_slides": 8,
+    "ppt_path": "runtime/workspace/data/presentations/中文 RAG 研究组会汇报-fc54eec5.pptx",
+    "ics_status": "exported",
+    "email_status": "blocked_without_smtp_authorization_code",
+    "email_recipient": "1342325858@qq.com"
+  },
+  "automated_regression": {
+    "backend_pytest": "522 passed, 1 warning",
+    "frontend_build": "passed",
+    "tauri_cargo_check": "passed",
+    "api_audit_verify_broken_at": null
+  }
+}

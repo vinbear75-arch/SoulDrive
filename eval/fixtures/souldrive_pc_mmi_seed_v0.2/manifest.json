@@ -1,0 +1,30 @@
+{
+  "schema_version": "souldrive_pc_mmi_seed_manifest_v0.2",
+  "dataset_id": "SoulDrive-PC-MMI-seed-v0.2",
+  "description": "30 synthetic episodes for schema, label, and harness validation only.",
+  "episode_count": 30,
+  "split": "seed",
+  "episodes_sha256": "79382f30709fe8b85af055a3c561d75eea9b43fc75db4b9307e30d1cbb5353ca",
+  "intent_counts": {
+    "cancel": 2,
+    "clarify_target": 2,
+    "confirm": 2,
+    "email_draft": 2,
+    "extract_tasks": 2,
+    "out_of_scope": 1,
+    "private_qa": 4,
+    "project_compare": 3,
+    "rewrite_selection": 2,
+    "schedule_draft": 2,
+    "search_document": 2,
+    "selection_summary": 4,
+    "switch_template": 2
+  },
+  "generator": "scripts/build_souldrive_mmi_seed.py",
+  "review_status": "reviewed",
+  "limitations": [
+    "Synthetic text and structured events; no real audio or screenshots.",
+    "Not a public benchmark and not evidence of competition performance."
+  ],
+  "review_source": "human_review.csv; blank decisions accepted by explicit operator authorization"
+}

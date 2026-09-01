@@ -1,0 +1,424 @@
+{
+  "case": "single_paper",
+  "project_id": "rag-cn-demo-20260824",
+  "selected_sources": [
+    "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+  ],
+  "task": {
+    "task_id": "task_97e0f9dfcdd47e09a86f",
+    "kind": "presentation.generate",
+    "status": "completed",
+    "current_step": null,
+    "owner_id": null,
+    "created_at": 1787657024.7221632,
+    "updated_at": 1787657057.7347052,
+    "started_at": 1787657024.7291749,
+    "completed_at": 1787657057.7347052,
+    "attempt_count": 1,
+    "error": null,
+    "inputs": {
+      "audience": "technical",
+      "max_slides": 8,
+      "open_in_wps": false,
+      "source_filenames": [
+        "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+      ],
+      "style_skill_id": "",
+      "task_id": "task_97e0f9dfcdd47e09a86f",
+      "title": "单篇中文 RAG 论文多模态研究汇报验收 20260825"
+    },
+    "result": {
+      "elapsed_ms": 33016.0,
+      "evidence_metrics": {
+        "attributed_slide_count": 6,
+        "cited_source_count": 1,
+        "evidence_bound_point_count": 16,
+        "evidence_slide_count": 6,
+        "evidence_slide_coverage": 1.0,
+        "selected_source_count": 1,
+        "selected_source_coverage": 1.0
+      },
+      "opened_in_wps": false,
+      "outline_source": "local_ollama",
+      "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\单篇中文 RAG 论文多模态研究汇报验收 20260825-7e09a86f.pptx",
+      "renderer": "SoulDrive OpenXML",
+      "slide_count": 8,
+      "source_count": 1
+    },
+    "steps": [
+      {
+        "task_id": "task_97e0f9dfcdd47e09a86f",
+        "step_name": "collect_evidence",
+        "ordinal": 0,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "460103e314f289006a303ab92a77bb5d5a553d543d9f741b95c4d9309d291b67",
+        "started_at": 1787657024.7312238,
+        "completed_at": 1787657025.0151036,
+        "error": null,
+        "output": {
+          "record_count": 18,
+          "records": [
+            {
+              "content": "# 基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 1,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_0",
+              "parent_index": 0,
+              "section": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "## 二、RAG核心技术问题研究",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 2,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_1",
+              "parent_index": 1,
+              "section": "基于科学数据的检索增强生成 （RAG）技术研究与应用 > 二、RAG核心技术问题研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "## 三、基于RAG的科学数据智能服务 基于 RAG 的智能服务",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 2,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_2",
+              "parent_index": 2,
+              "section": "基于科学数据的检索增强生成 （RAG）技术研究与应用 > 三、基于RAG的科学数据智能服务",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG with LLMs RAG（Retrieval-Augmented Generation，检索增强生成）是一种结合了信息检索和自然语言生成 的技术，主要应用于增强大型语言模型（如GPT等）的生成能力。",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 3,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_3",
+              "parent_index": 3,
+              "section": "RAG with LLMs",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 2020 年由 Meta AI 提出",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 3,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_4",
+              "parent_index": 4,
+              "section": "2020 年由 Meta AI 提出",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG-大模型应用技术 预训练阶段：模型在大规模通用数据集上学习基础知识和结构。 微调阶段：将预训练模型应用到特定任务的数据集上，通过再训练提升表现。 模型应用阶段：通过优化模型交互，使用 RAG 技术和 Agent 实现动态任务处理，并在各行业中应用。",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_5",
+              "parent_index": 5,
+              "section": "RAG-大模型应用技术",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 自监督指令泛化学习 对齐学习研究 （利用云端基座模型，利 用自动标注技术，减少人 力投入）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_6",
+              "parent_index": 6,
+              "section": "自监督指令泛化学习 对齐学习研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# ICL、提示工程、RAG、 Agent研究 （大模型应用技术，适配学科、 行业场景及数据 管理信息化、数据库、安全…）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_7",
+              "parent_index": 7,
+              "section": "ICL、提示工程、RAG、 Agent研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 研究点",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_8",
+              "parent_index": 8,
+              "section": "研究点",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 语料预处理研究 （金融、医疗、法律等文 本性强的学科）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_9",
+              "parent_index": 9,
+              "section": "语料预处理研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 继续预训练研究 （适合做学术论文、学科 数据的增量学习，例如代 码、生物信息、物理、化 学…）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_10",
+              "parent_index": 10,
+              "section": "继续预训练研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG-大模型应用技术",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 5,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_11",
+              "parent_index": 11,
+              "section": "RAG-大模型应用技术",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 检索增强生成 · 输入解析器 · Prompt 工程 · 输出解析器 · 向量数据库 · 知识图谱模块 · 私域文件加载器",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 5,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_12",
+              "parent_index": 12,
+              "section": "检索增强生成",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# GraphRAG",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 6,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_13",
+              "parent_index": 13,
+              "section": "GraphRAG",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 利用知识图谱提升RAG应用的准确性 图检索增强生成（GraphRAG）利用图数据库的结构化特性，以节点和关系的方式进行组织数据，增加 - 了检索到信息的深度和关联上下文，是传统向量检索方法的有效补充。",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 6,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_14",
+              "parent_index": 14,
+              "section": "利用知识图谱提升RAG应用的准确性",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# Self-RAG Self-RAG（Self-Reflective RAG） 是一种增强的RAG范式，由华盛顿大学和IBM人工智能研究院的技术专家提 出，核心思想是通过自省机制来优化生成任务的准确性和质量。 · 按需检索： Self-RAG在生成内容时，首先判 断是否需要检索外部知识。如果不需要，模 型直接生成答案；如果需要，则进行检索。 · 自省标记： 模型在生成过程中会插入自省标 记（如[Retrieval]、[Relevant]等），这些 标记帮助模型评估生成内容的相关性和支持 度。 · 增强生成 ：在需要检索的情况下，Self-RAG 会使用检索到的相关知识与输入问题一起生 成多个响应，并通过评分算法选择最优答案。 · 评估指标： Self-RAG设计了四种评估指标： 检索判断（Retrieve）、知识相关性 （IsRel）、响应支持度（IsSup）和响应有 效性（IsUse）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 7,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_15",
+              "parent_index": 15,
+              "section": "Self-RAG",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG大模型应用落地案例-智能问答",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 8,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_16",
+              "parent_index": 16,
+              "section": "RAG大模型应用落地案例-智能问答",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 1. 客户支持",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 8,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_17",
+              "parent_index": 17,
+              "section": "1. 客户支持",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            }
+          ],
+          "source_count": 1
+        }
+      },
+      {
+        "task_id": "task_97e0f9dfcdd47e09a86f",
+        "step_name": "build_outline",
+        "ordinal": 1,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "60fe4bb4e654ee206046753869e1d9dd5a155d6296f3f2f869c43cf28f039141",
+        "started_at": 1787657025.0171032,
+        "completed_at": 1787657057.7202222,
+        "error": null,
+        "output": {
+          "generated_at_label": "2026-08-25 19:24",
+          "outline_source": "local_ollama",
+          "schema_version": "souldrive_presentation_plan_v1",
+          "slides": [
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "cover",
+              "points": [],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "20260825 技术验收汇报",
+              "title": "基于科学数据的检索增强生成（RAG）技术研究与应用"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "content",
+              "points": [
+                "结合信息检索与自然语言生成，增强大模型能力。",
+                "解决预训练、微调及动态任务处理中的关键技术挑战。",
+                "适配学科场景与数据管理信息化需求的研究框架。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "RAG 核心技术问题研究概述"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "content",
+              "points": [
+                "预训练：在大规模通用数据集学习基础知识与结构。",
+                "微调：利用特定任务数据提升模型表现与适应性。",
+                "应用：通过优化交互，结合 RAG 技术与 Agent 实现动态处理。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "大模型应用阶段技术架构"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "content",
+              "points": [
+                "针对金融、医疗等强文本学科进行深度语料预处理。",
+                "支持学术论文及生物信息等领域的增量学习需求。",
+                "利用云端基座模型与自动标注技术减少人力投入。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "语料预处理与继续预训练研究"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "content",
+              "points": [
+                "核心输入解析器与 Prompt 工程优化策略。",
+                "输出解析器、向量数据库及知识图谱集成应用。",
+                "私域文件加载器支持多源数据接入与管理。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "RAG 系统组件与技术模块"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "content",
+              "points": [
+                "利用图数据库结构化特性提升信息深度与关联上下文。",
+                "Self-RAG 通过自省机制按需检索并评估生成质量。",
+                "设计 Retrieve、IsRel、IsSup 等四种关键评估指标体系。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "GraphRAG 与 Self-RAG 进阶范式"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "content",
+              "points": [
+                "智能问答系统在客户支持场景中的实际应用。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "RAG 大模型应用落地案例"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "sources",
+              "points": [
+                "数据来源：《基于科学数据的检索增强生成（RAG）技术研究与应用》。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "参考资料来源"
+            }
+          ],
+          "style": {
+            "accent": "DAAB4A",
+            "background": "F8F7F2",
+            "primary": "173F3B",
+            "text": "1C2624"
+          },
+          "style_skill": {},
+          "title": "单篇中文 RAG 论文多模态研究汇报验收"
+        }
+      },
+      {
+        "task_id": "task_97e0f9dfcdd47e09a86f",
+        "step_name": "render_pptx",
+        "ordinal": 2,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "0edebcf504ca04ef57378059d095de8f294ff22a23a3b57a8f12992dc968b133",
+        "started_at": 1787657057.7212768,
+        "completed_at": 1787657057.728192,
+        "error": null,
+        "output": {
+          "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\单篇中文 RAG 论文多模态研究汇报验收 20260825-7e09a86f.pptx",
+          "planned_slide_count": 8,
+          "renderer": "SoulDrive OpenXML"
+        }
+      },
+      {
+        "task_id": "task_97e0f9dfcdd47e09a86f",
+        "step_name": "verify_pptx",
+        "ordinal": 3,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "2eec273213e264d1e6e04f2934b81ecd37cd73b6a5a0b3c5706dec6e1194aa93",
+        "started_at": 1787657057.7292023,
+        "completed_at": 1787657057.7321746,
+        "error": null,
+        "output": {
+          "errors": [],
+          "expected_slide_count": 8,
+          "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\单篇中文 RAG 论文多模态研究汇报验收 20260825-7e09a86f.pptx",
+          "size_bytes": 19239,
+          "slide_count": 8,
+          "valid": true
+        }
+      },
+      {
+        "task_id": "task_97e0f9dfcdd47e09a86f",
+        "step_name": "open_in_wps",
+        "ordinal": 4,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "5bdc28fd20963629b57cb878245cc54b72e88d85f769dab3a8bb5db230b9a074",
+        "started_at": 1787657057.7331986,
+        "completed_at": 1787657057.7331986,
+        "error": null,
+        "output": {
+          "opened": false,
+          "reason": "not_requested"
+        }
+      }
+    ],
+    "progress": {
+      "completed": 5,
+      "total": 5
+    },
+    "recoverable": false
+  },
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace"
+}

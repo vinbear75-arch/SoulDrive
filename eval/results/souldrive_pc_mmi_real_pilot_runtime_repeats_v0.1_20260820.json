@@ -1,0 +1,718 @@
+{
+  "schema_version": "souldrive_real_mmi_runtime_repeat_benchmark_v0.1",
+  "dataset_id": "SoulDrive-PC-MMI-Real-pilot-v0.1",
+  "dataset_sha256": "2a7d71fae0c232f0ae672aa1d405f4bd4179ecf2223d57c5d3ea5cb6704de76c",
+  "unique_episode_count": 10,
+  "repeat_count": 3,
+  "measurement_count": 30,
+  "cold_start_measurement_count": 10,
+  "warm_measurement_count": 20,
+  "latency_ms": {
+    "warm_wall_clock": {
+      "count": 20,
+      "p50": 1189.98,
+      "p95": 1228.806,
+      "max": 1293.16
+    },
+    "warm_runtime_total": {
+      "count": 20,
+      "p50": 1189.9344999999998,
+      "p95": 1228.783,
+      "max": 1293.134
+    }
+  },
+  "stage_latency_ms": {
+    "asr": {
+      "count": 20,
+      "p50": 0.398,
+      "p95": 0.536,
+      "max": 0.546
+    },
+    "ocr": {
+      "count": 20,
+      "p50": 1187.982,
+      "p95": 1226.978,
+      "max": 1291.053
+    },
+    "soulalign": {
+      "count": 20,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+    }
+  },
+  "pipeline_coverage": {
+    "perception": "measured",
+    "retrieval": "not_integrated",
+    "first_token": "not_integrated",
+    "complete_response": "not_integrated"
+  },
+  "records": [
+    {
+      "episode_id": "REAL-PILOT-01",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 2616.442,
+      "runtime_latency_ms": 2616.43,
+      "stage_latency_ms": {
+        "asr": 0.765,
+        "ocr": 2585.61,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-02",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1410.246,
+      "runtime_latency_ms": 1410.226,
+      "stage_latency_ms": {
+        "asr": 0.698,
+        "ocr": 1371.501,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-03",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1248.115,
+      "runtime_latency_ms": 1248.096,
+      "stage_latency_ms": {
+        "asr": 0.521,
+        "ocr": 1207.05,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-04",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1182.965,
+      "runtime_latency_ms": 1182.939,
+      "stage_latency_ms": {
+        "asr": 0.801,
+        "ocr": 1179.58,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-05",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1244.927,
+      "runtime_latency_ms": 1244.886,
+      "stage_latency_ms": {
+        "asr": 0.636,
+        "ocr": 1203.407,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-06",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1224.055,
+      "runtime_latency_ms": 1224.024,
+      "stage_latency_ms": {
+        "asr": 0.429,
+        "ocr": 1183.322,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-07",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1242.84,
+      "runtime_latency_ms": 1242.806,
+      "stage_latency_ms": {
+        "asr": 0.621,
+        "ocr": 1203.749,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-08",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1202.075,
+      "runtime_latency_ms": 1202.049,
+      "stage_latency_ms": {
+        "asr": 0.697,
+        "ocr": 1197.89,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-09",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1191.483,
+      "runtime_latency_ms": 1191.461,
+      "stage_latency_ms": {
+        "asr": 0.595,
+        "ocr": 1172.014,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-10",
+      "repeat": 1,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1228.629,
+      "runtime_latency_ms": 1228.598,
+      "stage_latency_ms": {
+        "asr": 0.607,
+        "ocr": 1224.67,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-01",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1079.298,
+      "runtime_latency_ms": 1079.276,
+      "stage_latency_ms": {
+        "asr": 0.375,
+        "ocr": 1077.485,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-02",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1197.326,
+      "runtime_latency_ms": 1197.299,
+      "stage_latency_ms": {
+        "asr": 0.446,
+        "ocr": 1195.548,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-03",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1200.424,
+      "runtime_latency_ms": 1200.394,
+      "stage_latency_ms": {
+        "asr": 0.373,
+        "ocr": 1198.699,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-04",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1181.383,
+      "runtime_latency_ms": 1181.356,
+      "stage_latency_ms": {
+        "asr": 0.546,
+        "ocr": 1179.313,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-05",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1222.591,
+      "runtime_latency_ms": 1222.565,
+      "stage_latency_ms": {
+        "asr": 0.388,
+        "ocr": 1220.85,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-06",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1174.204,
+      "runtime_latency_ms": 1174.168,
+      "stage_latency_ms": {
+        "asr": 0.37,
+        "ocr": 1172.421,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-07",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1228.806,
+      "runtime_latency_ms": 1228.783,
+      "stage_latency_ms": {
+        "asr": 0.369,
+        "ocr": 1226.978,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-08",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1189.427,
+      "runtime_latency_ms": 1189.358,
+      "stage_latency_ms": {
+        "asr": 0.426,
+        "ocr": 1187.568,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-09",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1184.105,
+      "runtime_latency_ms": 1184.08,
+      "stage_latency_ms": {
+        "asr": 0.536,
+        "ocr": 1181.32,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-10",
+      "repeat": 2,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1192.014,
+      "runtime_latency_ms": 1191.98,
+      "stage_latency_ms": {
+        "asr": 0.396,
+        "ocr": 1190.25,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-01",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1079.681,
+      "runtime_latency_ms": 1079.624,
+      "stage_latency_ms": {
+        "asr": 0.388,
+        "ocr": 1077.804,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-02",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1200.777,
+      "runtime_latency_ms": 1200.739,
+      "stage_latency_ms": {
+        "asr": 0.422,
+        "ocr": 1198.772,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-03",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1188.004,
+      "runtime_latency_ms": 1187.973,
+      "stage_latency_ms": {
+        "asr": 0.45,
+        "ocr": 1186.086,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-04",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1192.648,
+      "runtime_latency_ms": 1192.611,
+      "stage_latency_ms": {
+        "asr": 0.378,
+        "ocr": 1190.802,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-05",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1217.166,
+      "runtime_latency_ms": 1217.135,
+      "stage_latency_ms": {
+        "asr": 0.445,
+        "ocr": 1214.919,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-06",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1190.533,
+      "runtime_latency_ms": 1190.511,
+      "stage_latency_ms": {
+        "asr": 0.403,
+        "ocr": 1188.396,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-07",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1178.018,
+      "runtime_latency_ms": 1177.985,
+      "stage_latency_ms": {
+        "asr": 0.386,
+        "ocr": 1176.292,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-08",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1176.554,
+      "runtime_latency_ms": 1176.529,
+      "stage_latency_ms": {
+        "asr": 0.377,
+        "ocr": 1174.76,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-09",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1185.603,
+      "runtime_latency_ms": 1185.567,
+      "stage_latency_ms": {
+        "asr": 0.475,
+        "ocr": 1183.747,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    },
+    {
+      "episode_id": "REAL-PILOT-10",
+      "repeat": 3,
+      "status": "blocked",
+      "wall_clock_latency_ms": 1293.16,
+      "runtime_latency_ms": 1293.134,
+      "stage_latency_ms": {
+        "asr": 0.4,
+        "ocr": 1291.053,
+        "vlm": 0.0,
+        "soulalign": 0.0
+      },
+      "retrieval": {
+        "status": "not_integrated"
+      },
+      "first_token": {
+        "status": "not_integrated"
+      },
+      "complete_response": {
+        "status": "not_integrated"
+      }
+    }
+  ],
+  "limitations": [
+    "重复运行不增加独立 episode 数；10 条 pilot 仍然只是开发数据。",
+    "仅测量真实 ASR + OCR + SoulAlign 快路径。",
+    "检索、首 token 和完整回答尚未接入该 Harness，不能据此宣称赛题五完整 P95。",
+    "不是公开数据集成绩，也不是华为隐藏集成绩。"
+  ]
+}

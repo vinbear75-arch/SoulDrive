@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 from core.answer_quality import content_terms
@@ -9,6 +10,27 @@ MEMORY_PRIORITY = {
     "project_fact": 1,
     "workflow_fact": 2,
 }
+
+MEMORY_DECAY_AFTER_SECONDS = 30 * 24 * 60 * 60
+
+
+def _memory_freshness_weight(memory: dict[str, Any], *, now: float | None = None) -> float:
+    """Lower stale memories without allowing age to erase a relevant fact."""
+    anchor = memory.get("last_used_at") or memory.get("confirmed_at") or memory.get("created_at")
+    try:
+        anchor_value = float(anchor)
+    except (TypeError, ValueError):
+        return 1.0
+    if anchor_value <= 0:
+        return 1.0
+    age = max(0.0, float(now if now is not None else time.time()) - anchor_value)
+    if age <= MEMORY_DECAY_AFTER_SECONDS:
+        return 1.0
+    if age <= 90 * 24 * 60 * 60:
+        return 0.85
+    if age <= 180 * 24 * 60 * 60:
+        return 0.65
+    return 0.45
 
 
 def build_memory_capsule(memories: list[dict[str, Any]], max_chars: int = 900) -> dict[str, Any]:
@@ -68,7 +90,9 @@ def gate_memory_context(
         overlap = query_terms & memory_terms
         lexical_relevance = len(overlap) / max(1, len(query_terms)) if query_terms else 0.0
         search_score = _safe_float(memory.get("score"))
-        relevance = max(search_score, lexical_relevance)
+        raw_relevance = max(search_score, lexical_relevance)
+        freshness_weight = _memory_freshness_weight(memory)
+        relevance = raw_relevance * freshness_weight
         global_preference = (
             str(memory.get("subtype") or "") == "user_preference"
             and _is_global_control_preference(text)
@@ -81,6 +105,7 @@ def gate_memory_context(
             {
                 **memory,
                 "context_relevance": round(max(relevance, 0.08 if global_preference else 0.0), 6),
+                "freshness_weight": freshness_weight,
                 "context_gate_reason": "global_control_preference" if global_preference and relevance < 0.08 else "query_relevant",
             }
         )
@@ -92,6 +117,37 @@ def gate_memory_context(
             -_safe_float(item.get("updated_at")),
         )
     )
+    conflict_free = []
+    for memory in accepted:
+        conflict = next(
+            (
+                previous
+                for previous in conflict_free
+                if _looks_like_conflicting_preference(memory, previous)
+            ),
+            None,
+        )
+        if conflict is None:
+            conflict_free.append(memory)
+            continue
+        winner, loser = max(
+            (memory, conflict),
+            key=_preference_authority,
+        ), min(
+            (memory, conflict),
+            key=_preference_authority,
+        )
+        if winner is memory:
+            conflict_free.remove(conflict)
+            conflict_free.append(memory)
+        rejected.append(
+            {
+                "memory_id": str(loser.get("memory_id") or loser.get("asset_id") or ""),
+                "reason": "conflicting_preference",
+                "conflict_with": str(winner.get("memory_id") or winner.get("asset_id") or ""),
+            }
+        )
+    accepted = conflict_free
     capsule = build_memory_capsule(accepted[:max_items], max_chars=max_chars)
     admitted_ids = {
         str(item.get("memory_id") or item.get("asset_id") or "")
@@ -144,6 +200,40 @@ def _is_global_control_preference(text: str) -> bool:
         "长期记忆",
     )
     return any(marker in normalized for marker in markers)
+
+
+def _looks_like_conflicting_preference(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    if str(left.get("subtype") or "") != "user_preference" or str(right.get("subtype") or "") != "user_preference":
+        return False
+    left_text = " ".join(str(left.get(key) or "").lower() for key in ("title", "content"))
+    right_text = " ".join(str(right.get(key) or "").lower() for key in ("title", "content"))
+    opposite_pairs = (
+        ("automatic", "manual"),
+        ("always", "never"),
+        ("every answer", "before closing"),
+        ("without review", "review before"),
+        ("自动", "手动"),
+        ("每次回答", "关闭前"),
+        ("每次提问", "关闭前"),
+        ("无需审核", "需要审核"),
+        ("不需要审核", "需要审核"),
+        ("中文", "英文"),
+    )
+    return any(
+        (left_marker in left_text and right_marker in right_text)
+        or (right_marker in left_text and left_marker in right_text)
+        for left_marker, right_marker in opposite_pairs
+    )
+
+
+def _preference_authority(memory: dict[str, Any]) -> tuple[int, int, float, float, float]:
+    return (
+        1 if str(memory.get("scope") or "") == "project" else 0,
+        1 if str(memory.get("confirmation_status") or "") == "human_reviewed" else 0,
+        _safe_float(memory.get("freshness_weight")),
+        _safe_float(memory.get("context_relevance")),
+        _safe_float(memory.get("updated_at")),
+    )
 
 
 def _safe_float(value: Any) -> float:

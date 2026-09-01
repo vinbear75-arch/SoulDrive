@@ -1,0 +1,23 @@
+{
+  "schema_version": "souldrive_competition_runtime_readiness_v0.1",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "gpu": {
+    "available": true,
+    "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "memory_gib": 7.96,
+    "runtime_python": "python.exe"
+  },
+  "dependencies": {
+    "rapidocr": true,
+    "torch": true,
+    "transformers": true,
+    "sklearn": true
+  },
+  "model_assets": {
+    "embedding": true,
+    "qwen_vl_3b": true,
+    "sensevoice_small": true
+  },
+  "ready_for_real_multimodal_run": true,
+  "next_required": []
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": "souldrive_rag_multimodal_evidence_bridge_recheck_v0.1",
+  "performed_at": "2026-08-30",
+  "scope": "confirmed audio evidence gate and linked document figure metadata -> hybrid retrieval -> cited evidence panel",
+  "design_basis": [
+    {
+      "source": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adopted_boundary": "A# is reserved for explicitly confirmed speech/transcripts; multimodal evidence must remain traceable and must not weaken the document evidence gate."
+    },
+    {
+      "source": "https://github.com/infiniflow/ragflow/blob/main/docs/basics/rag.md",
+      "adopted_boundary": "Preserve document structure and multimodal asset context for hybrid retrieval instead of relying on a bare vector-only chunk."
+    },
+    {
+      "source": "https://arxiv.org/abs/2510.03663",
+      "adopted_boundary": "Link text, tables, and figures as separate evidence types; do not claim image-only or joint-embedding quality without a matched evaluation."
+    }
+  ],
+  "implemented": [
+    "Only audio events with explicit=true can become A# evidence; confidence alone cannot authorize an ASR transcript.",
+    "The browser flow now shows the local transcript and requires confirmation before submitting a recording; the confirmed chat event is marked explicit for the server-side gate.",
+    "PDF figure metadata is attached once to the first non-empty page parent with a deterministic figure asset ID, page number, caption, source locator, and vision status; image placeholders remain out of page text.",
+    "Figure captions enter the bounded retrieval context as [VISUAL_ASSETS], and visual-asset questions receive a deterministic structure preference without introducing a new model or embedding dependency.",
+    "E# citations expose linked visual assets and locators, claim-support checks include their captions, and the evidence panel displays the association and pending-vision status."
+  ],
+  "verification": {
+    "targeted_backend": {
+      "command": "pytest -q tests/test_document_parser.py tests/test_knowledge_base_paths.py tests/test_retrieval.py tests/test_answer_quality.py tests/test_interaction_context.py tests/test_rag_prompting.py",
+      "passed": 157,
+      "warnings": 0
+    },
+    "full_backend": {
+      "command": "pytest -q",
+      "passed": 750,
+      "warnings": 1
+    },
+    "frontend_tests": "passed",
+    "frontend_build": "passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "regressions": [
+    "An unconfirmed audio transcript produces no citable A# evidence and is rejected by the audio evidence gate.",
+    "A confirmed audio transcript remains citable as A1 and existing meeting-action prompt tests pass.",
+    "A PDF figure caption is preserved with page/locator metadata without changing the page chunk into an image-only content kind.",
+    "A visual-asset query exposes the linked caption in E# evidence and receives the visual structure preference."
+  ],
+  "claims_not_supported": [
+    "No real cross-application episode accuracy, multimodal-vs-text-only gain, or complete-chain P50/P95 claim is made.",
+    "No direct image embedding, VLM figure understanding, or chart-value extraction was added; pending_local_model remains explicit.",
+    "The encrypted production workspace was not rebuilt or modified without its unlock key.",
+    "Unit tests and metadata linkage do not replace the roadmap's frozen 30-episode and sealed-test evaluation gates."
+  ]
+}

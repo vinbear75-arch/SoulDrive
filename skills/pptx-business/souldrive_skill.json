@@ -1,0 +1,44 @@
+{
+  "schema_version": "souldrive_skill_adapter_v1",
+  "source_sha256": "builtin-pptx-business-v1",
+  "target": "presentation",
+  "compatibility_status": "verified",
+  "validation": {
+    "passed": true,
+    "mode": "deterministic_static_contract",
+    "scripts_ignored": true
+  },
+  "title": "商务汇报",
+  "intent": "商务汇报",
+  "applicability": "用于商务分析、经营复盘、客户汇报和商业计划汇报。用户提到经营分析、业务复盘、客户汇报、商业计划或行动计划时使用。按目标—数据—判断—方案—行动项组织可编辑 PPTX。",
+  "triggers": [],
+  "steps": [
+    "商务汇报",
+    "帮助决策者快速看懂目标、数据和判断，并明确下一步行动，不把描述性数据直接当成结论。",
+    "页面流程",
+    "按目标与范围、关键数据、业务判断、解决方案、行动项与负责人、资料来源组织页面。",
+    "内容规则",
+    "数据页保留指标定义、时间范围和来源；判断页区分数据事实与推断。"
+  ],
+  "content": "1. 商务汇报\n2. 帮助决策者快速看懂目标、数据和判断，并明确下一步行动，不把描述性数据直接当成结论。\n3. 页面流程\n4. 按目标与范围、关键数据、业务判断、解决方案、行动项与负责人、资料来源组织页面。\n5. 内容规则\n6. 数据页保留指标定义、时间范围和来源；判断页区分数据事实与推断。",
+  "output_contract": "生成证据可追溯、结构清晰且可编辑的 PPTX 大纲与演示文稿。",
+  "success_criteria": [
+    "每个事实页保留来源映射。",
+    "输出通过 PPTX 结构校验。",
+    "不执行原 Skill 中的脚本或安装命令。"
+  ],
+  "presentation_contract": {
+    "schema_version": "souldrive_presentation_contract_v1",
+    "source_format": "pptx",
+    "local_output_format": "pptx",
+    "adaptation": "native_pptx",
+    "layout_profile": "editable_evidence",
+    "business_profile": "business",
+    "section_sequence": ["目标与范围", "关键数据", "业务判断", "解决方案", "行动项与负责人"],
+    "stage_keywords": [["目标", "范围", "需求"], ["数据", "指标", "统计"], ["判断", "趋势", "原因"], ["方案", "策略", "收益"], ["行动", "负责人", "计划"]],
+    "point_limit": 3,
+    "source_policy": "every_content_slide",
+    "scripts": "ignored",
+    "compatibility_notes": []
+  }
+}

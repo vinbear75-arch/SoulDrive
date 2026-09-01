@@ -1,0 +1,52 @@
+{
+  "schema_version": "souldrive_rag_experiment_measurement_bridge_recheck_v0.1",
+  "performed_at": "2026-08-30",
+  "scope": "explicit experiment runs -> comparability gate -> M# evidence -> /chat -> citation validation",
+  "design_basis": [
+    {
+      "source": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adopted_boundary": "M# is reserved for structured experiment measurements; incompatible comparisons must not compute or expose changes; causes remain candidate or pending until validated."
+    },
+    {
+      "source": "https://mlflow.org/docs/latest/tracking",
+      "adopted_boundary": "Keep metrics, parameters, dataset/evaluation references, and artifacts bound to a run before comparing measurements; implementation remains a local lightweight ledger adapter."
+    }
+  ],
+  "implemented": [
+    "The experiment comparison result is converted into bounded M# evidence only when status=comparable and change_computation=enabled.",
+    "M# retains metric, baseline/current values, delta, split, definition, dataset, evaluation script, and baseline/current source locators.",
+    "Only an explicitly selected baseline_run_id and current_run_id can enter /chat; /chat never infers a last-month run.",
+    "The workflow plan endpoint and /chat both block missing, cross-project, or non-comparable run pairs before model generation.",
+    "The answer prompt, retry instruction, citation validator, fallback checks, mindmap extraction, and offline evaluator recognize M# without mixing it into document E# evidence.",
+    "The experiment comparison workflow UI loads current-project runs and requires separate baseline/current selections.",
+    "The evidence panel renders M# values, delta, split/definition, both source locators, and the non-causal comparability boundary separately from document evidence."
+  ],
+  "verification": {
+    "targeted_backend": {
+      "command": "pytest -q tests/test_experiment_ledger.py tests/test_interaction_context.py tests/test_multimodal_workflows.py tests/test_rag_prompting.py tests/test_answer_quality.py tests/test_mcp_server_indexing.py",
+      "passed": 120,
+      "warnings": 1
+    },
+    "full_backend": {
+      "command": "pytest -q",
+      "passed": 746,
+      "warnings": 1
+    },
+    "frontend_tests": "passed",
+    "frontend_build": "passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "regressions": [
+    "A comparable pair produced M1 with the numeric change and row-level source locators.",
+    "A blocked comparison produced no M# evidence.",
+    "A main chat request with two explicit comparable runs delivered the comparison payload to the RAG interaction context.",
+    "An incompatible pair was blocked by the workflow plan before generation."
+  ],
+  "claims_not_supported": [
+    "No real-model answer accuracy, retrieval recall, or sealed-test gain is claimed.",
+    "No automatic last-month run selection was added; ambiguity still requires explicit user selection.",
+    "M# supports measured change and source location, but does not establish causal attribution without a discriminating experiment.",
+    "The encrypted production workspace was not rebuilt or modified without its unlock key."
+  ]
+}

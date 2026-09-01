@@ -1,0 +1,44 @@
+{
+  "schema_version": "souldrive_skill_adapter_v1",
+  "source_sha256": "builtin-pptx-technical-solution-v1",
+  "target": "presentation",
+  "compatibility_status": "verified",
+  "validation": {
+    "passed": true,
+    "mode": "deterministic_static_contract",
+    "scripts_ignored": true
+  },
+  "title": "技术方案汇报",
+  "intent": "技术方案汇报",
+  "applicability": "用于技术方案、系统设计、工程架构和项目实施汇报。用户提到技术方案、系统架构、工程设计、技术路线或项目落地时使用。按背景—架构—流程—风险—落地计划组织可编辑 PPTX。",
+  "triggers": [],
+  "steps": [
+    "技术方案汇报",
+    "让评审者能判断方案为什么这样设计、如何运行、风险在哪里以及怎样落地。",
+    "页面流程",
+    "按背景与目标、总体架构、关键流程、风险与边界、落地计划、资料来源组织页面。",
+    "内容规则",
+    "架构页区分组件和职责，流程页按先后顺序表达，不把长段代码或原文搬入页面。"
+  ],
+  "content": "1. 技术方案汇报\n2. 让评审者能判断方案为什么这样设计、如何运行、风险在哪里以及怎样落地。\n3. 页面流程\n4. 按背景与目标、总体架构、关键流程、风险与边界、落地计划、资料来源组织页面。\n5. 内容规则\n6. 架构页区分组件和职责，流程页按先后顺序表达，不把长段代码或原文搬入页面。",
+  "output_contract": "生成证据可追溯、结构清晰且可编辑的 PPTX 大纲与演示文稿。",
+  "success_criteria": [
+    "每个事实页保留来源映射。",
+    "输出通过 PPTX 结构校验。",
+    "不执行原 Skill 中的脚本或安装命令。"
+  ],
+  "presentation_contract": {
+    "schema_version": "souldrive_presentation_contract_v1",
+    "source_format": "pptx",
+    "local_output_format": "pptx",
+    "adaptation": "native_pptx",
+    "layout_profile": "editable_evidence",
+    "business_profile": "technical",
+    "section_sequence": ["背景与目标", "总体架构", "关键流程", "风险与边界", "落地计划"],
+    "stage_keywords": [["背景", "目标", "现状"], ["架构", "组件", "系统"], ["流程", "链路", "步骤"], ["风险", "边界", "故障"], ["落地", "计划", "阶段"]],
+    "point_limit": 3,
+    "source_policy": "every_content_slide",
+    "scripts": "ignored",
+    "compatibility_notes": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": "souldrive_run_manifest_v0.1",
+  "run_id": "real_mmi_vlm_slow_smoke_recheck_20260830",
+  "environment": {
+    "python": "3.10.20",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "conda_environment": "pytorch"
+  },
+  "dataset_sha256": "2a7d71fae0c232f0ae672aa1d405f4bd4179ecf2223d57c5d3ea5cb6704de76c",
+  "episode_id": "REAL-PILOT-01",
+  "visual_mode": "slow",
+  "test_used_for_model_selection": false
+}

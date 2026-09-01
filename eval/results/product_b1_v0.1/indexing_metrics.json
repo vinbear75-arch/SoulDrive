@@ -1,0 +1,84 @@
+{
+  "schema_version": "souldrive_product_b1_runtime_metrics_v0.1",
+  "status": "completed",
+  "discovered_files": 13,
+  "processed_files": 13,
+  "succeeded_files": 8,
+  "failed_files": 5,
+  "parse_success_rate": 0.6153846153846154,
+  "chunk_count": 8,
+  "failure_summary": {
+    "NO_PARSEABLE_CHUNKS": 2,
+    "INDEXING_FAILED": 3
+  },
+  "totals": {
+    "parse_ms": 32126,
+    "ingest_ms": 574,
+    "graph_ms": 6,
+    "elapsed_ms": 32752,
+    "chunk_chars": 492,
+    "child_count": 8,
+    "embedding_ms": 414,
+    "vector_store_ms": 116,
+    "keyword_index_ms": 16,
+    "parent_store_ms": 15,
+    "child_split_ms": 1,
+    "raw_items": 8,
+    "kept_items": 8,
+    "removed_page_artifacts": 0,
+    "removed_non_content": 0,
+    "removed_duplicates": 0,
+    "table_items": 0,
+    "image_items": 0,
+    "ocr_ms": 1236,
+    "ocr_region_count": 0,
+    "ocr_mean_confidence": 0.0,
+    "pages": 8,
+    "parent_chunks": 8,
+    "conversion_error_count": 3,
+    "converted_pages": 10,
+    "failed_page_count": 0,
+    "formal_window_count": 0,
+    "boundary_overlap_opportunity_count": 0,
+    "boundary_overlap_count": 0,
+    "boundary_overlap_truncated_count": 0,
+    "boundary_overlap_token_skip_count": 0,
+    "boundary_overlap_coverage_rate": null,
+    "max_child_tokens": 66,
+    "max_embedding_input_tokens": 136,
+    "embedding_token_limit": 512,
+    "child_strategy_counts": {
+      "dynamic_structure_overlap_v1": 8
+    },
+    "conversion_status_counts": {
+      "success": 10,
+      "failed": 3
+    },
+    "modality_counts": {
+      "document": 10,
+      "image": 3
+    }
+  },
+  "failures": [
+    {
+      "source_filename": "03_dataset_audit.pdf",
+      "reason": "no parseable chunks"
+    },
+    {
+      "source_filename": "07_baseline_report.pdf",
+      "reason": "no parseable chunks"
+    },
+    {
+      "source_filename": "08_metrics_chart.png",
+      "reason": "OCR_NO_TEXT: image contains no recognized text"
+    },
+    {
+      "source_filename": "08_selection_ui.png",
+      "reason": "OCR_NO_TEXT: image contains no recognized text"
+    },
+    {
+      "source_filename": "vision_confusion_matrix.png",
+      "reason": "OCR_NO_TEXT: image contains no recognized text"
+    }
+  ]
+}

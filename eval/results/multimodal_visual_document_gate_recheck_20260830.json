@@ -1,0 +1,49 @@
+{
+  "schema_version": "souldrive_multimodal_visual_document_gate_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "把屏幕元素结构化后再进行后续目标/任务处理；本轮将视觉观察与项目事实分成独立证据通道"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "视觉理解与文本知识检索分路后再合并；本轮仅允许纯视觉问题绕过文档证据门"
+    },
+    {
+      "project": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adopted": "把检索证据质量和生成回答质量分开诊断；本轮保持文档 evidence_gate 独立于视觉 evidence_gate"
+    }
+  ],
+  "implemented": {
+    "direct_visual_query": "visual evidence may answer visible-screen questions without project documents",
+    "document_grounded_visual_markers": [
+      "why/cause",
+      "project",
+      "experiment",
+      "paper/document",
+      "configuration/dataset/version",
+      "comparison/previous month"
+    ],
+    "mixed_query_policy": "visual evidence cannot bypass document evidence gate",
+    "missing_document_behavior": "explain that visible content was recognized but project conclusion is not inferred; preserve visual evidence block",
+    "audit_field": "visual_document_required",
+    "authorization_scope_changed": false
+  },
+  "verification": {
+    "targeted_backend": "135 passed, 1 warning",
+    "full_backend_after_this_increment": "786 passed, 1 warning",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "frontend_test": "passed",
+    "frontend_build": "passed"
+  },
+  "limits": [
+    "The document-dependency classifier is deterministic and conservative; it is not a semantic entailment model",
+    "This prevents one known evidence bypass but does not prove answer truth, retrieval recall, or multimodal accuracy",
+    "Mixed-query marker coverage, real 30 episode evaluation, calibrated confidence, full-chain P50/P95, and sealed-test remain unfinished"
+  ]
+}

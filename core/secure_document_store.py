@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ from typing import Any
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from core.document_types import document_media_type, is_supported_document
 from core.secure_object_store import SecureObjectStore
 
 
@@ -41,7 +43,7 @@ class SecureDocumentStore:
         source = Path(source_path)
         display_name = source.name or "unknown"
 
-        if source.suffix.lower() != ".pdf":
+        if not is_supported_document(source.name):
             return {"name": display_name, "status": "rejected", "error_code": "UNSUPPORTED_FILE_TYPE"}
         if not source.exists() or not source.is_file():
             return {"name": display_name, "status": "rejected", "error_code": "SOURCE_NOT_FOUND"}
@@ -50,7 +52,11 @@ class SecureDocumentStore:
         content_digest = self._content_digest(payload)
         existing = self._row_by_digest(content_digest)
         if existing is not None:
-            return {"name": existing["name"], "status": "already_present"}
+            return {
+                "name": existing["name"],
+                "status": "already_present",
+                "media_type": document_media_type(existing["name"]),
+            }
 
         object_id = self._object_id(content_digest, display_name)
         self.object_store.write_bytes(object_id, payload)
@@ -58,6 +64,7 @@ class SecureDocumentStore:
         metadata = {
             "name": display_name,
             "relative_path": relative_path,
+            "media_type": document_media_type(display_name),
         }
         nonce, ciphertext = self._encrypt_metadata(metadata)
         self.conn.execute(
@@ -70,7 +77,51 @@ class SecureDocumentStore:
             (object_id, content_digest, len(payload), source.stat().st_mtime, nonce, ciphertext),
         )
         self.conn.commit()
-        return {"name": display_name, "status": "imported"}
+        return {
+            "name": display_name,
+            "status": "imported",
+            "media_type": document_media_type(display_name),
+        }
+
+    def import_document_bytes(self, display_name: str, payload: bytes, *, modified_at: float | None = None) -> dict:
+        display_name = Path(display_name).name or "unknown"
+
+        if not is_supported_document(display_name):
+            return {"name": display_name, "status": "rejected", "error_code": "UNSUPPORTED_FILE_TYPE"}
+
+        content_digest = self._content_digest(payload)
+        existing = self._row_by_digest(content_digest)
+        if existing is not None:
+            return {
+                "name": existing["name"],
+                "status": "already_present",
+                "media_type": document_media_type(existing["name"]),
+            }
+
+        object_id = self._object_id(content_digest, display_name)
+        self.object_store.write_bytes(object_id, payload)
+        relative_path = self.object_store.object_path(object_id).relative_to(self.workspace.documents_path).as_posix()
+        metadata = {
+            "name": display_name,
+            "relative_path": relative_path,
+            "media_type": document_media_type(display_name),
+        }
+        nonce, ciphertext = self._encrypt_metadata(metadata)
+        self.conn.execute(
+            """
+            INSERT INTO documents (
+                object_id, content_digest, size_bytes, modified_at, metadata_nonce, metadata_ciphertext
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (object_id, content_digest, len(payload), float(modified_at or 0.0) or time.time(), nonce, ciphertext),
+        )
+        self.conn.commit()
+        return {
+            "name": display_name,
+            "status": "imported",
+            "media_type": document_media_type(display_name),
+        }
 
     def list_documents(self) -> list[dict[str, Any]]:
         return [
@@ -79,6 +130,7 @@ class SecureDocumentStore:
                 "relative_path": document["relative_path"],
                 "size_bytes": document["size_bytes"],
                 "modified_at": document["modified_at"],
+                "media_type": document["media_type"],
             }
             for document in self.iter_documents()
         ]
@@ -103,12 +155,31 @@ class SecureDocumentStore:
                     "relative_path": metadata["relative_path"],
                     "size_bytes": int(row[2]),
                     "modified_at": float(row[3]),
+                    "media_type": metadata.get("media_type") or document_media_type(metadata["name"]),
                 }
             )
         return documents
 
     def read_document_bytes(self, object_id: str) -> bytes:
         return self.object_store.read_bytes(object_id)
+
+    def read_document_named(self, name: str) -> bytes | None:
+        for document in self.iter_documents():
+            if document["name"] == name:
+                return self.read_document_bytes(document["object_id"])
+        return None
+
+    def delete_document(self, name: str) -> bytes | None:
+        """Delete one managed document and return its plaintext only for index cleanup."""
+        for document in self.iter_documents():
+            if document["name"] != name:
+                continue
+            payload = self.read_document_bytes(document["object_id"])
+            self.object_store.delete(document["object_id"])
+            self.conn.execute("DELETE FROM documents WHERE object_id = ?", (document["object_id"],))
+            self.conn.commit()
+            return payload
+        return None
 
     def close(self):
         self.conn.close()

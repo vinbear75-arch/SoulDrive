@@ -1,0 +1,3 @@
+metric,value
+accuracy,0.889
+p95_latency_ms,920

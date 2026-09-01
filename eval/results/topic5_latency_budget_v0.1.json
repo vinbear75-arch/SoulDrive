@@ -1,0 +1,17 @@
+{
+  "schema_version": "souldrive_topic5_latency_budget_v0.1",
+  "components_ms": {
+    "sensevoice_asr_ms": 443.1308999774046,
+    "rapidocr_ms": 1145.89420001721,
+    "qwen_vl_ms": 2108.145500009414,
+    "soulalign_p95_ms": 0.004100031219422817
+  },
+  "serial_component_sum_ms": 3697.174700035248,
+  "under_5s_component_sum": true,
+  "status": "smoke_budget_only",
+  "limitations": [
+    "Components were measured in separate smoke runs, not one recorded business episode.",
+    "OCR and VLM are alternative fast/slow paths in production; this sum is conservative.",
+    "Do not report this as Topic 5 P95 until a real episode run is frozen."
+  ]
+}

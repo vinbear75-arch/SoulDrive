@@ -1,0 +1,9 @@
+{
+  "dataset": "eval\\fixtures\\souldrive_pc_mmi_media_smoke_v0.2\\episodes.jsonl",
+  "media_root": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\fixtures\\souldrive_pc_mmi_media_smoke_v0.2",
+  "episode_count": 3,
+  "require_media": true,
+  "valid": true,
+  "error_count": 0,
+  "errors": []
+}

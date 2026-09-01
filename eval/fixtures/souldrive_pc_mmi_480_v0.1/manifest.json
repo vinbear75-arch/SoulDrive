@@ -1,0 +1,35 @@
+{
+  "schema_version": "souldrive_pc_mmi_480_manifest_v0.1",
+  "dataset_id": "SoulDrive-PC-MMI-480-v0.1",
+  "episode_count": 480,
+  "split_counts": {
+    "train": 320,
+    "validation": 80,
+    "test": 80
+  },
+  "intent_counts": {
+    "selection_summary": 38,
+    "rewrite_selection": 38,
+    "private_qa": 38,
+    "project_compare": 38,
+    "extract_tasks": 38,
+    "schedule_draft": 38,
+    "email_draft": 38,
+    "search_document": 38,
+    "switch_template": 38,
+    "confirm": 38,
+    "cancel": 38,
+    "clarify_target": 38,
+    "out_of_scope": 24
+  },
+  "template_id_count": 480,
+  "template_split_overlap": false,
+  "episodes_sha256": "a08c4e8ccea5bae571bb1dae7518c5f5100d2d35716a4efb1c50152e2b69469e",
+  "source_dataset": "SoulDrive-PC-MMI-seed-v0.2",
+  "generator": "scripts/build_souldrive_mmi_480.py",
+  "limitations": [
+    "Synthetic structured episodes; audio waveforms and screenshots are not included.",
+    "Generated expansion is for harness and model development, not a competition score.",
+    "Test labels must remain sealed after this manifest is frozen."
+  ]
+}

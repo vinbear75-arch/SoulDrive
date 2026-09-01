@@ -1,0 +1,56 @@
+{
+  "schema_version": "souldrive_image_ocr_eval_v1",
+  "sample_count": 3,
+  "parsed_count": 3,
+  "parse_success_rate": 1.0,
+  "expected_term_count": 9,
+  "matched_term_count": 9,
+  "term_recall": 1.0,
+  "all_terms_sample_rate": 1.0,
+  "expected_region_count": 0,
+  "localized_region_count": 0,
+  "localization_accuracy_at_iou": 0.0,
+  "ocr_mean_confidence": 0.99235,
+  "latency_ms": {
+    "mean": 1146.0,
+    "p50": 765,
+    "p95": 1911,
+    "max": 1911
+  },
+  "under_5s_rate": 1.0,
+  "samples": [
+    {
+      "id": "PRODUCT-OCR-001",
+      "parsed": true,
+      "latency_ms": 1911,
+      "expected_terms": 3,
+      "matched_terms": 3,
+      "expected_regions": 0,
+      "localized_regions": 0,
+      "ocr_region_count": 4,
+      "ocr_mean_confidence": 0.99235
+    },
+    {
+      "id": "PRODUCT-OCR-002",
+      "parsed": true,
+      "latency_ms": 765,
+      "expected_terms": 3,
+      "matched_terms": 3,
+      "expected_regions": 0,
+      "localized_regions": 0,
+      "ocr_region_count": 4,
+      "ocr_mean_confidence": 0.99235
+    },
+    {
+      "id": "PRODUCT-OCR-003",
+      "parsed": true,
+      "latency_ms": 762,
+      "expected_terms": 3,
+      "matched_terms": 3,
+      "expected_regions": 0,
+      "localized_regions": 0,
+      "ocr_region_count": 4,
+      "ocr_mean_confidence": 0.99235
+    }
+  ]
+}

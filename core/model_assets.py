@@ -1,3 +1,4 @@
+import os
 import shutil
 from pathlib import Path
 
@@ -107,6 +108,13 @@ def _copy_missing_files(source: Path, destination: Path) -> int:
 
 
 def _first_available_asset(asset_names: tuple[str, ...], workspace_root: Path) -> str | None:
+    configured_dir = os.environ.get("SOULDRIVE_MODEL_DIR")
+    if configured_dir:
+        configured_root = Path(configured_dir)
+        for asset_name in asset_names:
+            if (configured_root / asset_name).exists():
+                return asset_name
+        return None
     for asset_name in asset_names:
         if _find_model_asset_source(asset_name, workspace_root) is not None:
             return asset_name

@@ -27,7 +27,7 @@ function Assert-LastCommandSucceeded {
 
 Push-Location $Root
 try {
-    Invoke-SoulDrivePython -Arguments @("-m", "unittest", "discover", "-s", "tests", "-v")
+    Invoke-SoulDrivePython -Arguments @("-m", "pytest", "-q")
     Assert-LastCommandSucceeded "backend tests"
 
     Invoke-SoulDrivePython -Arguments @("-m", "compileall", "-q", "core", "tests")
@@ -38,10 +38,13 @@ try {
         npm.cmd run build
         Assert-LastCommandSucceeded "frontend build"
 
+        npm.cmd test
+        Assert-LastCommandSucceeded "frontend tests"
+
         Push-Location "src-tauri"
         try {
-            cargo check
-            Assert-LastCommandSucceeded "cargo check"
+            cargo check --locked
+            Assert-LastCommandSucceeded "locked cargo check"
         }
         finally {
             Pop-Location

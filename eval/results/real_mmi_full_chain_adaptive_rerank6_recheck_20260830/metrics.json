@@ -1,0 +1,137 @@
+{
+  "schema_version": "souldrive_real_mmi_pilot_metrics_v0.2",
+  "dataset_sha256": "2a7d71fae0c232f0ae672aa1d405f4bd4179ecf2223d57c5d3ea5cb6704de76c",
+  "metrics": {
+    "sample_count": 10,
+    "intent_accuracy": 0.9,
+    "target_binding_accuracy_on_targeted": 1.0,
+    "action_accuracy": 1.0,
+    "clarification_accuracy": 1.0,
+    "latency_ms": {
+      "p50": 7806.6415,
+      "p95": 16314.631,
+      "max": 16314.631
+    },
+    "cold_start_ms": 16314.631,
+    "warm_latency_ms": {
+      "count": 9,
+      "p50": 6958.208,
+      "p95": 12177.819,
+      "max": 12177.819
+    },
+    "failure_count": 1,
+    "stage_coverage": {
+      "asr": {
+        "status_counts": {
+          "pass": 10
+        },
+        "measured_count": 10,
+        "latency_count": 10,
+        "latency_ms": {
+          "p50": 102.2465,
+          "p95": 953.531,
+          "max": 953.531
+        }
+      },
+      "ocr": {
+        "status_counts": {
+          "pass": 10
+        },
+        "measured_count": 10,
+        "latency_count": 10,
+        "latency_ms": {
+          "p50": 0.7965,
+          "p95": 2264.178,
+          "max": 2264.178
+        }
+      },
+      "vlm": {
+        "status_counts": {
+          "skipped": 10
+        },
+        "measured_count": 0,
+        "latency_count": 0,
+        "latency_ms": {
+          "p50": null,
+          "p95": null,
+          "max": null
+        }
+      },
+      "alignment": {
+        "status_counts": {
+          "pass": 10
+        },
+        "measured_count": 10,
+        "latency_count": 10,
+        "latency_ms": {
+          "p50": 0.669,
+          "p95": 19.271,
+          "max": 19.271
+        }
+      },
+      "retrieval": {
+        "status_counts": {
+          "not_applicable": 3,
+          "pass": 7
+        },
+        "measured_count": 7,
+        "latency_count": 7,
+        "latency_ms": {
+          "p50": 5339.186,
+          "p95": 9230.614,
+          "max": 9230.614
+        }
+      },
+      "first_token": {
+        "status_counts": {
+          "not_applicable": 3,
+          "pass": 7
+        },
+        "measured_count": 7,
+        "latency_count": 7,
+        "latency_ms": {
+          "p50": 6456.294,
+          "p95": 10150.097,
+          "max": 10150.097
+        }
+      },
+      "complete_answer": {
+        "status_counts": {
+          "not_applicable": 3,
+          "pass": 7
+        },
+        "measured_count": 7,
+        "latency_count": 7,
+        "latency_ms": {
+          "p50": 8567.19,
+          "p95": 13132.138,
+          "max": 13132.138
+        }
+      }
+    },
+    "full_chain_coverage": true,
+    "full_chain_coverage_detail": {
+      "enabled": true,
+      "rerank_candidate_limit": 6,
+      "eligible_count": 7,
+      "complete_count": 7
+    },
+    "perception_warmup": {
+      "requested": true,
+      "status": "pass",
+      "wall_clock_latency_ms": 22875.299
+    },
+    "text_only_baseline": {
+      "intent_accuracy": 0.9,
+      "target_binding_accuracy_on_targeted": 0.0,
+      "action_accuracy": 1.0,
+      "clarification_accuracy": 1.0
+    },
+    "limitations": [
+      "真实用户授权 WAV/截图，但仅 10 条 pilot；不是公开集或华为隐藏集成绩。",
+      "本轮使用快路径，VLM 慢路径仍未纳入；PILOT-11/12 未采集，不补造样本。",
+      "RAG 全链路只在显式提供的本地测试工作区运行；查询来自 ASR，未注入答案标签；澄清样本在检索前记为 not_applicable。",
+      "该模式测量检索、首模型 token、完整回答和引用是否存在，不等于答案事实准确率或竞赛成绩。"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": "rag_retrieval_correction_recheck_v0.1",
+  "performed_at": "2026-08-30T01:57:51+08:00",
+  "change": "bounded_query_variant_correction",
+  "design_basis": {
+    "retrieval_correction": "https://arxiv.org/abs/2401.15884",
+    "roadmap": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md"
+  },
+  "contract": {
+    "max_additional_retrieval_passes": 1,
+    "correction_modes": [
+      "query_variant",
+      "decomposed_subqueries",
+      "top_k_only"
+    ],
+    "evidence_gate_query": "original RAG query, not contextual retrieval hints",
+    "project_scope": "same project_id/global fallback filtering is forwarded to the correction pass",
+    "raw_query_logging": false
+  },
+  "unit_scenario": {
+    "first_query": "RAG 的核心思想是什么？",
+    "first_evidence_score": 0.055,
+    "retry_query_contains": "定义与核心机制",
+    "retry_evidence_score": 0.2,
+    "query_changed": true,
+    "retry_selected": true,
+    "comparison_mode": "decomposed_subqueries",
+    "context_project_hint_preserved": true
+  },
+  "validation": {
+    "targeted_tests": "84 passed",
+    "full_backend_tests": "713 passed, 1 warning",
+    "compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "interpretation": "The existing corrective branch now performs a distinct deterministic query rewrite or decomposition before its single bounded retry and exposes the correction mode for audit. This proves the reliability contract and does not prove an answer-accuracy gain.",
+  "limitations": [
+    "The unit scenario uses a controlled knowledge-base double; it is not a sealed or real-business accuracy result.",
+    "The six-document retrieval dev set did not trigger this branch in its normal high-confidence first pass, so no before/after answer metric is claimed.",
+    "The correction remains deterministic and local; no external web search or additional model call was introduced.",
+    "No sealed-test data, metric definition, retrieval weight, or production encrypted workspace was changed."
+  ]
+}

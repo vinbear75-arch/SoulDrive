@@ -1,0 +1,18 @@
+{
+  "schema_version": "souldrive_multimodal_business_baseline_v0.1",
+  "captured_at": "2026-08-25T00:00:00+08:00",
+  "scope": "现有多模态入口与端侧感知链路",
+  "current_product_behavior": {
+    "entry": "通用录音、文件选择、授权屏幕、端侧感知按钮",
+    "business_workflow": false,
+    "evidence_preview": "仅展示感知阶段状态，不绑定业务产物",
+    "human_confirmation": "语音识别确认；外部草稿另有确认",
+    "supported_local_stages": ["asr", "ocr", "visual_route", "vlm", "soulalign"]
+  },
+  "verification": {
+    "python_multimodal_tests": {"command": "conda run -n souldrive python -m pytest tests/test_multimodal_media.py tests/test_interaction_context.py tests/test_soulalign.py tests/test_topic5_runtime.py tests/test_souldrive_mmi_media.py -q", "result": "23 passed"},
+    "frontend_tests": {"command": "npm test", "result": "17 passed"},
+    "frontend_build": {"command": "npm run build", "result": "passed"}
+  },
+  "known_business_gap": "用户必须自己决定什么时候录音、截图、OCR、视觉理解以及如何把结果接到论文、实验或会议产物；系统没有任务目标、输入完整性检查、证据范围和产物预览。"
+}

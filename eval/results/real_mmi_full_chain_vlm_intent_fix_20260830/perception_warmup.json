@@ -1,0 +1,35 @@
+{
+  "schema_version": "souldrive_real_mmi_perception_warmup_eval_v0.1",
+  "requested": true,
+  "wall_clock_latency_ms": 4770.237,
+  "result": {
+    "schema_version": "souldrive_topic5_runtime_perception_warmup_v0.1",
+    "status": "pass",
+    "stages": {
+      "asr": {
+        "status": "pass",
+        "loaded": true,
+        "already_loaded": false,
+        "latency_ms": 4269.57
+      },
+      "ocr": {
+        "status": "pass",
+        "loaded": true,
+        "already_loaded": false,
+        "latency_ms": 500.629
+      }
+    },
+    "loaded": {
+      "asr": true,
+      "ocr": true
+    },
+    "already_loaded": false,
+    "latency_ms": {
+      "total": 4770.231
+    },
+    "policy": {
+      "side_effect": "none",
+      "mode": "explicit_local_perception_warmup"
+    }
+  }
+}

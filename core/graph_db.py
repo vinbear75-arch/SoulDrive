@@ -1,5 +1,7 @@
-import sqlite3
+import json
 import os
+import sqlite3
+import time
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -84,6 +86,26 @@ class LocalGraphDB:
                 FOREIGN KEY (relationship_id) REFERENCES relationships(id)
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS graph_documents (
+                source_filename TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                keywords_json TEXT NOT NULL,
+                chunk_ids_json TEXT NOT NULL,
+                project_id TEXT NOT NULL DEFAULT ''
+            )
+        """)
+        columns = {row[1] for row in cursor.execute("PRAGMA table_info(graph_documents)").fetchall()}
+        if "project_id" not in columns:
+            cursor.execute("ALTER TABLE graph_documents ADD COLUMN project_id TEXT NOT NULL DEFAULT ''")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS graphrag_indexes (
+                index_name TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            )
+        """)
 
         # ==========================================
         # 性能优化：建立索引 (Indexes)
@@ -96,6 +118,41 @@ class LocalGraphDB:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_chunks_chunk ON relationship_chunks(chunk_id)")
 
         # 提交上述建表和索引操作到数据库
+        self.conn.commit()
+
+    def add_document(
+        self,
+        source_filename: str,
+        title: str,
+        summary: str,
+        keywords: list[str] | None = None,
+        chunk_ids: list[str] | None = None,
+        project_id: str | None = None,
+    ):
+        source = str(source_filename or "").strip()
+        if not source:
+            return
+        self.conn.execute(
+            """
+            INSERT INTO graph_documents
+                (source_filename, title, summary, keywords_json, chunk_ids_json, project_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source_filename) DO UPDATE SET
+                title = excluded.title,
+                summary = excluded.summary,
+                keywords_json = excluded.keywords_json,
+                chunk_ids_json = excluded.chunk_ids_json,
+                project_id = excluded.project_id
+            """,
+            (
+                source,
+                str(title or source)[:240],
+                str(summary or "")[:4000],
+                json.dumps(_dedupe(keywords or []), ensure_ascii=False),
+                json.dumps(_dedupe(chunk_ids or []), ensure_ascii=False),
+                str(project_id or "").strip(),
+            ),
+        )
         self.conn.commit()
 
     def add_entity(self, name: str, entity_type: str, description: str, chunk_ids: list[str] | None = None):
@@ -149,7 +206,11 @@ class LocalGraphDB:
         )
         self.conn.commit()
 
-    def get_all_entities(self):
+    def get_all_entities(
+        self,
+        project_id: str | None = None,
+        global_only: bool = False,
+    ):
         """
         检索层：返回图谱中所有的实体名。
 
@@ -158,6 +219,7 @@ class LocalGraphDB:
         例如，如果同时存在实体 "苹果" 和 "苹果公司"，按长度倒序可以让系统优先匹配到更具体的 "苹果公司"，
         从而避免短词过早抢占检索上下文，导致实体截断错误。
         """
+        allowed_chunk_ids = self._scope_chunk_ids(project_id, global_only)
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT name
@@ -166,9 +228,20 @@ class LocalGraphDB:
             ORDER BY LENGTH(name) DESC, name ASC
         """)
         # 提取每一行的第一列（实体名），生成一个平铺的列表并返回
-        return [row[0] for row in cursor.fetchall()]
+        return [
+            row[0]
+            for row in cursor.fetchall()
+            if allowed_chunk_ids is None
+            or set(self._entity_chunk_ids(row[0])) & allowed_chunk_ids
+        ]
 
-    def get_related_entities(self, entity_name: str, limit: int = 20):
+    def get_related_entities(
+        self,
+        entity_name: str,
+        limit: int = 20,
+        project_id: str | None = None,
+        global_only: bool = False,
+    ):
         """
         检索层：返回与指定实体直接相连的一跳关系（即相邻边）。
 
@@ -176,7 +249,7 @@ class LocalGraphDB:
         供上层系统（如 LocalKnowledgeBase）直接拼装成 LLM 容易理解的自然语言上下文。
         """
         cursor = self.conn.cursor()
-        cursor.execute("""
+        query = """
             SELECT source, relation, target
             FROM relationships
             -- 关键点：图谱关系是有向的，但在检索时通常需要“双向查询”。
@@ -184,12 +257,27 @@ class LocalGraphDB:
             WHERE source = ? OR target = ?
             -- 排序保证每次查询结果的一致性
             ORDER BY source ASC, relation ASC, target ASC
-            -- 设置硬性上限，防止某个“超级节点”（如“中国”、“人类”）返回成千上万条关系撑爆内存
-            LIMIT ?
-        """, (entity_name, entity_name, limit))
-        return cursor.fetchall()
+        """
+        parameters = [entity_name, entity_name]
+        if project_id is None and not global_only:
+            query += " LIMIT ?"
+            parameters.append(limit)
+        cursor.execute(query, parameters)
+        allowed_chunk_ids = self._scope_chunk_ids(project_id, global_only)
+        return [
+            item
+            for item in cursor.fetchall()
+            if allowed_chunk_ids is None
+            or set(self._relationship_chunk_ids(*item)) & allowed_chunk_ids
+        ][:limit]
 
-    def get_subgraph(self, entity_name: str, depth: int = 1):
+    def get_subgraph(
+        self,
+        entity_name: str,
+        depth: int = 1,
+        project_id: str | None = None,
+        global_only: bool = False,
+    ):
         """
         检索层：图谱核心算法 —— 多跳检索 (Multi-hop Retrieval)
 
@@ -227,7 +315,11 @@ class LocalGraphDB:
                 continue
 
             # 调用刚才定义的单跳查询方法，获取当前实体的所有相连关系
-            for source, relation, target in self.get_related_entities(current_entity):
+            for source, relation, target in self.get_related_entities(
+                current_entity,
+                project_id=project_id,
+                global_only=global_only,
+            ):
                 # 将三元组打包作为唯一标识
                 edge_key = (source, relation, target)
 
@@ -251,14 +343,25 @@ class LocalGraphDB:
 
         return results
 
-    def search_context(self, query: str, depth: int = 1, max_entities: int = 8, max_edges: int = 24):
+    def search_context(
+        self,
+        query: str,
+        depth: int = 1,
+        max_entities: int = 8,
+        max_edges: int = 24,
+        project_id: str | None = None,
+        global_only: bool = False,
+    ):
         """
         面向 RAG 的图谱上下文接口：从自然语言查询中匹配实体，再返回可直接注入 Prompt 的关系链。
         该方法是后续替换 Kuzu/Neo4j 时最小稳定接口。
         """
         match_space = (query or "").lower()
         matched_entities = []
-        for entity in self.get_all_entities():
+        for entity in self.get_all_entities(
+            project_id=project_id,
+            global_only=global_only,
+        ):
             if entity and entity.lower() in match_space:
                 matched_entities.append(entity)
             if len(matched_entities) >= max_entities:
@@ -267,7 +370,12 @@ class LocalGraphDB:
         graph_context = []
         seen_relations = set()
         for entity in matched_entities:
-            for source, relation, target in self.get_subgraph(entity, depth=depth):
+            for source, relation, target in self.get_subgraph(
+                entity,
+                depth=depth,
+                project_id=project_id,
+                global_only=global_only,
+            ):
                 relation_key = (source, relation, target)
                 if relation_key in seen_relations:
                     continue
@@ -278,39 +386,131 @@ class LocalGraphDB:
 
         return graph_context
 
-    def recall_chunk_ids(self, query: str, limit: int = 40):
+    def recall_chunk_ids(
+        self,
+        query: str,
+        limit: int = 40,
+        project_id: str | None = None,
+        global_only: bool = False,
+    ):
         if limit <= 0:
             return []
 
         match_space = (query or "").lower()
         matched_entities = [
             entity
-            for entity in self.get_all_entities()
+            for entity in self.get_all_entities(
+                project_id=project_id,
+                global_only=global_only,
+            )
             if entity and entity.lower() in match_space
         ]
 
         chunk_ids = []
         seen = set()
+        allowed_chunk_ids = self._scope_chunk_ids(project_id, global_only)
+
+        def add_chunk_id(chunk_id):
+            if allowed_chunk_ids is not None and chunk_id not in allowed_chunk_ids:
+                return False
+            if chunk_id in seen:
+                return False
+            seen.add(chunk_id)
+            chunk_ids.append(chunk_id)
+            return True
+
         for entity_name in matched_entities:
             for chunk_id in self._entity_chunk_ids(entity_name):
-                if chunk_id not in seen:
-                    seen.add(chunk_id)
-                    chunk_ids.append(chunk_id)
+                add_chunk_id(chunk_id)
 
-            for source, relation, target in self.get_subgraph(entity_name, depth=1):
+            for source, relation, target in self.get_subgraph(
+                entity_name,
+                depth=1,
+                project_id=project_id,
+                global_only=global_only,
+            ):
                 for related_entity in (source, target):
                     for chunk_id in self._entity_chunk_ids(related_entity):
-                        if chunk_id not in seen:
-                            seen.add(chunk_id)
-                            chunk_ids.append(chunk_id)
+                        add_chunk_id(chunk_id)
                 for chunk_id in self._relationship_chunk_ids(source, relation, target):
-                    if chunk_id not in seen:
-                        seen.add(chunk_id)
-                        chunk_ids.append(chunk_id)
+                    add_chunk_id(chunk_id)
                 if len(chunk_ids) >= limit:
                     return chunk_ids[:limit]
 
         return chunk_ids[:limit]
+
+    def get_graph_snapshot(self) -> dict:
+        entities = []
+        for name, entity_type, description in self.conn.execute(
+            "SELECT name, type, description FROM entities ORDER BY name ASC"
+        ).fetchall():
+            entities.append({
+                "name": name,
+                "type": entity_type,
+                "description": description or "",
+                "chunk_ids": self._entity_chunk_ids(name),
+            })
+
+        relationships = []
+        for source, relation, target in self.conn.execute(
+            "SELECT source, relation, target FROM relationships ORDER BY source, relation, target"
+        ).fetchall():
+            relationships.append({
+                "source": source,
+                "relation": relation,
+                "target": target,
+                "chunk_ids": self._relationship_chunk_ids(source, relation, target),
+            })
+
+        documents = []
+        for source, title, summary, keywords_json, chunk_ids_json, project_id in self.conn.execute(
+            """
+            SELECT source_filename, title, summary, keywords_json, chunk_ids_json, project_id
+            FROM graph_documents
+            ORDER BY source_filename ASC
+            """
+        ).fetchall():
+            documents.append({
+                "source_filename": source,
+                "title": title,
+                "summary": summary,
+                "keywords": _json_list(keywords_json),
+                "chunk_ids": _json_list(chunk_ids_json),
+                "project_id": project_id or "",
+            })
+        return {
+            "entities": entities,
+            "relationships": relationships,
+            "documents": documents,
+        }
+
+    def save_graphrag_index(self, payload: dict, index_name: str = "default") -> None:
+        index_name = str(index_name or "default").strip() or "default"
+        self.conn.execute(
+            """
+            INSERT INTO graphrag_indexes (index_name, payload_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(index_name) DO UPDATE SET
+                payload_json = excluded.payload_json,
+                updated_at = excluded.updated_at
+            """,
+            (index_name, json.dumps(payload, ensure_ascii=False), time.time()),
+        )
+        self.conn.commit()
+
+    def load_graphrag_index(self, index_name: str = "default") -> dict | None:
+        index_name = str(index_name or "default").strip() or "default"
+        row = self.conn.execute(
+            "SELECT payload_json FROM graphrag_indexes WHERE index_name = ?",
+            (index_name,),
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            payload = json.loads(row[0])
+        except (TypeError, ValueError):
+            return None
+        return payload if isinstance(payload, dict) else None
 
     def remove_chunk_ids(self, chunk_ids: list[str]) -> None:
         removed = _dedupe(chunk_ids)
@@ -341,6 +541,21 @@ class LocalGraphDB:
                 batch,
             )
 
+        for source, chunk_ids_json in cursor.execute(
+            "SELECT source_filename, chunk_ids_json FROM graph_documents"
+        ).fetchall():
+            kept = [item for item in _json_list(chunk_ids_json) if item not in removed]
+            if kept:
+                cursor.execute(
+                    "UPDATE graph_documents SET chunk_ids_json = ? WHERE source_filename = ?",
+                    (json.dumps(kept, ensure_ascii=False), source),
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM graph_documents WHERE source_filename = ?",
+                    (source,),
+                )
+
         cursor.executemany(
             """
             DELETE FROM relationships
@@ -365,6 +580,22 @@ class LocalGraphDB:
             """,
             [(entity_name,) for entity_name in affected_entities],
         )
+        # 删除原始切片后，社区报告和 chunk 指针都可能过期；下次索引会重建派生层。
+        cursor.execute("DELETE FROM graphrag_indexes")
+        self.conn.commit()
+
+    def remove_project(self, project_id: str, chunk_ids: list[str] | None = None) -> None:
+        project_id = str(project_id or "").strip()
+        if not project_id:
+            return
+        self.remove_chunk_ids(chunk_ids or [])
+        self.conn.execute(
+            "DELETE FROM graph_documents WHERE project_id = ?",
+            (project_id,),
+        )
+        # Global and project GraphRAG reports are derived from the same graph;
+        # deleting a project invalidates every report until the next rebuild.
+        self.conn.execute("DELETE FROM graphrag_indexes")
         self.conn.commit()
 
     def _entity_chunk_ids(self, name: str) -> list[str]:
@@ -378,6 +609,27 @@ class LocalGraphDB:
             (name,),
         ).fetchall()
         return [row[0] for row in rows]
+
+    def _scope_chunk_ids(
+        self,
+        project_id: str | None,
+        global_only: bool = False,
+    ) -> set[str] | None:
+        project_id = str(project_id or "").strip()
+        if project_id:
+            query = "SELECT chunk_ids_json FROM graph_documents WHERE project_id = ?"
+            parameters = (project_id,)
+        elif global_only:
+            query = "SELECT chunk_ids_json FROM graph_documents WHERE project_id = ''"
+            parameters = ()
+        else:
+            return None
+        rows = self.conn.execute(query, parameters).fetchall()
+        return {
+            chunk_id
+            for row in rows
+            for chunk_id in _json_list(row[0])
+        }
 
     def _relationship_chunk_ids(self, source: str, relation: str, target: str) -> list[str]:
         rows = self.conn.execute(
@@ -415,6 +667,14 @@ def _dedupe(values: list[str]) -> list[str]:
 def _batches(values: list[str], size: int):
     for start in range(0, len(values), size):
         yield values[start : start + size]
+
+
+def _json_list(value: str | None) -> list[str]:
+    try:
+        payload = json.loads(value or "[]")
+    except (TypeError, ValueError):
+        return []
+    return _dedupe(payload if isinstance(payload, list) else [])
 # ---------------------------------------------------------
 # 简易测试代码 (仅在直接运行此脚本时执行)
 # ---------------------------------------------------------

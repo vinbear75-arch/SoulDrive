@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ def _document_converter() -> DocumentConverter:
 
     pipeline_options = PdfPipelineOptions(
         artifacts_path=artifacts_path,
+        do_ocr=False,
         accelerator_options=AcceleratorOptions(
             num_threads=2,
             device=AcceleratorDevice.CPU,
@@ -64,6 +66,9 @@ class AdvancedDocumentParser:
             ("#", "Header 1"),
             ("##", "Header 2"),
             ("###", "Header 3"),
+            ("####", "Header 4"),
+            ("#####", "Header 5"),
+            ("######", "Header 6"),
         ]
         self.markdown_splitter = MarkdownHeaderTextSplitter(
             headers_to_split_on=self.headers_to_split_on,
@@ -90,6 +95,9 @@ class AdvancedDocumentParser:
             "conversion_error_count": 0,
             "converted_pages": 0,
             "failed_pages": [],
+            "repeated_page_artifacts": 0,
+            "heading_only_merges": 0,
+            "short_same_section_merges": 0,
         }
         self._page_assets = {}
         if not os.path.exists(pdf_path):
@@ -150,6 +158,17 @@ class AdvancedDocumentParser:
         if status is None or status == ConversionStatus.SUCCESS:
             return
 
+        # Docling can return a usable document together with page-level
+        # failures. Keep the successfully converted pages available for
+        # retrieval and expose the failed pages through parse statistics. A
+        # partial result without a document is still a hard parse failure.
+        if status == ConversionStatus.PARTIAL_SUCCESS and getattr(result, "document", None) is not None:
+            logger.warning(
+                "[Parser] Docling returned a partial document; continuing with converted pages: %s",
+                failed_pages,
+            )
+            return
+
         detail = "; ".join(error_messages[:3]) or "unspecified conversion error"
         page_detail = f"; failed pages: {failed_pages}" if failed_pages else ""
         raise RuntimeError(
@@ -161,15 +180,20 @@ class AdvancedDocumentParser:
         page_assets: dict[int, dict[str, list[dict[str, Any]]]] = defaultdict(lambda: {"tables": [], "images": []})
         last_page: int | None = None
         last_markdown_by_page: dict[int, str] = {}
+        entries = list(document.iterate_items())
+        repeated_artifact_keys = self._repeated_page_artifact_keys(entries)
 
-        for raw_entry in document.iterate_items():
+        for raw_entry in entries:
             item = raw_entry[0] if isinstance(raw_entry, tuple) else raw_entry
             self.last_parse_stats["raw_items"] += 1
             page = self._page_number(item) or last_page
             label = self._item_label(item)
             raw_text = self._item_text(item)
-            if self._is_page_artifact(label, raw_text):
+            raw_key = self._duplicate_key(raw_text)
+            if self._is_page_artifact(label, raw_text) or raw_key in repeated_artifact_keys:
                 self.last_parse_stats["removed_page_artifacts"] += 1
+                if raw_key in repeated_artifact_keys:
+                    self.last_parse_stats["repeated_page_artifacts"] += 1
                 continue
             if "document_index" in label:
                 self.last_parse_stats["removed_non_content"] += 1
@@ -187,7 +211,14 @@ class AdvancedDocumentParser:
                 page_assets[page]["tables"].append(self._table_metadata(page, markdown))
                 self.last_parse_stats["table_items"] += 1
             if page is not None and self._is_image_label(label):
-                page_assets[page]["images"].append(self._image_metadata(page, item, markdown))
+                page_assets[page]["images"].append(
+                    self._image_metadata(
+                        page,
+                        item,
+                        markdown,
+                        len(page_assets[page]["images"]) + 1,
+                    )
+                )
                 self.last_parse_stats["image_items"] += 1
             if page is None or not markdown:
                 continue
@@ -209,6 +240,7 @@ class AdvancedDocumentParser:
         document_metadata = document_metadata or {}
         for page, markdown in page_markdown.items():
             page_chunks = self.markdown_splitter.split_text(markdown)
+            page_assets_attached = False
             for chunk in page_chunks:
                 if not chunk.page_content.strip():
                     continue
@@ -217,11 +249,22 @@ class AdvancedDocumentParser:
                 chunk.metadata["page"] = page
                 chunk.metadata["page_number"] = page
                 chunk.metadata["page_label"] = str(page)
-                chunk.metadata.update(self._structured_metadata_for_chunk(page, chunk.page_content))
+                chunk.metadata.update(
+                    self._structured_metadata_for_chunk(
+                        page,
+                        chunk.page_content,
+                        attach_page_images=not page_assets_attached,
+                    )
+                )
+                page_assets_attached = page_assets_attached or bool(chunk.metadata.get("image_count"))
                 section_path = self._section_path(chunk.metadata)
                 if section_path:
                     chunk.metadata["section_path"] = section_path
                     chunk.metadata["section"] = section_path[-1]
+                else:
+                    # Page provenance is more useful than a blank section in the review UI.
+                    chunk.metadata["section"] = f"第 {page} 页正文（未识别标题）"
+                    chunk.metadata["section_path"] = [chunk.metadata["section"]]
                 chunk.metadata["structure_aware"] = bool(
                     section_path or document_metadata.get("document_profile") != "general"
                 )
@@ -230,15 +273,96 @@ class AdvancedDocumentParser:
                     chunk.metadata["content_kind"] = "table"
                 elif chunk.metadata.get("clause_id"):
                     chunk.metadata["content_kind"] = "clause"
-                elif chunk.metadata.get("image_count"):
-                    chunk.metadata["content_kind"] = "image"
                 else:
                     chunk.metadata["content_kind"] = "prose"
                 chunks.append(chunk)
-        return chunks
+        return self._merge_fragmented_chunks(chunks)
+
+    def _merge_fragmented_chunks(self, chunks):
+        """Join structural leftovers while retaining the smallest useful retrieval unit."""
+        if not chunks:
+            return []
+        merged = []
+        pending_headings = []
+        for chunk in chunks:
+            if self._is_heading_only_chunk(chunk):
+                pending_headings.append(chunk)
+                continue
+            if pending_headings:
+                for heading in pending_headings:
+                    chunk = self._merge_chunk_pair(heading, chunk)
+                pending_headings = []
+                self._increment_parse_stat("heading_only_merges")
+            if merged and self._can_merge_short_section(merged[-1], chunk):
+                merged[-1] = self._merge_chunk_pair(merged[-1], chunk)
+                self._increment_parse_stat("short_same_section_merges")
+            else:
+                merged.append(chunk)
+        if pending_headings:
+            if merged and self._can_merge_short_section(merged[-1], pending_headings[0]):
+                for heading in pending_headings:
+                    merged[-1] = self._merge_chunk_pair(merged[-1], heading)
+                self._increment_parse_stat("heading_only_merges")
+            else:
+                merged.extend(pending_headings)
+        return merged
+
+    def _is_heading_only_chunk(self, chunk) -> bool:
+        lines = [line.strip() for line in str(chunk.page_content or "").splitlines() if line.strip()]
+        return bool(lines) and all(re.match(r"^#{1,6}\s+\S", line) for line in lines)
+
+    def _can_merge_short_section(self, left, right) -> bool:
+        left_text = str(left.page_content or "").strip()
+        right_text = str(right.page_content or "").strip()
+        if not left_text or not right_text:
+            return False
+        if len(left_text) >= 160 and len(right_text) >= 160:
+            return False
+        if len(left_text) + len(right_text) + 2 > 2400:
+            return False
+        if left.metadata.get("table_count") or right.metadata.get("table_count"):
+            return False
+        if left.metadata.get("image_count") or right.metadata.get("image_count"):
+            return False
+        return self._section_path(left.metadata) == self._section_path(right.metadata)
+
+    def _merge_chunk_pair(self, left, right):
+        from langchain_core.documents import Document
+
+        metadata = {**left.metadata, **right.metadata}
+        start = min(int(left.metadata.get("page_start", left.metadata.get("page", 1))),
+                    int(right.metadata.get("page_start", right.metadata.get("page", 1))))
+        end = max(int(left.metadata.get("page_end", left.metadata.get("page", start))),
+                  int(right.metadata.get("page_end", right.metadata.get("page", start))))
+        metadata["page_start"] = start
+        metadata["page_end"] = end
+        metadata["page"] = start
+        metadata["page_number"] = start
+        metadata["page_label"] = str(start) if start == end else f"{start}-{end}"
+        return Document(
+            page_content=f"{left.page_content.rstrip()}\n\n{right.page_content.lstrip()}",
+            metadata=metadata,
+        )
+
+    def _increment_parse_stat(self, key: str) -> None:
+        stats = getattr(self, "last_parse_stats", None)
+        if isinstance(stats, dict):
+            stats[key] = int(stats.get(key, 0)) + 1
+
+    def _repeated_page_artifact_keys(self, entries) -> set[str]:
+        pages_by_key: dict[str, set[int]] = defaultdict(set)
+        for raw_entry in entries:
+            item = raw_entry[0] if isinstance(raw_entry, tuple) else raw_entry
+            text = self._item_text(item)
+            key = self._duplicate_key(text)
+            page = self._page_number(item)
+            label = self._item_label(item)
+            if key and page is not None and len(text) <= 100 and not self._is_image_label(label):
+                pages_by_key[key].add(page)
+        return {key for key, pages in pages_by_key.items() if len(pages) >= 3}
 
     def _inherit_page_headers(self, metadata: dict[str, Any], active_headers: dict[str, str]) -> None:
-        header_keys = ("Header 1", "Header 2", "Header 3")
+        header_keys = tuple(f"Header {level}" for level in range(1, 7))
         explicit_headers = {
             key: str(metadata.get(key) or "").strip()
             for key in header_keys
@@ -267,25 +391,30 @@ class AdvancedDocumentParser:
             except Exception:
                 return ""
 
-        text = self._item_text(item)
         if self._is_image_label(label):
-            return f"[图像: {text}]" if text else "[图像]"
+            # 图像本身由多模态链路处理，不能用占位符污染文本检索。
+            return ""
+        text = self._item_text(item)
         if not text:
             return ""
 
         if label == "title":
+            if not self._is_valid_heading(text):
+                return text
             return f"# {text}"
-        formal_heading = self._formal_heading_markdown(text)
-        if formal_heading:
-            return formal_heading
-        if "section_header" in label or item.__class__.__name__.lower().endswith("sectionheaderitem"):
-            level = self._bounded_heading_level(getattr(item, "level", 1))
-            return f"{'#' * level} {text}"
         if "list_item" in label:
             marker = self._clean_text(str(getattr(item, "marker", "") or ""))
             if marker and not text.startswith(marker):
                 return f"{marker} {text}"
             return f"- {text}"
+        formal_heading = self._formal_heading_markdown(text)
+        if formal_heading:
+            return formal_heading
+        if "section_header" in label or item.__class__.__name__.lower().endswith("sectionheaderitem"):
+            if not self._is_valid_heading(text):
+                return text
+            level = self._bounded_heading_level(getattr(item, "level", 1))
+            return f"{'#' * level} {text}"
         return text
 
     def _page_number(self, item) -> int | None:
@@ -300,7 +429,13 @@ class AdvancedDocumentParser:
         label = getattr(item, "label", "")
         return str(getattr(label, "value", label)).lower()
 
-    def _structured_metadata_for_chunk(self, page: int, content: str) -> dict[str, Any]:
+    def _structured_metadata_for_chunk(
+        self,
+        page: int,
+        content: str,
+        *,
+        attach_page_images: bool = False,
+    ) -> dict[str, Any]:
         assets = self._page_assets.get(page, {"tables": [], "images": []})
         tables = [
             table
@@ -310,7 +445,7 @@ class AdvancedDocumentParser:
         images = [
             image
             for image in assets.get("images", [])
-            if not image.get("caption") or image.get("caption") in content or "[图像" in content
+            if attach_page_images
         ]
         metadata: dict[str, Any] = {}
         if tables:
@@ -330,12 +465,20 @@ class AdvancedDocumentParser:
             "markdown": markdown,
         }
 
-    def _image_metadata(self, page: int, item: Any, markdown: str) -> dict[str, Any]:
+    def _image_metadata(
+        self,
+        page: int,
+        item: Any,
+        markdown: str,
+        asset_index: int,
+    ) -> dict[str, Any]:
         caption = str(getattr(item, "text", None) or getattr(item, "orig", "") or "").strip()
         return {
+            "asset_id": f"figure-p{page}-{asset_index}",
             "page": page,
             "caption": caption,
             "placeholder": markdown or "[图像]",
+            "source_locator": f"page:{page}/figure:{asset_index}",
             "vision_status": "pending_local_model",
         }
 
@@ -365,9 +508,23 @@ class AdvancedDocumentParser:
                 return f"{'#' * level} {text}"
         return ""
 
+    def _is_valid_heading(self, text: str) -> bool:
+        normalized = str(text or "").strip()
+        if not normalized or not re.search(r"[\u4e00-\u9fffA-Za-z0-9]", normalized):
+            return False
+        # Docling can label a short OCR-extracted author name as a section.
+        # Keep the text, but do not let that low-information line become a
+        # retrieval hierarchy node.
+        if re.fullmatch(r"[\u4e00-\u9fff]{1,2}\s+[\u4e00-\u9fff]{1,2}", normalized):
+            return False
+        return not re.fullmatch(
+            r"(?:第[一二三四五六七八九十百千万0-9]+[章节篇部分]|[一二三四五六七八九十百千万]+、|\d+(?:\.\d+)*[、.)]?)",
+            normalized,
+        )
+
     def _section_path(self, metadata: dict[str, Any]) -> list[str]:
         path = []
-        for key in ("Header 1", "Header 2", "Header 3"):
+        for key in ("Header 1", "Header 2", "Header 3", "Header 4", "Header 5", "Header 6"):
             value = str(metadata.get(key) or "").strip()
             if value:
                 path.append(value)
@@ -389,8 +546,13 @@ class AdvancedDocumentParser:
         return self._clean_text(value)
 
     def _clean_text(self, value: str) -> str:
-        text = (
-            value.replace("\u00ad", "")
+        text = "".join(
+            unicodedata.normalize("NFKC", character)
+            if "\u2f00" <= character <= "\u2fd5" or "\uf900" <= character <= "\ufaff"
+            else character
+            for character in value
+        ).replace("戶", "户").replace("\u00ad", "")
+        text = (text
             .replace("\u200b", "")
             .replace("\u200c", "")
             .replace("\u200d", "")
@@ -411,6 +573,7 @@ class AdvancedDocumentParser:
             r"^[Pp]age\s+\d+(?:\s+of\s+\d+)?$",
             r"^\d+\s*/\s*\d+$",
             r"^[-—–]\s*\d{1,4}\s*[-—–]$",
+            r"^\d+\s+copyright$",
         )
         return any(re.fullmatch(pattern, normalized) for pattern in page_number_patterns)
 

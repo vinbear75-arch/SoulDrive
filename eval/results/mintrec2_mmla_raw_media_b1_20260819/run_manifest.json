@@ -1,0 +1,8 @@
+{
+  "schema_version": "mintrec2_mmla_raw_media_b1_manifest_v0.1",
+  "archive_sha256": "78bd9ab4a0f9e5768ed2a094524165ecc51926e210a4701a9548d036a68d5e29",
+  "feature_cache_sha256": "073350b27e3be838877dbdd3c6c76d9d67d7d6c03a5559fd903057d8e08eafe6",
+  "feature_version": "mmla_raw_media_av_v0.1",
+  "split_policy": "pinned MMLA train/dev/test; test never used for fitting or parameter selection",
+  "status": "complete"
+}

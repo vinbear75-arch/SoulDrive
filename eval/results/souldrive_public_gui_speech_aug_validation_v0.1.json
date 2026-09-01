@@ -1,0 +1,9 @@
+{
+  "dataset": "eval\\fixtures\\souldrive_public_gui_speech_aug_v0.1\\episodes.jsonl",
+  "media_root": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\fixtures\\souldrive_public_gui_speech_aug_v0.1",
+  "episode_count": 30,
+  "require_media": true,
+  "valid": true,
+  "error_count": 0,
+  "errors": []
+}

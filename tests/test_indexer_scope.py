@@ -1,15 +1,62 @@
 import tempfile
 import unittest
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+from langchain_core.documents import Document
 
 import core.runtime_state as runtime_state
-from core.indexer import INDEX_METADATA_SCHEMA_VERSION, DriveIndexer
+from core.indexer import (
+    INDEX_METADATA_SCHEMA_VERSION,
+    DriveIndexer,
+    _document_navigation_summary,
+    _graph_sources_missing_coverage,
+)
 from core.workspace import SoulDriveWorkspace
 
 
 class IndexerScopeTests(unittest.TestCase):
+    def test_pre_index_summary_preserves_title_sections_and_source_excerpt(self):
+        summary = _document_navigation_summary("中文RAG报告.pdf", [
+            Document(page_content="RAG 通过检索外部知识增强生成。", metadata={"section": "1 引言"}),
+            Document(page_content="重排序用于提高证据相关性。", metadata={"section": "2 方法"}),
+        ])
+
+        self.assertIn("中文RAG报告", summary)
+        self.assertIn("1 引言", summary)
+        self.assertIn("检索外部知识", summary)
+
+    def test_graph_backfill_detects_indexed_documents_without_graph_coverage(self):
+        snapshot = {
+            "documents": [
+                {"source_filename": "covered.pdf", "chunk_ids": ["c1", "c2"]},
+                {"source_filename": "missing.pdf", "chunk_ids": ["c3", "c4"]},
+            ],
+            "entities": [{"name": "RAG", "chunk_ids": ["c1"]}],
+            "relationships": [],
+        }
+
+        self.assertEqual(
+            _graph_sources_missing_coverage(
+                snapshot,
+                ["covered.pdf", "missing.pdf", "not-in-graph.pdf"],
+            ),
+            {"missing.pdf", "not-in-graph.pdf"},
+        )
+
+    def test_graph_backfill_is_disabled_for_lightweight_auth_levels(self):
+        indexer = DriveIndexer()
+        indexer.workspace = SimpleNamespace(root_path="unused")
+
+        with patch("core.indexer.get_workspace_keys") as get_keys:
+            self.assertEqual(
+                indexer._graph_backfill_sources(["paper.pdf"], "BASIC"),
+                set(),
+            )
+        get_keys.assert_not_called()
+
     def test_indexer_scans_only_managed_papers_directory(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -22,6 +69,36 @@ class IndexerScopeTests(unittest.TestCase):
 
         self.assertIn(str(managed_pdf), files)
         self.assertNotIn(str(unmanaged_pdf), files)
+
+    def test_indexer_discovers_supported_project_assets_but_not_unrelated_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            image = Path(workspace.papers_path) / "screen.png"
+            note = Path(workspace.papers_path) / "note.txt"
+            unrelated = Path(workspace.papers_path) / "archive.exe"
+            image.write_bytes(b"image")
+            note.write_text("note", encoding="utf-8")
+            unrelated.write_bytes(b"binary")
+
+            files = DriveIndexer.discover_workspace_document_files(workspace)
+
+        self.assertIn(str(image), files)
+        self.assertIn(str(note), files)
+        self.assertNotIn(str(unrelated), files)
+
+    def test_indexer_can_explicitly_use_original_source_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source_materials" / "rag_cn"
+            source.mkdir(parents=True)
+            raw_pdf = source / "raw.pdf"
+            raw_pdf.write_bytes(b"%PDF raw")
+            with patch.dict("os.environ", {"SOULDRIVE_INDEX_SOURCE_DIR": str(source)}):
+                indexer = DriveIndexer()
+                indexer.workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+                files, temp_index = indexer._discover_index_document_files()
+
+        self.assertEqual(files, [str(raw_pdf)])
+        self.assertIsNone(temp_index)
 
     def test_default_graph_extractor_is_bound_to_active_workspace(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -36,6 +113,28 @@ class IndexerScopeTests(unittest.TestCase):
             graph_db_path=workspace.graph_db_path,
             workspace_path=workspace.root_path,
         )
+
+    def test_catalog_lookup_accepts_sha256_registration_after_md5_miss(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            document = Path(temp_dir) / "report.txt"
+            document.write_text("catalog-bound report", encoding="utf-8")
+            catalog = Mock()
+            catalog.find_asset_version_for_file.side_effect = [
+                None,
+                {"title": "规范报告"},
+            ]
+            indexer = DriveIndexer()
+            indexer.project_catalog = catalog
+
+            with patch.object(indexer, "_catalog_ref_for_document", return_value="report.txt"):
+                result = indexer._catalog_item_for_document(
+                    str(document),
+                    "report.txt",
+                    "legacy-md5",
+                )
+
+        self.assertEqual(result["title"], "规范报告")
+        self.assertEqual(catalog.find_asset_version_for_file.call_count, 2)
 
     def test_indexer_blocks_when_workspace_disk_is_not_ready(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -74,6 +173,25 @@ class IndexerScopeTests(unittest.TestCase):
 
         self.assertTrue(indexer._document_index_is_current("abc"))
 
+    def test_same_content_different_sources_are_indexed_independently(self):
+        indexer = DriveIndexer()
+        indexer.kb = _FakeKnowledgeBase({
+            "ids": ["existing_child"],
+            "metadatas": [{
+                "document_hash": "abc",
+                "source_filename": "first.png",
+                "metadata_schema_version": INDEX_METADATA_SCHEMA_VERSION,
+                "page": 1,
+            }],
+        })
+
+        self.assertTrue(indexer._document_index_is_current("abc", "first.png"))
+        self.assertFalse(indexer._document_index_is_current("abc", "second.png"))
+        self.assertNotEqual(
+            indexer._index_document_id("abc", "first.png"),
+            indexer._index_document_id("abc", "second.png"),
+        )
+
     def test_document_index_is_rebuilt_when_embedding_model_changes(self):
         indexer = DriveIndexer()
         indexer.kb = _FakeKnowledgeBase({
@@ -91,6 +209,34 @@ class IndexerScopeTests(unittest.TestCase):
             indexer._document_index_status("abc"),
             "embedding_model_upgrade",
         )
+
+    def test_document_index_is_rebuilt_when_project_binding_is_removed(self):
+        indexer = DriveIndexer()
+        indexer.kb = _FakeKnowledgeBase({
+            "ids": ["project_child"],
+            "metadatas": [{
+                "document_hash": "abc",
+                "source_filename": "paper.pdf",
+                "metadata_schema_version": INDEX_METADATA_SCHEMA_VERSION,
+                "embedding_model_name": "bge-small-zh-v1.5",
+                "page": 1,
+                "project_id": "rag-cn-demo-20260824",
+                "asset_id": "asset-a",
+                "asset_version_id": "version-a",
+                "asset_type": "document",
+                "catalog_file_ref": "paper.pdf",
+            }],
+        })
+        indexer.project_catalog = Mock()
+        indexer.project_catalog.find_asset_version_for_file.return_value = None
+
+        with patch.object(indexer, "_catalog_ref_for_document", return_value="paper.pdf"), patch.object(
+            indexer, "_project_for_path", return_value=None
+        ):
+            self.assertEqual(
+                indexer._document_index_status("abc", "paper.pdf", "D:/papers/paper.pdf"),
+                "metadata_upgrade",
+            )
 
     def test_stale_cleanup_preserves_new_ids_and_deletes_exact_old_records(self):
         indexer = DriveIndexer()
@@ -134,10 +280,23 @@ class IndexerScopeTests(unittest.TestCase):
 
                 indexer = DriveIndexer()
                 indexer.parser = _FakeParser()
+                catalog_item = {
+                    "project_id": "project-a",
+                    "asset_id": "asset-a",
+                    "asset_type": "report",
+                    "title": "规范报告标题",
+                    "version_id": "version-a",
+                    "valid_from": "2026-08-01T00:00:00+00:00",
+                    "authored_at": None,
+                    "imported_at": "2026-08-01T00:00:00+00:00",
+                    "file_ref": "scheme.pdf",
+                }
                 with patch.object(runtime_state, "STATE_PATH", state_path), patch(
                     "core.knowledge_base.LocalKnowledgeBase",
                     _IngestRecordingKnowledgeBase,
-                ):
+                ), patch.object(
+                    indexer, "_catalog_item_for_document", return_value=catalog_item
+                ) as catalog_lookup:
                     indexer.sync_workspace(workspace, auth_level="BASIC")
                     state = runtime_state.get_runtime_state()
         finally:
@@ -150,6 +309,8 @@ class IndexerScopeTests(unittest.TestCase):
         self.assertEqual(observability["documents"][0]["status"], "indexed")
         self.assertEqual(observability["documents"][0]["chunk_count"], 2)
         self.assertEqual(observability["documents"][0]["child_count"], 3)
+        self.assertEqual(observability["documents"][0]["section_tree_node_count"], 4)
+        self.assertEqual(observability["totals"]["section_tree_leaf_count"], 2)
         self.assertEqual(observability["totals"]["embedding_ms"], 4)
         self.assertEqual(observability["totals"]["vector_store_ms"], 5)
         self.assertEqual(observability["totals"]["keyword_index_ms"], 6)
@@ -170,6 +331,7 @@ class IndexerScopeTests(unittest.TestCase):
             {"formal_structure_paragraph_window_v2": 3},
         )
         self.assertGreater(observability["totals"]["chunk_chars"], 0)
+        self.assertEqual(catalog_lookup.call_count, 1)
         ingested_document_id, ingested_chunks = (
             _IngestRecordingKnowledgeBase.last_instance.ingested[0]
         )
@@ -187,6 +349,11 @@ class IndexerScopeTests(unittest.TestCase):
                 "bge-small-zh-v1.5",
             )
             self.assertEqual(chunk.metadata["chunk_index"], chunk_index)
+            self.assertEqual(chunk.metadata["project_id"], "project-a")
+            self.assertEqual(chunk.metadata["asset_id"], "asset-a")
+            self.assertEqual(chunk.metadata["asset_version_id"], "version-a")
+            self.assertEqual(chunk.metadata["catalog_title"], "规范报告标题")
+            self.assertEqual(chunk.metadata["document_title"], "规范报告标题")
 
 
 class _FakeKnowledgeBase:
@@ -209,6 +376,8 @@ class _IngestRecordingKnowledgeBase:
         self.ingested.append((document_hash, chunks))
         return {
             "child_count": 3,
+            "section_tree_node_count": 4,
+            "section_tree_leaf_count": 2,
             "embedding_ms": 4,
             "vector_store_ms": 5,
             "keyword_index_ms": 6,

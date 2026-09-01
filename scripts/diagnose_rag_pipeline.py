@@ -136,7 +136,10 @@ def diagnose_records(
     from core.knowledge_base import LocalKnowledgeBase
 
     workspace = SoulDriveWorkspace(str(workspace_path)).ensure()
-    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+    kb = LocalKnowledgeBase(
+        workspace_path=workspace.root_path,
+        enable_usage_ledger=False,
+    )
     graph_db = LocalGraphDB(db_path=workspace.graph_db_path) if include_graph else None
     samples: list[dict[str, Any]] = []
     try:
@@ -161,6 +164,11 @@ def diagnose_records(
     return samples
 
 
+def hydrate_stage_candidates(kb: Any, candidates: list[SearchCandidate], limit: int) -> list[SearchCandidate]:
+    """Apply the same secure-ID hydration used by production retrieval."""
+    return kb._hydrate_secure_candidates(candidates, limit)
+
+
 def diagnose_record(
     kb: Any,
     record: dict[str, Any],
@@ -178,17 +186,30 @@ def diagnose_record(
     final_k_values = sorted({value for value in (final_k_values or []) if value > 0})
     max_recall_depth = max(recall_depths) if recall_depths else dense_pool_size
     query_variants = expand_query_variants(question)
+    embedding_model = kb._ensure_embedding_model()
 
     dense_candidate_groups: list[list[SearchCandidate]] = []
     keyword_candidate_groups: list[list[SearchCandidate]] = []
     for variant in query_variants:
-        query_vector = kb.embedding_model.encode([variant], normalize_embeddings=True).tolist()
+        query_vector = embedding_model.encode(
+            [kb._query_embedding_text(variant)],
+            normalize_embeddings=True,
+        ).tolist()
         dense_candidate_groups.append(kb._dense_candidates(query_vector, max_recall_depth))
         keyword_candidate_groups.append(kb._keyword_candidates(variant, max_recall_depth))
 
     dense_candidates = flatten_candidate_groups(dense_candidate_groups, dense_pool_size)
     keyword_candidates = flatten_candidate_groups(keyword_candidate_groups, dense_pool_size)
-    source_title_candidates = kb._source_title_candidates(question, limit=max(top_k * 4, 12))
+    # Secure recall intentionally returns IDs first.  Hydrate before taking
+    # stage snapshots, otherwise source-level evaluation sees empty metadata.
+    hydrate_limit = max(top_k * 40, max_recall_depth)
+    dense_candidates = hydrate_stage_candidates(kb, dense_candidates, hydrate_limit)
+    keyword_candidates = hydrate_stage_candidates(kb, keyword_candidates, hydrate_limit)
+    source_title_candidates = kb._source_title_candidates(
+        question,
+        limit=max(top_k * 4, 12),
+        query_variants=query_variants,
+    )
     merged_candidates = kb._merge_candidates(dense_candidates, keyword_candidates, source_title_candidates)
     stages = {
         "dense": build_stage_result(expected_sources, dense_candidates, top_limit=stage_top_limit),
@@ -224,6 +245,7 @@ def diagnose_record(
         question,
         clone_candidates(merged_candidates),
         top_k=max(top_k * 2, top_k),
+        query_variants=query_variants,
     )
     final_candidates = kb._expand_parent_context(reranked_candidates, top_k=top_k)
     stages["reranked_pool"] = build_stage_result(expected_sources, reranked_candidates, top_limit=stage_top_limit)
@@ -321,6 +343,7 @@ def build_final_k_scan(
             question,
             clone_candidates(merged_candidates),
             top_k=max(final_k * 2, final_k),
+            query_variants=expand_query_variants(question),
         )
         final_candidates = kb._expand_parent_context(reranked_candidates, top_k=final_k)
         scan[str(final_k)] = compact_stage_result(

@@ -1,0 +1,87 @@
+{
+  "schema_version": "souldrive_functional_acceptance_v1",
+  "generated_at": "2026-08-25T14:52:00+08:00",
+  "scope": "当前本机 PC 开发运行态逐项功能验收",
+  "runtime": {
+    "startup_script": "启动SoulDrive.bat",
+    "single_tauri_window": true,
+    "ui_window_count": 1,
+    "duplicate_instance_dialog_present": false,
+    "pending_memory_review_dialog_present": true,
+    "sidecar_process_count": 1,
+    "sidecar_parent_chain_verified": true,
+    "ui_ready": true,
+    "workspace_unlocked": true,
+    "sidecar_health": "pass",
+    "sidecar_api_port_last_observed": 54656,
+    "redis": "pass",
+    "postgresql": "pass",
+    "storage_root": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace"
+  },
+  "schedule_draft": {
+    "status": "pass",
+    "flow": [
+      "open local drafts",
+      "select saved contact",
+      "fill title and local date-time",
+      "create local schedule draft",
+      "confirm and freeze draft",
+      "export ICS"
+    ],
+    "artifact": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\calendars\\artifact_c30970bdf095415895afaa0b991ef5ac.ics",
+    "artifact_verified": {
+      "exists": true,
+      "summary_present": true,
+      "attendee_present": true,
+      "dtstart_and_dtend_present": true,
+      "external_calendar_write": false
+    }
+  },
+  "rag": {
+    "core_project_scoped_status": "pass",
+    "project_id": "rag-cn-demo-20260824",
+    "project_index_name": "project:rag-cn-demo-20260824",
+    "project_document_count": 6,
+    "project_entity_count": 174,
+    "project_relationship_count": 241,
+    "project_community_count": 4,
+    "community_algorithm": "leiden_v1_local_move_refine",
+    "ordinary_hybrid_global_local_routes": "pass",
+    "all_candidate_answers_cited": true,
+    "candidate_refusal_free": true,
+    "legacy_english_sources_in_project_evidence": [],
+    "core_artifact": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\results\\graphrag_acceptance_project_rag_cn_clean_20260825.json",
+    "corpus_cleanup_artifact": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\results\\rag_corpus_cleanup_20260825.json",
+    "real_sidecar_after_code_reload": "pending_cold_restart",
+    "latency_status": "not_competition_ready",
+    "latency_ms_observed": {
+      "ordinary_hybrid": 145535,
+      "global_graphrag": 166532,
+      "local_graphrag": 179743
+    }
+  },
+  "smtp_real_delivery": {
+    "status": "blocked_user_action",
+    "provider": "qq",
+    "sender": "1342325858@qq.com",
+    "recipient_contact": "Handsome_Vin <2956584050@qq.com>",
+    "smtp_tcp_465_reachable": true,
+    "win32cred_importable_in_souldrive_env": true,
+    "matching_windows_credential_targets_found": 0,
+    "credential_status_after_cold_start": "unconfigured",
+    "authorization_code_read_or_recorded_by_agent": false,
+    "next_gate": "用户在界面保存授权码后，再由用户确认一次真实发送"
+  },
+  "regression_evidence": {
+    "python_tests": "566 passed, 1 warning",
+    "frontend_typescript": "pass",
+    "vite_production_build": "pass",
+    "git_diff_check": "pass"
+  },
+  "notes": [
+    "SMTP 草稿、确认、幂等门控和 mock SMTP 已通过；真实服务商发送未冒充通过。",
+    "GraphRAG、RAG、PPT、Skill、多模态、项目线程和历史恢复的细项证据保存在既有 eval/results 与 docs 文件中。",
+    "sidecar 端口由 Tauri 每次动态预留，验收不得把 54656 固定写入启动配置。",
+    "单实例已恢复为一个主窗口；当前候选记忆审核弹窗需要用户明确确认或取消，之后才能继续项目切换和邮件面板的 UI 验收。"
+  ]
+}

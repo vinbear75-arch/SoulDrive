@@ -1,0 +1,41 @@
+{
+  "schema_version": "souldrive_rag_playbook_citation_namespace_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adopted": "将检索/生成诊断拆开；本轮把通用引用支持门与 Playbook 证据类型门分开记录"
+    },
+    {
+      "project": "Claude Code permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "adopted": "把业务边界放在模型输出之外，用确定性规则强制执行，而不是只依赖提示词"
+    }
+  ],
+  "implemented": {
+    "contracts": {
+      "paper_review": ["E", "V"],
+      "experiment_compare": ["E", "V", "M"],
+      "meeting_actions": ["A", "E", "V"]
+    },
+    "gate_order": [
+      "先检查引用 ID 是否存在、每条 claim 是否有引用以及词法支持",
+      "再检查当前 Playbook 是否允许该引用命名空间",
+      "不满足时最多按现有一次生成重试；不能通过则保守回退"
+    ],
+    "security_boundary": "命名空间校验不把学习记忆、UI 上下文或未授权视觉/语音内容升级为事实证据"
+  },
+  "verification": {
+    "targeted_backend": "68 passed, 1 warning",
+    "backend_full": "775 passed, 1 warning",
+    "scope_regression": "global retrieval feedback with stale project_id passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "limits": [
+    "命名空间校验只保证证据类型不跨 Playbook 混用，不证明引用内容为真",
+    "事实级 NLI、同义改写、跨段推理和产物级 E#/V#/A#/M# 映射仍未完成",
+    "真实 30 条多模态 episode、完整链路 P95、真实长文档/标准和 sealed-test 仍未完成"
+  ]
+}

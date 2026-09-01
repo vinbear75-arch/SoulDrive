@@ -1,0 +1,44 @@
+{
+  "schema_version": "rag_graph_evidence_identity_recheck_v0.1",
+  "performed_at": "2026-08-30T04:20:00+08:00",
+  "status": "implemented_increment",
+  "change": "deduplicate_and_reassign_graph_hybrid_document_evidence_ids",
+  "problem": "GraphRAG 原始切片和普通混合检索合并时可能重复返回同一个候选，并各自从 E1 开始编号，造成中间路由/诊断结果的引用歧义和上下文预算浪费。",
+  "design_basis": [
+    {
+      "name": "Microsoft GraphRAG query overview",
+      "url": "https://microsoft.github.io/graphrag/query/overview/",
+      "adapted_mechanism": "图谱结果用于不同范围的导航，最终上下文仍回到可定位的原始证据；合并后必须保持单一、稳定的证据身份。"
+    },
+    {
+      "name": "SoulDrive EvidenceGraph contract",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "遵循 E#/V#/A#/M# 类型边界，文档证据在合并链路中使用不歧义的 E# 编号。"
+    }
+  ],
+  "contract": {
+    "merge_scope": "GraphRAG 原始证据与普通混合检索文档证据",
+    "dedup_key": "优先使用 candidate_id 与 project_id；缺失时使用项目、版本、来源、页码、切片、章节和正文组成的确定性回退键。",
+    "selection": "重复候选保留证据分数更高者；分数相同保留先出现者。",
+    "citation_namespace": "合并排序后统一重编号为 E1..En；不修改 V#/A# 其他模态命名空间。",
+    "alignment": "documents、metadatas、evidence 三列同步删除和排序。"
+  },
+  "verification": {
+    "graph_rag_targeted": "72 passed",
+    "backend_full": "738 passed, 1 warning",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "regression_cases": [
+      "同一 candidate_id 在 GraphRAG/混合检索两路只保留一条",
+      "保留分数更高的重复候选",
+      "合并后 E1..En 唯一且与 documents/metadatas 对齐",
+      "既有项目+全局 GraphRAG 证据域与噪声抑制测试继续通过"
+    ]
+  },
+  "interpretation": "该增量修复了 GraphRAG 与普通检索合并时的证据身份和重复上下文风险，并通过全量回归；它不代表真实业务 RAG 准确率或 sealed-test 已提升。",
+  "limitations": [
+    "最终生成前的上下文门仍会再次做预算和相似度过滤，本增量不替代证据充分性门。",
+    "没有在正式加密工作区重建 GraphRAG 索引，也没有完成真实跨项目答案级评测。",
+    "本次未修改模型、检索权重、评测数据或 sealed-test 主口径。"
+  ]
+}

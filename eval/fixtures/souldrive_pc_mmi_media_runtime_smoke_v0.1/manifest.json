@@ -1,0 +1,11 @@
+{
+  "schema_version": "souldrive_media_runtime_smoke_v0.1",
+  "dataset_id": "SoulDrive-PC-MMI-media-runtime-smoke-v0.1",
+  "episode_count": 3,
+  "media_root": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\fixtures\\souldrive_pc_mmi_media_runtime_smoke_v0.1",
+  "limitations": [
+    "Public example audio and one ScreenSpot image are used only to validate the runtime.",
+    "The fixture is not a business benchmark and must not be reported as Topic 5 score.",
+    "Replace with user-authorized recorded PC episodes before training or submission."
+  ]
+}

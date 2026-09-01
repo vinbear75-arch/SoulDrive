@@ -1,0 +1,51 @@
+{
+  "schema_version": "souldrive_rag_playbook_output_contract_recheck_v0.1",
+  "performed_at": "2026-08-30",
+  "scope": "versioned multimodal business output contracts -> generation prompt -> deterministic structure audit",
+  "design_basis": [
+    {
+      "source": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adopted_mechanism": "S5 Playbook must declare input, output, evidence scope, side effects, and confirmation points; missing evidence must remain explicit."
+    },
+    {
+      "source": "https://github.com/infiniflow/ragflow/blob/main/docs/basics/rag.md",
+      "adopted_mechanism": "Keep document-grounded evidence and inspectable retrieval/generation stages separate from the business result format."
+    },
+    {
+      "source": "https://code.claude.com/docs/en/permissions",
+      "adopted_mechanism": "Keep task policy and confirmation boundaries explicit and outside untrusted model content."
+    }
+  ],
+  "implemented": [
+    "paper_review, experiment_compare, and meeting_actions each declare a versioned response_contract with required sections, evidence rules, and the missing-evidence marker.",
+    "The workflow plan and UI expose the required output structure before execution, so users can see what the selected business task will produce.",
+    "The generation system prompt receives the contract only after workflow selection; the retrieval query remains unchanged to avoid adding format terms to recall and evidence matching.",
+    "Completed workflow answers are checked with a bounded deterministic section audit and the result is recorded in rag.completed; the audit does not judge factual truth or citation validity."
+  ],
+  "verification": {
+    "targeted_backend": {
+      "command": "pytest -q tests/test_multimodal_workflows.py tests/test_rag_prompting.py",
+      "passed": 65,
+      "warnings": 1
+    },
+    "full_backend": {
+      "command": "pytest -q",
+      "passed": 753,
+      "warnings": 1
+    },
+    "frontend_tests": "npm test passed",
+    "frontend_build": "npm run build passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "regressions": [
+    "The three workflow catalogs expose non-empty response contracts and plan_workflow returns the selected contract.",
+    "Numbered headings and colon-prefixed headings are recognized; missing sections are reported without modifying the answer.",
+    "The generation prompt contains the experiment comparison contract while the user/retrieval message does not receive the contract text."
+  ],
+  "claims_not_supported": [
+    "No claim is made that a prompt contract alone improves answer accuracy, citation correctness, or multimodal benchmark scores.",
+    "The structure audit is not a factuality or NLI evaluator and does not replace claim-to-citation validation.",
+    "Real 30-episode evaluation, multimodal-vs-text-only gain, complete-chain P50/P95 under 5 seconds, and sealed-test validation remain incomplete."
+  ]
+}

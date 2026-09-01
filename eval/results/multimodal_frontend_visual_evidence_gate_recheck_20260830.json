@@ -1,0 +1,37 @@
+{
+  "schema_version": "souldrive_multimodal_frontend_visual_evidence_gate_recheck_v0.1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "将 OCR/VLM 产物作为结构化视觉元素处理，而不是依赖单一字面事件类型"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "视觉证据按独立通道传递，并在进入问答前完成输入有效性检查"
+    }
+  ],
+  "before": {
+    "frontend_gate": "只接受 modality=image 且有 text，或任意事件有 target_candidates",
+    "failure": "image_region/ocr_region 的有效文本或 bbox 证据可能被前端误判为没有视觉证据并阻止发送"
+  },
+  "after": {
+    "helper": "souldrive-ui/src/mediaCapture.ts:hasUsableVisualEvidence",
+    "accepted_modalities": ["image", "image_region", "ocr_region"],
+    "accepted_evidence": ["text", "bbox", "target_candidates"],
+    "excluded_modalities": ["ui_automation", "screen"],
+    "forwarding": "runtime perception events with text, bbox, or target_candidates are retained for /chat"
+  },
+  "verification": {
+    "frontend_media_tests": "6 passed",
+    "frontend_full_tests": "npm test passed",
+    "frontend_build": "npm run build passed",
+    "backend_regression_after_related_increment": "795 passed, 1 warning"
+  },
+  "limits": [
+    "该修复保证有效结构化视觉证据不被前端静默丢弃，不证明视觉识别准确率提升。",
+    "视觉置信度、用户授权、项目文档证据门和完整回答 P95 仍由后端后续阶段独立判定。"
+  ]
+}

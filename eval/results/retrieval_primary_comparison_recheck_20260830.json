@@ -1,0 +1,115 @@
+{
+  "schema_version": "souldrive_retrieval_comparison_recheck_v0.2",
+  "performed_at": "2026-08-30",
+  "dataset": "eval/retrieval_quality_blind_v0.3.jsonl",
+  "workspace": "runtime/rag-eval-workspace-v4",
+  "indexed_source_count": 36,
+  "positive_sample_count": 324,
+  "multi_doc_sample_count": 108,
+  "top_k": 3,
+  "evaluation_controls": {
+    "usage_ledger_enabled": false,
+    "baseline_comparison_source_reservation_enabled": false,
+    "candidate_comparison_source_reservation_enabled": true,
+    "workspace_usage_ledger_changed": false
+  },
+  "baseline_result": "eval/results/retrieval_primary_isolated_baseline2_20260830.jsonl",
+  "candidate_result": "eval/results/retrieval_primary_isolated_candidate3_20260830.jsonl",
+  "candidate_previous_result": "eval/results/retrieval_primary_isolated_candidate2_20260830.jsonl",
+  "change_scope": [
+    "comparison_subquery_source_reservation",
+    "blind_source_relevance_margin",
+    "parent_level_source_slot_preservation",
+    "post_expansion_score_ordering"
+  ],
+  "metrics": {
+    "retrieval_all_hit_rate_at_3": {
+      "baseline": 0.962963,
+      "candidate": 0.944444,
+      "delta_percentage_points": -1.85,
+      "baseline_count": "312/324",
+      "candidate_count": "306/324"
+    },
+    "retrieval_any_hit_rate_at_3": {
+      "baseline": 0.984568,
+      "candidate": 0.984568,
+      "delta_percentage_points": 0.0,
+      "baseline_count": "319/324",
+      "candidate_count": "319/324"
+    },
+    "first_hit_rate_at_1": {
+      "baseline": 0.922840,
+      "candidate": 0.925926,
+      "delta_percentage_points": 0.31,
+      "baseline_count": "299/324",
+      "candidate_count": "300/324"
+    },
+    "mean_reciprocal_rank": {
+      "baseline": 0.949074,
+      "candidate": 0.950617,
+      "delta": 0.001543
+    },
+    "average_source_coverage_at_3": {
+      "baseline": 0.973765,
+      "candidate": 0.964506,
+      "delta_percentage_points": -0.93
+    },
+    "multi_doc_all_hit_rate_at_3": {
+      "baseline": 0.935185,
+      "candidate": 0.879630,
+      "delta_percentage_points": -5.56,
+      "baseline_count": "101/108",
+      "candidate_count": "95/108"
+    },
+    "graph_context_hit_rate_at_3": {
+      "baseline": 0.982270,
+      "candidate": 0.982270,
+      "delta_percentage_points": 0.0
+    },
+    "average_retrieval_ms": {
+      "baseline": 3565,
+      "candidate": 3708,
+      "delta_ms": 143
+    }
+  },
+  "paired_samples": {
+    "improved": 5,
+    "regressed": 11,
+    "unchanged": 344,
+    "exact_mcnemar_p": 0.210114
+  },
+  "acceptance": {
+    "primary_metric_improved": false,
+    "secondary_rank_metrics_regressed": true,
+    "candidate_accepted_for_query_time_path": false,
+    "candidate_retained_as_explicit_experiment": true,
+    "production_default_uses_source_reservation": false,
+    "statistical_significance_proven": false,
+    "answer_accuracy_proven": false,
+    "production_encrypted_index_rebuilt": false
+  },
+  "research_basis": [
+    {
+      "name": "CRAG",
+      "url": "https://arxiv.org/abs/2401.15884",
+      "borrowed_principle": "evaluate retrieval quality and correct/recompose retrieval before generation"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "borrowed_principle": "traceable chunk and source-oriented retrieval"
+    },
+    {
+      "name": "Dify knowledge pipeline",
+      "url": "https://docs.dify.ai/en/cloud/use-dify/knowledge/knowledge-pipeline/knowledge-pipeline-orchestration",
+      "borrowed_principle": "hybrid retrieval and parent-child evidence organization"
+    }
+  ],
+  "limitations": [
+    "The result is query-time retrieval only and does not prove generated-answer factual accuracy.",
+    "The experimental source-reservation candidate loses the matched baseline on primary all-hit and multi-document all-hit metrics, so it is not enabled by default.",
+    "The evaluation workspace has indexed source metadata but no original PDFs available to the preflight checker.",
+    "The workspace usage ledger was ignored and its timestamp remained unchanged during both runs.",
+    "No full answer, semantic citation, real 30-episode multimodal, production encrypted-index, or sealed-test claim is made."
+  ]
+}

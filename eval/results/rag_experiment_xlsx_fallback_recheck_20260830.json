@@ -1,0 +1,65 @@
+{
+  "schema_version": "souldrive_rag_experiment_xlsx_fallback_recheck_v0.1",
+  "performed_at": "2026-08-30T21:17:34.5539379+08:00",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "结构化文档解析与证据引用分层，原始表格位置必须能够回溯"
+    },
+    {
+      "name": "Dify Knowledge Pipeline",
+      "url": "https://docs.dify.ai/en/cloud/use-dify/knowledge/knowledge-pipeline/knowledge-pipeline-orchestration",
+      "applied_principle": "摄取阶段保留字段关系和来源元数据，再交给检索上下文链路使用"
+    },
+    {
+      "name": "MLflow",
+      "url": "https://mlflow.org/docs/latest/ml/tracking/",
+      "applied_principle": "实验指标与 run/source 元数据分离保存，支持可追溯的本地导入"
+    }
+  ],
+  "scope": "S2 实验指标 XLSX 摄取的正常包路径与轻量导出回退；不改变向量模型、检索排序、Top-K、项目权限或 GraphRAG 路由",
+  "implementation": {
+    "standard_xlsx": "继续优先使用 openpyxl 读取完整 Excel 包，并为每个数据行保留 sheet:name/row:N 定位",
+    "lightweight_xlsx": "openpyxl 无法读取时，对包含 worksheet XML 的轻量 ZIP 导出使用受限 XML 回退；支持共享字符串、inline string、无命名空间 XML 和缺少 workbook.xml 的 sheetN 回退",
+    "embedded_rows": "当前产品夹具的单元格嵌入 CSV 按 embedded_row:N 展开，不把物理 XML 行号伪装成业务数据行号",
+    "failure_boundary": "非 ZIP、无 worksheet XML 或 XML 解析失败时保持 fail-closed；完整 Excel 包仍走标准解析路径"
+  },
+  "verification": {
+    "targeted_tests": "129 passed",
+    "full_backend_tests": "843 passed, 1 warning",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings",
+    "standard_fixture": {
+      "parser_mode": "openpyxl",
+      "sheet": "Metrics",
+      "metric": "accuracy",
+      "value": 0.921,
+      "source_locator": "sheet:Metrics/row:2",
+      "source_locator_kind": "xlsx_sheet_row"
+    },
+    "product_fixture": {
+      "file": "eval/fixtures/product_b1_current_v0.1/project_vision_optimizer/vision_august_metrics.xlsx",
+      "parser_mode": "xml_fallback",
+      "rows": [
+        {
+          "metric": "accuracy",
+          "value": "0.921",
+          "source_locator": "sheet:sheet1/embedded_row:2"
+        },
+        {
+          "metric": "p95_latency_ms",
+          "value": "960",
+          "source_locator": "sheet:sheet1/embedded_row:3"
+        }
+      ]
+    }
+  },
+  "decision": "保留标准 openpyxl 优先、轻量 XML 受限回退的 XLSX 摄取策略；它补齐当前产品轻量指标导出的可读性和定位能力，但不宣称检索召回率、答案准确率或多模态业务效果提升",
+  "limitations": [
+    "轻量回退只读取 worksheet XML 中可解释的单元格值，不替代完整 Excel 公式计算、样式、合并单元格或复杂类型语义",
+    "当前产品夹具缺少完整 workbook 元数据，因此 sheet 名称只能回退为 sheet1；真实资产需要重新导入后才能验收业务 sheet 名称",
+    "行级 locator 仍不是精确单元格地址，实验字段的日期、单位、数据集版本和 split 仍须经过确认卡才能写入账本",
+    "正式加密工作区仍锁定，GraphRAG 生产业务验收、真实多模态 30 episode、完整 VLM+RAG P95、答案级人工/NLI 和 sealed-test 仍未完成"
+  ]
+}

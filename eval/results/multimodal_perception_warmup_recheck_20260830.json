@@ -1,0 +1,86 @@
+{
+  "schema_version": "souldrive_multimodal_perception_warmup_recheck_v0.1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "将感知阶段作为结构化、可审计的前置能力，不把未执行的视觉阶段伪装成成功"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "将语音、OCR 和视觉理解按任务路由分开，按需加载对应通道"
+    }
+  ],
+  "implementation": {
+    "runtime_method": "Topic5Runtime.warmup_perception",
+    "endpoint": "POST /multimodal/runtime/warmup-perception",
+    "evaluator_flag": "--warmup-perception",
+    "contract": {
+      "stages": ["asr", "ocr"],
+      "stage_status": ["pass", "blocked", "failed"],
+      "records_stage_latency": true,
+      "does_not_capture_or_infer": true,
+      "side_effect": "none"
+    }
+  },
+  "live_runtime_smoke": {
+    "status": "pass",
+    "wall_clock_ms": 10052.369,
+    "stage_latency_ms": {
+      "asr": 9448.647,
+      "ocr": 565.285
+    },
+    "loaded": {
+      "asr": true,
+      "ocr": true
+    },
+    "source_scope": "local_runtime_smoke_only"
+  },
+  "pilot_comparison": {
+    "collection": "data/local/souldrive_pc_mmi_real_v0.1",
+    "episode_count": 10,
+    "same_runtime_and_collection": true,
+    "without_explicit_warmup": {
+      "output_scope": "local_only_data_local",
+      "cold_request_ms": 23382.006,
+      "warm_request_p50_ms": 78.171,
+      "warm_request_p95_ms": 1694.38
+    },
+    "with_explicit_perception_warmup": {
+      "output_scope": "local_only_data_local",
+      "warmup_status": "pass",
+      "warmup_wall_clock_ms": 9856.794,
+      "first_request_after_warmup_ms": 2138.695,
+      "request_p50_ms": 83.704,
+      "request_p95_ms": 2138.695,
+      "warm_request_p50_ms": 83.176,
+      "warm_request_p95_ms": 1651.939
+    },
+    "observed_first_request_change": {
+      "absolute_ms": 21243.311,
+      "relative_reduction_percent": 90.853,
+      "interpretation": "本机两次同集合对照中，显式预热前移了模型加载成本；该数字不是完整回答 P95，也不是跨设备保证"
+    },
+    "quality": {
+      "intent_accuracy_without_warmup": 0.9,
+      "intent_accuracy_with_warmup": 0.9,
+      "target_binding_accuracy_without_warmup": 1.0,
+      "target_binding_accuracy_with_warmup": 1.0
+    }
+  },
+  "verification": {
+    "targeted_regression": "36 passed, 1 warning",
+    "full_backend_regression": "794 passed, 1 warning",
+    "compileall": "pass",
+    "diff_check": "pass",
+    "raw_pilot_outputs": "kept under data/local and not copied into eval/results"
+  },
+  "limits": [
+    "预热成本约 9.86 秒，只是把 ASR/OCR 的加载从首个请求前移，不能宣称总交互耗时已经小于 5 秒。",
+    "本次 pilot 仍是 10 条真实授权样本；VLM、检索、首 token 和完整回答没有纳入该评测。",
+    "该对照没有证明 VLM 慢路径、图标/图表识别或完整模态相对 text-only 的稳定增益。",
+    "真实 30 条 episode、跨应用/分辨率/说话人、多次重复和完整链路 P50/P95 仍未完成。"
+  ]
+}

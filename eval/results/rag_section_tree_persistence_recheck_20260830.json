@@ -1,0 +1,68 @@
+{
+  "schema_version": "rag_section_tree_persistence_recheck_v0.1",
+  "performed_at": "2026-08-30T02:44:55+08:00",
+  "status": "implemented_increment",
+  "change": "persisted_section_tree_v1_with_ancestor_route",
+  "design_basis": [
+    {
+      "name": "PageIndex",
+      "url": "https://github.com/VectifyAI/PageIndex",
+      "adapted_mechanism": "长文档节点树、稳定节点关系和按章节祖先导航"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "adapted_mechanism": "父子分块保留结构元数据，并让分块和来源可检查"
+    },
+    {
+      "name": "SoulDrive roadmap",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "S5 长论文/标准层级文档树路由和证据可追溯"
+    }
+  ],
+  "contract": {
+    "version": "section_tree_v1",
+    "node_id": "sha256(document_id + NUL + normalized_full_section_path) first 20 hex characters",
+    "node_fields": [
+      "section_node_id",
+      "section_parent_node_id",
+      "section_node_title",
+      "section_node_depth",
+      "section_node_summary",
+      "section_node_summary_source",
+      "section_node_child_ids",
+      "section_node_child_count",
+      "section_node_is_leaf",
+      "section_path_key",
+      "section_ancestor_node_ids"
+    ],
+    "summary": "deterministic extractive first sentence, capped at 240 characters",
+    "route": [
+      "exact node title or full path reference",
+      "descendant chunk match through persisted ancestor IDs",
+      "partial node title fallback",
+      "legacy section_path route when tree metadata is absent"
+    ],
+    "stores": [
+      "ordinary vector/parent/keyword index metadata",
+      "encrypted child and parent metadata through the existing secure store"
+    ],
+    "scope": "tree metadata is routing and provenance metadata; dense, sparse, graph, reranker, evidence gate and project/global filters remain unchanged"
+  },
+  "evidence": {
+    "tree_unit_tests": "tests/test_document_tree.py: 4 passed",
+    "secure_metadata_test": "tests/test_secure_vector_store.py::test_secure_ingestion_preserves_section_tree_metadata passed",
+    "targeted_regression": "16 passed",
+    "full_backend_regression": "720 passed, 1 warning",
+    "compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "interpretation": "The increment proves deterministic tree construction, stable parent/child/ancestor metadata, full-path routing, ordinary-index metadata preservation, and encrypted-index round-trip visibility without breaking the backend regression suite. It does not prove a retrieval or answer-accuracy gain.",
+  "limitations": [
+    "The existing encrypted production workspace was not rebuilt or overwritten; its keys and data remain untouched.",
+    "The previously isolated six-PDF retrieval index was built before this persistence increment and was not silently replaced, so its 16-sample metrics remain section_path/no-regression evidence only.",
+    "The implementation uses a deterministic extractive summary rather than a model-generated PageIndex summary; no extra model call is introduced.",
+    "A long-paper/standard end-to-end retrieval and answer comparison, sealed-test evaluation, and multi-document citation audit are still required.",
+    "No sealed-test data, metric definition, retrieval weight, model, or production privacy boundary was changed."
+  ]
+}

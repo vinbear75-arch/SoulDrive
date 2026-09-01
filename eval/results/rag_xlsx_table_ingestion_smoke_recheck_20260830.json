@@ -1,0 +1,48 @@
+{
+  "schema_version": "souldrive_rag_xlsx_table_ingestion_smoke_recheck_v0.1",
+  "performed_at": "2026-08-30T21:47:14.8550984+08:00",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "结构化来源先恢复表格关系，再进入可追溯的检索上下文"
+    },
+    {
+      "name": "Dify Knowledge Pipeline",
+      "url": "https://docs.dify.ai/en/cloud/use-dify/knowledge/knowledge-pipeline/knowledge-pipeline-orchestration",
+      "applied_principle": "摄取、切片、检索分层验证，不能只验证解析器而跳过实际入库"
+    }
+  ],
+  "scope": "当前产品轻量 XLSX -> PlainDocumentParser -> 临时 LocalKnowledgeBase -> search_with_evidence 的结构链路烟测",
+  "fixture": {
+    "file": "eval/fixtures/product_b1_current_v0.1/project_vision_optimizer/vision_august_metrics.xlsx",
+    "project_id": "project_vision_optimizer",
+    "query": "vision august accuracy and p95 latency"
+  },
+  "verification": {
+    "parser_chunks": 1,
+    "ingest_child_count": 1,
+    "source": "vision_august_metrics.xlsx",
+    "source_locator": "sheet:sheet1/embedded_rows:2-3",
+    "content_kind": "table",
+    "snippet_contains_header": true,
+    "snippet_contains_accuracy": true,
+    "snippet_contains_p95": true,
+    "project_focus_route": "project_first",
+    "global_candidate_count": 0,
+    "private_source_leakage": false
+  },
+  "test_environment": {
+    "embedding": "deterministic fake embedding for structure smoke only",
+    "backend_tests": "845 passed, 1 warning",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "decision": "保留；证明 XLSX 表格结构和行级来源定位经过真实摄取及项目内检索后仍然存在，但不据此宣称 RAG 精度、答案准确率或多模态业务效果提升",
+  "limitations": [
+    "烟测使用确定性假 embedding，只隔离结构传递，不代表真实 embedding 或 reranker 的召回质量",
+    "仅覆盖一个产品 XLSX 夹具，尚未在当前代码的新索引上重跑完整 30 条产品检索/答案评测",
+    "正式加密工作区仍锁定，GraphRAG 生产验收、真实多模态 30 episode、完整 VLM+RAG P95、答案级人工/NLI 和 sealed-test 仍未完成",
+    "完整 Excel 公式、样式、图表语义和单元格级地址仍不在本次烟测范围内"
+  ]
+}

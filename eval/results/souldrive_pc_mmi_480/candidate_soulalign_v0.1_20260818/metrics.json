@@ -1,0 +1,47 @@
+{
+  "dataset_id": "SoulDrive-PC-MMI-480-v0.1",
+  "split": {
+    "train": 320,
+    "validation": 80,
+    "test": 80
+  },
+  "b1_text_only_validation": {
+    "sample_count": 80,
+    "intent_accuracy": 1.0,
+    "intent_macro_f1": 1.0,
+    "target_accuracy_on_targeted": 0.0,
+    "alignment_exact_match": 0.075,
+    "conflict_accuracy": 0.925,
+    "action_accuracy": 0.7,
+    "clarification_accuracy": 0.7
+  },
+  "selected_confidence_threshold": 0.7,
+  "b1_text_only_test": {
+    "sample_count": 80,
+    "intent_accuracy": 1.0,
+    "intent_macro_f1": 1.0,
+    "target_accuracy_on_targeted": 0.0,
+    "alignment_exact_match": 0.075,
+    "conflict_accuracy": 0.925,
+    "action_accuracy": 0.7,
+    "clarification_accuracy": 0.7
+  },
+  "candidate_soulalign_test": {
+    "sample_count": 80,
+    "intent_accuracy": 1.0,
+    "intent_macro_f1": 1.0,
+    "target_accuracy_on_targeted": 1.0,
+    "alignment_exact_match": 1.0,
+    "conflict_accuracy": 1.0,
+    "action_accuracy": 1.0,
+    "clarification_accuracy": 1.0,
+    "latency_ms": {
+      "p50": 0.0025999615900218487,
+      "p95": 0.004100031219422817
+    }
+  },
+  "limitations": [
+    "Synthetic structured episodes; results validate harness behavior, not competition performance.",
+    "No audio waveform, screenshot pixels, VLM, or QLoRA weights are used in this run."
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schema_version": "souldrive_real_mmi_stage_ledger_recheck_v1",
+  "performed_at": "2026-08-30",
+  "source_run": {
+    "collection": "data/local/souldrive_pc_mmi_real_v0.1",
+    "output_scope": "local_only_data_local",
+    "episode_count": 10,
+    "raw_output_not_copied_to_eval_results": true
+  },
+  "design_basis": [
+    {
+      "project": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adopted": "将感知、检索和生成分开记录，缺失阶段不作为零延迟"
+    },
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "保留结构化视觉阶段状态，支持后续目标/工作流评测"
+    }
+  ],
+  "implementation": {
+    "script": "scripts/eval_real_mmi_pilot.py",
+    "per_episode_output": "data/local/souldrive_pc_mmi_real_v0.1/evaluation_stage_ledger_recheck_20260830/stage_ledger.jsonl",
+    "failure_output": "data/local/souldrive_pc_mmi_real_v0.1/evaluation_stage_ledger_recheck_20260830/failures.jsonl",
+    "stage_names": [
+      "asr",
+      "ocr",
+      "vlm",
+      "alignment",
+      "retrieval",
+      "first_token",
+      "complete_answer"
+    ],
+    "missing_stage_policy": "not_integrated or not_measured with null latency; skipped stages also have null latency"
+  },
+  "aggregate": {
+    "intent_accuracy": 0.9,
+    "target_binding_accuracy_on_targeted": 1.0,
+    "cold_start_ms": 23382.006,
+    "warm_latency_p95_ms": 1694.38,
+    "stage_status_counts": {
+      "asr": {"pass": 10},
+      "ocr": {"pass": 10},
+      "vlm": {"skipped": 10},
+      "alignment": {"pass": 10},
+      "retrieval": {"not_integrated": 10},
+      "first_token": {"not_integrated": 10},
+      "complete_answer": {"not_integrated": 10}
+    },
+    "full_chain_coverage": false,
+    "failure_count": 1,
+    "failure_error_types": {"intent_mismatch": 1}
+  },
+  "verification": {
+    "unit_regression": "2 passed: tests/test_eval_real_mmi_pilot.py",
+    "full_backend_before_this_increment": "790 passed, 1 warning",
+    "runtime_run_exit_code": 0,
+    "stage_ledger_row_count": 10,
+    "failure_row_count": 1,
+    "raw_stage_ledger_exists_locally": true
+  },
+  "limits": [
+    "这是 10 条 pilot 的感知/对齐快路径结果，不是公开集、华为隐藏集或完整 RAG 回答成绩。",
+    "VLM 在本次运行中按快路径策略跳过；检索、首 token、完整回答没有接入，不能据此宣称端到端 P95。",
+    "冷启动仍超过 5 秒；热运行 P95 只描述当前感知链路，不能替代路线图的完整回答 P95 门槛。",
+    "10 条样本、单一项目和未完成困难样本覆盖仍不足以完成 S1 验收。"
+  ]
+}

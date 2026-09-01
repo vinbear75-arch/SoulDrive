@@ -1,0 +1,52 @@
+{
+  "schema_version": "souldrive_functional_completion_audit_v2",
+  "created_at": "2026-08-25T16:23:40+08:00",
+  "scope": "SoulDrive 当前功能链路的最新证据审计",
+  "verified": {
+    "full_python_regression": "566 passed, 1 warning",
+    "tauri_cold_start": "pass",
+    "sidecar_health_and_ready": "pass",
+    "redis_postgresql_file_archive": "pass",
+    "local_contact_history": "pass",
+    "qq_smtp_configuration": "pass",
+    "qq_real_smtp_delivery": "pass",
+    "audit_chain": "682 events, ready=true, broken_at=null",
+    "rag_graphrag": "functionally pass; competition latency not ready",
+    "ppt_schedule_skill": "pass_smoke",
+    "multimodal_perception_to_answer": "3/3 pass on synthetic fixture"
+  },
+  "evidence": [
+    "eval/results/email_and_cold_start_acceptance_20260825.json",
+    "eval/results/functional_acceptance_recheck_20260825_post_smtp.json",
+    "eval/results/multimodal_full_path_recheck_20260825.json",
+    "eval/results/graphrag_retest_20260825.json",
+    "eval/results/functional_regression_recheck_20260825.json"
+  ],
+  "not_yet_passed": {
+    "multimodal_project_rag_binding": {
+      "status": "not_passed",
+      "reason": "3 个 synthetic fixture 使用 project_souldrive_agent，而当前论文索引属于 rag-cn-demo-20260824；项目隔离返回 0 条证据"
+    },
+    "real_user_multimodal_samples": {
+      "status": "missing",
+      "reason": "当前只有合成 fixture，缺少用户授权的语音、屏幕选区和任务样本"
+    },
+    "competition_runtime_p95": {
+      "status": "not_ready",
+      "reason": "尚未完成完整多模态 30 次热运行的统一 P50/P95、失败率和资源测量"
+    },
+    "training_and_ablation": {
+      "status": "not_verified",
+      "reason": "缺少 B0/B1/Candidate 训练指标和模态消融证据"
+    },
+    "public_dataset_final_audit": {
+      "status": "partial",
+      "reason": "许可证、原始模态、官方划分和封闭测试冻结尚未全部完成"
+    },
+    "external_mailbox_receipt": {
+      "status": "pending_user_observation",
+      "reason": "SMTP 已真实发送成功，但助手不能读取用户 QQ 收件箱"
+    }
+  },
+  "overall_status": "functional_core_verified_competition_delivery_incomplete"
+}

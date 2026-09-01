@@ -24,12 +24,29 @@ def _is_qwen3_reranker(model_name: str | None) -> bool:
     return bool(model_name and model_name.lower().startswith("qwen3-reranker"))
 
 
+def _runtime_device() -> str:
+    try:
+        import torch
+
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        return "cpu"
+
+
 def preferred_reranker_model_name(workspace_path: str | None = None) -> str | None:
     configured = os.environ.get("SOULDRIVE_RERANKER_MODEL")
     if configured:
         return configured
+    search_dirs = model_search_dirs(workspace_path)
+    configured_dir = os.environ.get("SOULDRIVE_MODEL_DIR")
+    if configured_dir:
+        # An explicit model directory is an isolated evaluation/runtime scope.
+        for model_name in PREFERRED_RERANKER_MODELS:
+            if (Path(configured_dir) / model_name).exists():
+                return model_name
+        return None
     for model_name in PREFERRED_RERANKER_MODELS:
-        for directory in model_search_dirs(workspace_path):
+        for directory in search_dirs:
             if (directory / model_name).exists():
                 return model_name
     return None
@@ -56,6 +73,7 @@ def reranker_runtime_diagnostics(workspace_path: str | None = None) -> dict[str,
         "model_name": model_name,
         "path": Path(model_path).name if ready and model_path else None,
         "instruction_aware": _is_qwen3_reranker(model_name),
+        "device": _runtime_device() if ready else None,
     }
 
 
@@ -66,13 +84,14 @@ class LocalReranker:
         self.model_path = resolve_reranker_model_path(workspace_path)
         self.encoder = None
         self.is_qwen3 = _is_qwen3_reranker(self.model_name)
+        self.device = _runtime_device()
 
         if self.model_name and self.model_path and Path(self.model_path).exists():
             from sentence_transformers import CrossEncoder
 
             options: dict[str, Any] = {
                 "max_length": 2048 if self.is_qwen3 else 512,
-                "device": "cpu",
+                "device": self.device,
                 "local_files_only": True,
             }
             if self.is_qwen3:
@@ -80,7 +99,19 @@ class LocalReranker:
                     "prompts": {"souldrive": QWEN3_RERANKER_INSTRUCTION},
                     "default_prompt_name": "souldrive",
                 })
-            self.encoder = CrossEncoder(self.model_path, **options)
+            try:
+                self.encoder = CrossEncoder(self.model_path, **options)
+            except TypeError:
+                # Compatibility with older sentence-transformers/test doubles.
+                options.pop("prompts", None)
+                options.pop("default_prompt_name", None)
+                self.encoder = CrossEncoder(self.model_path, **options)
+            except Exception:
+                if self.device != "cuda":
+                    raise
+                self.device = "cpu"
+                options["device"] = self.device
+                self.encoder = CrossEncoder(self.model_path, **options)
 
     @property
     def ready(self) -> bool:

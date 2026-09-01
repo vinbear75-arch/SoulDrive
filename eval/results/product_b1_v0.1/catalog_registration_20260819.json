@@ -1,0 +1,8 @@
+{
+  "schema_version": "souldrive_product_catalog_registration_metrics_v0.1",
+  "sample_count": 30,
+  "registered_count": 30,
+  "registration_rate": 1.0,
+  "elapsed_ms": 150.34030005335808,
+  "workspace": "C:\\Users\\13423\\AppData\\Local\\Temp\\souldrive-catalog-registration-20260819"
+}

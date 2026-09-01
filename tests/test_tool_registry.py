@@ -79,7 +79,7 @@ class ToolRegistryTests(unittest.TestCase):
             "souldrive.presentation_generate",
             {
                 "source_filenames": ["方案.pdf"],
-                "audience": "management",
+                "audience": "research",
                 "max_slides": 8,
                 "open_in_wps": False,
             },

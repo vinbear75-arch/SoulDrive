@@ -1,0 +1,556 @@
+{
+  "schema_version": "souldrive_b0_metrics_v0.2",
+  "status": "partial",
+  "components": {
+    "retrieval": {
+      "status": "archived",
+      "mode": "B0 archived retrieval",
+      "sample_count": 360,
+      "answer_sample_count": 0,
+      "top_k": 6,
+      "model_name": null,
+      "retrieval_all_hit_rate": 0.9166666666666666,
+      "retrieval_any_hit_rate": 0.9845679012345679,
+      "first_hit_rate": 0.8179012345679012,
+      "mean_reciprocal_rank": 0.8866255144032922,
+      "average_source_coverage": 0.9506172839506173,
+      "multi_doc_all_hit_rate": 0.7962962962962963,
+      "graph_context_hit_rate": 0.9822695035460993,
+      "retrieval_confidence_intervals_95": {
+        "retrieval_all_hit_rate": {
+          "low": 0.88147,
+          "high": 0.942098,
+          "successes": 297,
+          "total": 324
+        },
+        "retrieval_any_hit_rate": {
+          "low": 0.964389,
+          "high": 0.993391,
+          "successes": 319,
+          "total": 324
+        },
+        "first_hit_rate": {
+          "low": 0.772234,
+          "high": 0.856118,
+          "successes": 265,
+          "total": 324
+        },
+        "multi_doc_all_hit_rate": {
+          "low": 0.710785,
+          "high": 0.861453,
+          "successes": 86,
+          "total": 108
+        },
+        "graph_context_hit_rate": {
+          "low": 0.959172,
+          "high": 0.992404,
+          "successes": 277,
+          "total": 282
+        }
+      },
+      "citation_valid_rate": null,
+      "invalid_citation_rate": null,
+      "refusal_accuracy": null,
+      "refusal_leak_rate": null,
+      "false_refusal_rate": null,
+      "answerable_pass_rate": null,
+      "overall_reliability_rate": null,
+      "answer_keyword_coverage": null,
+      "avg_latency_ms": 1792,
+      "avg_retrieval_ms": null,
+      "avg_generation_ms": null
+    },
+    "ingestion": {
+      "status": "archived",
+      "mode": "清洗切片入库评测",
+      "sample_count": 216,
+      "chunk_count": 4593,
+      "matched_chunk_count": 4593,
+      "document_coverage_rate": 1.0,
+      "chunk_count_pass_rate": 1.0,
+      "page_metadata_rate": 1.0,
+      "section_metadata_rate": 1.0,
+      "dynamic_chunk_rate": 1.0,
+      "paragraph_overlap_applicability_rate": 0.8611111111111112,
+      "paragraph_overlap_rate": 1.0,
+      "formal_window_applicability_rate": 0.8676470588235294,
+      "formal_window_rate": 1.0,
+      "document_context_rate": 1.0,
+      "retrieval_context_rate": 1.0,
+      "source_provenance_rate": 1.0,
+      "parent_linkage_rate": 1.0,
+      "semantic_unit_rate": 1.0,
+      "index_schema_rate": 1.0,
+      "content_integrity_rate": 1.0,
+      "token_safe_rate": 1.0,
+      "table_coverage_rate": 1.0,
+      "image_metadata_rate": 1.0,
+      "average_chunk_chars": 520,
+      "chunk_char_distribution": {
+        "min": 49,
+        "p50": 478,
+        "p90": 932,
+        "max": 1638
+      },
+      "oversized_chunk_rate": 0.0,
+      "missing_page_chunk_count": 0,
+      "missing_section_chunk_count": 6,
+      "dataset_quality": {
+        "schema_version": "ingestion_dataset_quality_v2",
+        "pass": true,
+        "score": 1.0,
+        "checks": {
+          "sample_count": true,
+          "document_count": true,
+          "min_samples_per_document": true,
+          "document_class_count": true,
+          "language_count": true,
+          "evaluation_scope_count": true,
+          "hard_record_count": true,
+          "enterprise_technical_plan_count": true,
+          "government_formal_or_standard_count": true,
+          "rag_research_reference_count": true,
+          "table_record_count": true,
+          "image_record_count": true,
+          "multimodal_record_count": true,
+          "section_metadata_record_count": true,
+          "deep_chunk_record_count": true,
+          "focus_tag_count": true,
+          "required_metadata_core": true
+        },
+        "sample_count": 216,
+        "document_count": 36,
+        "min_samples_per_document": 6,
+        "document_class_count": 5,
+        "language_count": 2,
+        "evaluation_scope_count": 11,
+        "hard_record_count": 131,
+        "focus_tag_count": 58,
+        "table_record_count": 56,
+        "image_record_count": 58,
+        "multimodal_record_count": 46,
+        "deep_chunk_record_count": 103
+      },
+      "scope_metrics": {
+        "architecture_figure_metadata": {
+          "sample_count": 9,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.700847,
+            "high": 1.0,
+            "successes": 9,
+            "total": 9
+          }
+        },
+        "content_integrity": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "context_and_provenance": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "english_research_layout": {
+          "sample_count": 4,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.5101,
+            "high": 1.0,
+            "successes": 4,
+            "total": 4
+          }
+        },
+        "formal_report_layout": {
+          "sample_count": 8,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.675584,
+            "high": 1.0,
+            "successes": 8,
+            "total": 8
+          }
+        },
+        "index_integrity": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "paragraph_window_and_overlap": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "scenario_list_preservation": {
+          "sample_count": 2,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.342372,
+            "high": 1.0,
+            "successes": 2,
+            "total": 2
+          }
+        },
+        "structure_and_sectioning": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "table_and_clause_preservation": {
+          "sample_count": 11,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.74116,
+            "high": 1.0,
+            "successes": 11,
+            "total": 11
+          }
+        },
+        "text_only_layout": {
+          "sample_count": 2,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.342372,
+            "high": 1.0,
+            "successes": 2,
+            "total": 2
+          }
+        }
+      },
+      "document_class_metrics": {
+        "enterprise_technical_plan": {
+          "sample_count": 48,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.925897,
+            "high": 1.0,
+            "successes": 48,
+            "total": 48
+          }
+        },
+        "government_formal_document": {
+          "sample_count": 48,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.925897,
+            "high": 1.0,
+            "successes": 48,
+            "total": 48
+          }
+        },
+        "government_standard": {
+          "sample_count": 36,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.903578,
+            "high": 1.0,
+            "successes": 36,
+            "total": 36
+          }
+        },
+        "rag_research_reference": {
+          "sample_count": 60,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.939826,
+            "high": 1.0,
+            "successes": 60,
+            "total": 60
+          }
+        },
+        "scenario_list": {
+          "sample_count": 24,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.862019,
+            "high": 1.0,
+            "successes": 24,
+            "total": 24
+          }
+        }
+      },
+      "difficulty_metrics": {
+        "hard": {
+          "sample_count": 131,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.97151,
+            "high": 1.0,
+            "successes": 131,
+            "total": 131
+          }
+        },
+        "medium": {
+          "sample_count": 85,
+          "pass_rate": 1.0,
+          "confidence_interval_95": {
+            "low": 0.956759,
+            "high": 1.0,
+            "successes": 85,
+            "total": 85
+          }
+        }
+      },
+      "overall_ingestion_quality_rate": 1.0
+    },
+    "ocr": {
+      "status": "archived_fixed_center",
+      "schema_version": "screenspot_metrics_v0.1",
+      "sample_count": 1272,
+      "accuracy": 0.026729559748427674,
+      "by_platform": {
+        "mobile": 0.035856573705179286,
+        "desktop": 0.02694610778443114,
+        "web": 0.016055045871559634
+      },
+      "by_type": {
+        "text": 0.03299856527977044,
+        "icon": 0.019130434782608695
+      },
+      "missing_predictions": 0,
+      "latency_ms": {
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "official_rule": "normalized predicted point lies inside pixel bbox converted from [x,y,width,height]",
+      "limitations": []
+    },
+    "runtime": {
+      "status": "fresh_smoke_only",
+      "schema_version": "souldrive_pc_mmi_media_runtime_metrics_v0.2",
+      "dataset_id": "SoulDrive-PC-MMI-media-480-v0.2",
+      "dataset_sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+      "evaluated_split": "test",
+      "evaluated_count": 1,
+      "full_test": false,
+      "selection_policy": "frozen test file order; no test labels used for threshold/model selection",
+      "threshold": {
+        "value": 0.7,
+        "source": "validation-only selection from B1/Candidate harness"
+      },
+      "b1_original_transcript_test": {
+        "sample_count": 1,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_binding_accuracy_on_targeted": 0.0,
+        "conflict_accuracy": 1.0,
+        "action_accuracy": 0.0,
+        "clarification_accuracy": 0.0
+      },
+      "candidate_actual_asr_ocr_soulalign_test": {
+        "sample_count": 1,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_binding_accuracy_on_targeted": 1.0,
+        "conflict_accuracy": 1.0,
+        "action_accuracy": 1.0,
+        "clarification_accuracy": 1.0
+      },
+      "runtime": {
+        "status_before": {
+          "schema_version": "souldrive_topic5_runtime_status_v0.1",
+          "mode": "lazy_local",
+          "gpu": {
+            "installed": true,
+            "cuda_available": true,
+            "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            "memory_gib": 7.96
+          },
+          "dependencies": {
+            "funasr": true,
+            "rapidocr": true,
+            "transformers": true,
+            "qwen_vl_utils": false,
+            "bitsandbytes": false,
+            "pillow": true
+          },
+          "assets": {
+            "sensevoice_small": {
+              "ready": true,
+              "name": "SenseVoiceSmall"
+            },
+            "rapidocr": {
+              "ready": true,
+              "name": "RapidOCR"
+            },
+            "qwen2.5_vl_3b": {
+              "ready": true,
+              "name": "Qwen2.5-VL-3B-Instruct"
+            }
+          },
+          "loaded": {
+            "sensevoice_small": false,
+            "rapidocr": false,
+            "qwen2.5_vl_3b": false
+          },
+          "policy": {
+            "asr_requires_cuda": true,
+            "vlm_requires_cuda": true,
+            "media_scope": "workspace-relative-only",
+            "max_audio_seconds": 15,
+            "max_image_bytes": 8388608
+          }
+        },
+        "vlm_smoke_count": 0,
+        "stage_summary": {
+          "asr": {
+            "statuses": {
+              "pass": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 16367.051,
+              "p95": 16367.051,
+              "max": 16367.051
+            }
+          },
+          "ocr": {
+            "statuses": {
+              "pass": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 3243.14,
+              "p95": 3243.14,
+              "max": 3243.14
+            }
+          },
+          "vlm": {
+            "statuses": {
+              "skipped": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "soulalign": {
+            "statuses": {
+              "pass": 1
+            },
+            "latency_ms": {
+              "count": 1,
+              "p50": 12.876,
+              "p95": 12.876,
+              "max": 12.876
+            }
+          }
+        },
+        "runtime_total_latency_ms": {
+          "count": 1,
+          "p50": 19624.488,
+          "p95": 19624.488,
+          "max": 19624.488
+        },
+        "wall_clock_latency_ms": {
+          "count": 1,
+          "p50": 19624.548,
+          "p95": 19624.548,
+          "max": 19624.548
+        },
+        "cold_start": {
+          "episode_id": "MMI-TE-SELE-0000",
+          "runtime_total_ms": 19624.488,
+          "wall_clock_ms": 19624.548
+        },
+        "fast_path_all_latency_ms": {
+          "runtime": {
+            "count": 1,
+            "p50": 19624.488,
+            "p95": 19624.488,
+            "max": 19624.488
+          },
+          "wall_clock": {
+            "count": 1,
+            "p50": 19624.548,
+            "p95": 19624.548,
+            "max": 19624.548
+          }
+        },
+        "fast_path_hot_latency_ms": {
+          "runtime": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          },
+          "wall_clock": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          }
+        },
+        "vlm_sample_latency_ms": {
+          "runtime": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          },
+          "wall_clock": {
+            "count": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          }
+        },
+        "gpu_peak_allocated_mib": {
+          "count": 1,
+          "p50": 937.84,
+          "p95": 937.84,
+          "max": 937.84
+        }
+      },
+      "failure_count": 0,
+      "limitations": [
+        "This is an actual local SenseVoice + RapidOCR + SoulAlign runtime run on synthetic TTS/UI media, not a Huawei Topic 5 competition score.",
+        "The test split is used only once for post-hoc evaluation. Threshold 0.7 is fixed before this run from validation; no test-driven tuning is permitted.",
+        "B1 sees the provided synthetic transcript; Candidate transcribes local WAV and reads local synthetic screenshots. The two scores do not measure a public benchmark or human interaction quality.",
+        "VLM is sampled only on a fixed prefix when requested. Fast-path P95 and VLM-sampled P95 must be reported separately and cannot be averaged into a competition claim."
+      ]
+    },
+    "ppt": {
+      "status": "fresh_smoke",
+      "schema_version": "souldrive_ppt_smoke_metrics_v0.1",
+      "sample_count": 3,
+      "valid_count": 3,
+      "valid_rate": 1.0,
+      "latency_ms": {
+        "mean": 2.7,
+        "max": 3.855
+      }
+    }
+  },
+  "sample_count": 1852,
+  "failure_count": 64,
+  "provenance_policy": "Archived components are not fresh end-to-end replays; smoke components are not competition scores."
+}

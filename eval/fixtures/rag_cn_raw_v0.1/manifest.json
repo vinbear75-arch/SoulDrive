@@ -1,0 +1,126 @@
+{
+  "schema_version": "rag_cn_raw_eval_v0.1",
+  "source_directory": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\source_materials\\rag_cn",
+  "source_files_are_raw": true,
+  "split_unit": "document",
+  "sealed_labels_must_not_enter_runtime": true,
+  "documents": [
+    {
+      "doc_id": "RAGCN-5455da4b3bdf",
+      "filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+      "sha256": "5455da4b3bdfca85ac8183a9a183841ad58c28936b820ed01c9f8f9fcd8c105a",
+      "page_count": 26,
+      "text_chars": 8382,
+      "headings": [
+        "二、RAG核心技术问题研究",
+        "三、基于RAG的科学数据智能服务基于RAG的智能服务",
+        "3. 教育",
+        "1. 客户支持",
+        "2. 医疗与健康",
+        "1. 法律",
+        "2. 文案生成与写作",
+        "三、基于RAG的科学数据智能服务",
+        "一、RAG技术与应用"
+      ]
+    },
+    {
+      "doc_id": "RAGCN-93128a5b23df",
+      "filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "sha256": "93128a5b23dface4cf3cee44ad38a64ed4e592a70f6de01f7f4ba9e7d8c4b1aa",
+      "page_count": 18,
+      "text_chars": 50765,
+      "headings": [
+        "2.1 RAG 范式",
+        "2.2 系统流程",
+        "2.3 问答系统",
+        "3、T5），其全部知识均内嵌于参数之中，回答生成",
+        "3.1 检索器",
+        "3.2 生成器",
+        "3.3 检索与生成的协同机制",
+        "4.1 Fusion-in-Decoder",
+        "4.2 REALM、REPLUG、GTR 等",
+        "4.3 工具增强型语言模型",
+        "4.4 检索增强指令微调",
+        "4.5 GraphRAG"
+      ]
+    },
+    {
+      "doc_id": "RAGCN-8f9f13630d1f",
+      "filename": "03_检索增强生成_BIMSA.pdf",
+      "sha256": "8f9f13630d1f18f40bea58e6f5083eedd289c320b8cefc5b470bf9be239e3f7d",
+      "page_count": 64,
+      "text_chars": 17886,
+      "headings": [
+        "1、数据集构建",
+        "2、评价指标",
+        "3、基础实验",
+        "3.1、不提供上下文——直接问答",
+        "3.2、长文本的“大海捞针”实验",
+        "3.3、Naive RAG的结果",
+        "4、针对检索过程的优化",
+        "4.1、稀疏检索方式BM25",
+        "4.2、混合检索——BM25+向量召回",
+        "4.3、加上Rerank",
+        "5、整体结论",
+        "5.1 检索质量影响整体效果"
+      ]
+    },
+    {
+      "doc_id": "RAGCN-78800d7cb3c0",
+      "filename": "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "sha256": "78800d7cb3c03f3f51de24e4a57818e5f3e49226436c44cd088d445f1f2b35a2",
+      "page_count": 3,
+      "text_chars": 2121,
+      "headings": [
+        "一、什么是RAG？",
+        "二、RAG 的三大核心模块",
+        "1. 检索器（Retriever）：高效的知识筛选工具",
+        "2. 检索融合（Retrieval Fusion）：信息整合",
+        "3. 生成器（Generator）：内容创作的核心引擎",
+        "三、RAG 的训练策略",
+        "1. 静态知识库训练",
+        "2. 动态知识库更新",
+        "四、RAG 的应用与挑战",
+        "1. 典型应用场景",
+        "2. 现存挑战",
+        "五、未来发展方向"
+      ]
+    },
+    {
+      "doc_id": "RAGCN-68a4dcd45a45",
+      "filename": "06_检索增强生成_SciOpen.pdf",
+      "sha256": "68a4dcd45a451db68c481e28ba3a43818a4caa964f8259fe7e95f65c911ed064",
+      "page_count": 10,
+      "text_chars": 18803,
+      "headings": [
+        "1.1 语料来源的广度与深度问题",
+        "1.2 知识迁移的泛化与精确性问题",
+        "1.3 参数规模与知识覆盖的矛盾问题",
+        "1.4 知识的时效性与动态性问题",
+        "2.1 RAG的原理及技术框架",
+        "2.2 RAG应用于知识服务的关键问题探讨",
+        "2.2.1 专业知识覆盖",
+        "2.2.2 知识动态更新",
+        "2.2.3 精准性和可验证性",
+        "2.2.4 多模态信息处理",
+        "3.2 嵌入模型选择：面向知识服务的向量化",
+        "3.1 专业知识库建设：数字化与规范化的双轮"
+      ]
+    },
+    {
+      "doc_id": "RAGCN-7da648f9c564",
+      "filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+      "sha256": "7da648f9c564aff8ed57d6a7a843bba7930784bf4af9eaa15b367971bc53a690",
+      "page_count": 12,
+      "text_chars": 2001,
+      "headings": [
+        "1. graphrag的原理介绍",
+        "2. graphrag的效果体验(以斗破苍穹小说为例)",
+        "3. graphrag的源码剖析",
+        "4. graphrag适配国内大模型",
+        "摘要,引用社区子结构中的关键实体、关系",
+        "摘要和社区报告标题的文本嵌入来生成我们"
+      ]
+    }
+  ]
+}

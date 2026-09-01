@@ -1,0 +1,46 @@
+{
+  "schema_version": "souldrive_artifact_smoke_v1",
+  "created_at": "2026-08-25T10:41:17+0800",
+  "email": {
+    "status": "pass",
+    "provider": "qq",
+    "smtp_target": [
+      "smtp.qq.com",
+      465
+    ],
+    "recipient": "recipient@example.test",
+    "attachment_count": 1,
+    "authorization_code_exposed": false
+  },
+  "ppt": {
+    "status": "pass",
+    "renderer": "SoulDrive OpenXML",
+    "slide_count": 4,
+    "outline_source": "extractive",
+    "evidence_metrics": {
+      "attributed_slide_count": 2,
+      "cited_source_count": 1,
+      "evidence_bound_point_count": 2,
+      "evidence_slide_count": 2,
+      "evidence_slide_coverage": 1.0,
+      "selected_source_count": 1,
+      "selected_source_coverage": 1.0
+    },
+    "elapsed_ms": 15.0,
+    "valid_openxml": true,
+    "bytes": 11564,
+    "sha256": "199c1f29603a18ca92c80b9083703ee0cbc87b4129c1da5e113c2ab359118233",
+    "zip_entries": 22,
+    "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\results\\artifact_smoke_after_smtp_ui_fix.pptx",
+    "wps_executable": "D:\\SOFTWARES\\WPS Office\\12.1.0.28043\\office6\\wps.exe",
+    "wps_open_requested": false
+  },
+  "skill": {
+    "status": "pass",
+    "download_status": "pending_review",
+    "inbox_count_before_approval": 1,
+    "approval_status": "approved",
+    "active_skill_title": "Smoke Skill",
+    "scripts_auto_executed": false
+  }
+}

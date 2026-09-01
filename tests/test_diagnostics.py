@@ -12,6 +12,16 @@ from core.workspace import SoulDriveWorkspace
 
 
 class DiagnosticsTests(unittest.TestCase):
+    def setUp(self):
+        self.cloud_model_config_patch = patch(
+            "core.model_runtime.load_cloud_model_config",
+            return_value=None,
+        )
+        self.cloud_model_config_patch.start()
+
+    def tearDown(self):
+        self.cloud_model_config_patch.stop()
+
     def test_product_diagnostics_reports_mounted_workspace_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -64,6 +74,42 @@ class DiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(report["license"]["source"], "license.json")
         self.assertNotIn(str(root), json.dumps(report["license"], ensure_ascii=False))
+
+    def test_product_diagnostics_does_not_require_license_in_pc_only_mode(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            workspace = _create_workspace_with_models(root / "drive")
+            _create_minimal_project_root(root)
+            state_path = str(root / "runtime_state.json")
+
+            with patch.dict(os.environ, {
+                "SOULDRIVE_APP_ROOT": str(root),
+                "SOULDRIVE_MODEL_DIR": str(root / "models"),
+                "SOULDRIVE_PC_ONLY": "1",
+            }), patch.object(runtime_state, "STATE_PATH", state_path):
+                runtime_state.unlock_runtime("LOCAL", None, None, workspace.root_path)
+                report = product_diagnostics()
+
+        self.assertFalse(report["policy"]["require_signed_license"])
+        self.assertTrue(report["checks"]["license"])
+        self.assertTrue(report["runtime"]["local_pc_mode"])
+
+    def test_product_diagnostics_reports_effective_request_body_limit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            workspace = _create_workspace_with_models(root / "drive")
+            _create_minimal_project_root(root)
+            state_path = str(root / "runtime_state.json")
+
+            with patch.dict(os.environ, {
+                "SOULDRIVE_APP_ROOT": str(root),
+                "SOULDRIVE_MODEL_DIR": str(root / "models"),
+                "SOULDRIVE_MAX_BODY_BYTES": str(16 * 1024 * 1024),
+            }), patch.object(runtime_state, "STATE_PATH", state_path):
+                runtime_state.unlock_runtime("LOCAL", None, None, workspace.root_path)
+                report = product_diagnostics()
+
+        self.assertEqual(report["policy"]["max_request_body_bytes"], 16 * 1024 * 1024)
 
     def test_product_diagnostics_requires_mounted_unlocked_workspace_for_ready(self):
         with tempfile.TemporaryDirectory() as temp_dir:

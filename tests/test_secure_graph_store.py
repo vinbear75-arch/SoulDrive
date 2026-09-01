@@ -70,16 +70,56 @@ class SecureGraphStoreTests(unittest.TestCase):
                     "requires",
                     evidence_chunk_ids=["old-child", "kept-child"],
                 )
+                store.save_graphrag_index({"community_count": 2})
 
                 store.remove_chunk_ids(["old-child"])
                 recalled = store.recall_chunk_ids("zero trust legacy only", limit=10)
                 entities = store.get_all_entities()
+                invalidated = store.load_graphrag_index()
             finally:
                 store.close()
 
         self.assertEqual(recalled, ["kept-child"])
+        self.assertIsNone(invalidated)
         self.assertIn("Zero Trust", entities)
         self.assertNotIn("Legacy Only", entities)
+
+    def test_secure_graph_recall_applies_project_filter_before_limit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureGraphStore(workspace.secure_graph_store_path, keys)
+            try:
+                store.add_document(
+                    "other.pdf",
+                    "Other",
+                    "other",
+                    chunk_ids=["other-1", "other-2"],
+                    project_id="project-other",
+                )
+                store.add_document(
+                    "current.pdf",
+                    "Current",
+                    "current",
+                    chunk_ids=["current-1"],
+                    project_id="project-current",
+                )
+                store.add_entity(
+                    "目标实体",
+                    "概念",
+                    "目标",
+                    chunk_ids=["other-1", "other-2", "current-1"],
+                )
+                project_chunks = store.recall_chunk_ids(
+                    "目标实体",
+                    limit=1,
+                    project_id="project-current",
+                )
+            finally:
+                store.close()
+
+        self.assertEqual(project_chunks, ["current-1"])
 
     def test_secure_graph_store_returns_context_without_plaintext_leak(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -57,6 +57,9 @@ DEFAULT_STATE = {
                 "removed_duplicates": 0,
                 "table_items": 0,
                 "image_items": 0,
+                "ocr_ms": 0,
+                "ocr_region_count": 0,
+                "ocr_mean_confidence": 0.0,
                 "pages": 0,
                 "parent_chunks": 0,
                 "conversion_error_count": 0,
@@ -73,6 +76,7 @@ DEFAULT_STATE = {
                 "embedding_token_limit": 0,
                 "child_strategy_counts": {},
                 "conversion_status_counts": {},
+                "modality_counts": {},
             },
         },
     },
@@ -139,7 +143,14 @@ def unlock_runtime(
     reason: str = "workspace mounted",
 ):
     audit_logger = _audit_logger_for_workspace_path(workspace_path)
-    state = set_runtime_state(
+    previous = get_runtime_state()
+    previous_indexing = previous.get("indexing") or {}
+    preserve_completed_index = (
+        previous.get("workspace_path") == workspace_path
+        and previous_indexing.get("status") == "completed"
+        and int(previous_indexing.get("processed_files") or 0) > 0
+    )
+    updates = dict(
         locked=True,
         reason="workspace passphrase required",
         auth_level="HARDWARE_ONLY",
@@ -150,8 +161,10 @@ def unlock_runtime(
         crypto_initialized=False,
         software_unlocked=False,
         security_reason="workspace passphrase required",
-        indexing=copy.deepcopy(DEFAULT_STATE["indexing"]),
     )
+    if not preserve_completed_index:
+        updates["indexing"] = copy.deepcopy(DEFAULT_STATE["indexing"])
+    state = set_runtime_state(**updates)
     audit_logger.append_event("runtime.unlock", {
         "auth_level": "HARDWARE_ONLY",
         "hardware_sn_hash": _hash_sensitive(hardware_sn),

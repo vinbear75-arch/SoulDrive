@@ -1,0 +1,56 @@
+{
+  "schema_version": "souldrive_functional_acceptance_recheck_v3",
+  "created_at": "2026-08-25T16:16:05+08:00",
+  "scope": "本机单用户 SoulDrive；本次只把有运行日志、数据库记录或产物的项目标记为通过",
+  "verified": {
+    "tauri_cold_start": {
+      "status": "pass",
+      "evidence": "eval/results/email_and_cold_start_acceptance_20260825.json"
+    },
+    "local_contacts": {
+      "status": "pass",
+      "contact": "handsome_Vin <2956584050@qq.com>",
+      "evidence": "eval/results/email_and_cold_start_acceptance_20260825.json"
+    },
+    "qq_smtp_real_delivery": {
+      "status": "pass",
+      "sender": "1342325858@qq.com",
+      "recipient": "2956584050@qq.com",
+      "artifact_id": "artifact_325a9bee924742d29c89ea4818081b65",
+      "confirmation": "confirmed",
+      "delivery": "sent",
+      "external_mailbox_receipt": "pending_user_observation",
+      "evidence": "eval/results/email_and_cold_start_acceptance_20260825.json"
+    },
+    "redis_postgresql_file_storage": {
+      "status": "pass",
+      "health": "Redis vectorset ready, PostgreSQL ok, file archive ok, degraded=false",
+      "evidence": "cold-start /health response in email_and_cold_start_acceptance_20260825.json"
+    },
+    "rag_and_graphrag": {
+      "status": "pass_functionally_not_competition_ready",
+      "evidence": "eval/results/graphrag_retest_20260825.json"
+    },
+    "multimodal": {
+      "status": "pass_smoke_pending_30_run_p95",
+      "evidence": "eval/results/media_validation_goal_latest.json"
+    },
+    "ppt_schedule_skill": {
+      "status": "pass_smoke",
+      "evidence": "eval/results/artifact_smoke_goal_full_recheck_live.json"
+    },
+    "full_python_regression": {
+      "status": "pass",
+      "result": "566 passed, 1 warning",
+      "evidence": "python -m pytest -q run completed 2026-08-25"
+    }
+  },
+  "remaining": {
+    "external_mailbox_receipt": "用户检查 2956584050@qq.com 是否收到邮件",
+    "competition_p95": "完整多模态冷启动 + 30 次热运行的 P50/P95 和资源记录",
+    "training_and_ablation": "B0/B1/Candidate 与消融实验",
+    "public_dataset_final_audit": "许可证、原始模态、官方划分和封闭测试冻结",
+    "legacy_unreadable_test_session": "待用户确认是否清理"
+  },
+  "overall_status": "incomplete_for_competition_but_real_email_and_cold_start_verified"
+}

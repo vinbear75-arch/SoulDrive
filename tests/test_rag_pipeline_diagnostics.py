@@ -2,11 +2,28 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
+from core.retrieval import SearchCandidate
 from scripts import diagnose_rag_pipeline
 
 
 class RagPipelineDiagnosticsTests(unittest.TestCase):
+    def test_secure_stage_candidates_are_hydrated_before_source_evaluation(self):
+        candidate = SearchCandidate(id="chunk-1", content="", metadata={})
+        hydrated = SearchCandidate(
+            id="chunk-1",
+            content="正文",
+            metadata={"source_filename": "source.pdf"},
+        )
+        kb = Mock()
+        kb._hydrate_secure_candidates.return_value = [hydrated]
+
+        result = diagnose_rag_pipeline.hydrate_stage_candidates(kb, [candidate], limit=10)
+
+        self.assertEqual(result[0].metadata["source_filename"], "source.pdf")
+        kb._hydrate_secure_candidates.assert_called_once_with([candidate], 10)
+
     def test_stage_metrics_report_any_all_and_coverage(self):
         samples = [
             _sample(

@@ -1,0 +1,238 @@
+{
+  "schema_version": "souldrive_public_gui_speech_augmentation_v0.1",
+  "dataset_id": "SoulDrive-Public-GUI-Speech-Augmentation-v0.1",
+  "episode_count": 30,
+  "split": "train_only",
+  "audio_backend": "windows_sapi_microsoft_huihui",
+  "source": {
+    "dataset": "ScreenSpot",
+    "annotations_sha256": "d101500a238f2f7d7f00684279c0de4d8e046ea5fc410b609d86c8d15a600a0d",
+    "selection": "first_30_desktop_annotations_frozen_before_runtime"
+  },
+  "episodes_sha256": "f17bb3b918717f92348927628865d6196aee1736623ee82d499d3801db3b43d2",
+  "media": [
+    {
+      "episode_id": "PUBLIC-GUI-001",
+      "source_image": "pc_ede36f9b-1154-4f76-b7f8-c15d7d3f9b6e.png",
+      "source_instruction": "close",
+      "image_sha256": "9158571ab90a5075aabcd1c18c46a24ad5318c827350c67964f8f59534973375",
+      "audio_sha256": "457bc71f8b4b08f3fc92ae7c7e066a3e0034f464ddce5f95aedfd02bd6f8e2f0"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-002",
+      "source_image": "pc_5e09e8e9-7ef6-44be-ad54-aeaeac151897.png",
+      "source_instruction": "minimize this window",
+      "image_sha256": "f69f99f6321500fe3035baa5d2df2509529d7dbb0b6ffab1c0ad34ca697b6828",
+      "audio_sha256": "6088e39b1faf7ba6b4c7e7fdd69092de004197c54ae15028d47d89a445a504eb"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-003",
+      "source_image": "pc_2c6dc6ea-fd6f-4cbb-9954-2d6a68610a48.png",
+      "source_instruction": "play the solitaire collection",
+      "image_sha256": "09612cf327ce5bbaa1ad6e2f15f8fed67b49d761381b3e38c201770c039d9454",
+      "audio_sha256": "17cae1c474e5ff3ab9bb9ffdcdca2f0da5870cd75855798da244ee8b31e5a2bd"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-004",
+      "source_image": "pc_b072d03a-51cb-4dd6-bdeb-152d3fd44e6b.png",
+      "source_instruction": "open the gallery",
+      "image_sha256": "fb3da7bc9ad111857e01a390261731c3949daebe73879c09d0572b84930f8429",
+      "audio_sha256": "5cefabc0f8d4f3c455a6f9fe779298b0f7fe27f6485e9e7ead8853123af605a5"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-005",
+      "source_image": "pc_ac2d2c5e-fe5a-4233-95b4-2de18ef76a9e.png",
+      "source_instruction": "adjust the style",
+      "image_sha256": "b6eb803f99e41265e75514a34666bef83ab5b8e12ec3f2f5732d11064aa0b9fb",
+      "audio_sha256": "ee9d0a1abec2d7c1dd51013930cacf765d4b236b6dc306adabf58e83ea45d693"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-006",
+      "source_image": "pc_f0122b91-3f8b-4510-9a6e-f0239d84b94e.png",
+      "source_instruction": "minimize calculator",
+      "image_sha256": "35f808d9155b535684def5103d4ffaa525097a028900c3554f9b704d23380c71",
+      "audio_sha256": "ae9c1559c8ff427f4c4774869cf2eabfe9477f8c451344af1bc7730d99ead32d"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-007",
+      "source_image": "pc_354a6cb2-3fe0-4cea-950c-d7f8e01fdf45.png",
+      "source_instruction": "open the download page",
+      "image_sha256": "baa10d7577b60804a3176206f0e7d01f007c2def189062dac8f721bb5600a97e",
+      "audio_sha256": "46d42d6024d80c40b192d46fbe51d7c6cacac7610de164279449a3ecb62b492a"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-008",
+      "source_image": "pc_d6b09201-c944-4ad9-a0a2-ff78e8f056ce.png",
+      "source_instruction": "help menu",
+      "image_sha256": "39a3068347d844f7336058da44bd19e6f2e820fab88e2f888e18415a2808ab4c",
+      "audio_sha256": "913621cbd616ed01767b016d5e1da0b7f776e2fec2d58a47fa44823368038283"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-009",
+      "source_image": "pc_db6b6fa2-11cc-4b06-88cb-22c180f07a3b.png",
+      "source_instruction": "save the file",
+      "image_sha256": "d9bdf4877ca2dfad1ebf583c4988ecd5cb7bc6b21f80a118de45745d99c8aece",
+      "audio_sha256": "eb6c4b9b2436f7c3d839019134c51456cce3a8876aec3f907743b6f002e614d6"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-010",
+      "source_image": "pc_6dfa677c-7772-46fb-8c83-14a33b0806b4.png",
+      "source_instruction": "search for software ",
+      "image_sha256": "3738917f1bac4be0dda2d48356829012825039ca6f4d872ead05a61170ea0a1f",
+      "audio_sha256": "a27710d09889f6452e6eff192a20aff26e711420f2bf32395870e9f5aa57026f"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-011",
+      "source_image": "pc_bc9ed2f6-79c1-4a35-bcb5-4760bf4ed57d.png",
+      "source_instruction": "add this page to favourites",
+      "image_sha256": "d90e3c627c4e0700deedefb6fef82bcfab2aaeb0c992c27674ffef3585112d8d",
+      "audio_sha256": "a9d35df08ba148bc69e87e9e839cd7a28e47352bfe7280fe7f1eaadeb77f5df1"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-012",
+      "source_image": "pc_2c56f301-8e71-4498-8e52-44b37ac1a298.png",
+      "source_instruction": "choose language for windows",
+      "image_sha256": "f828308c6446c362458626f5b87ebc920f2d244bc3cd28c76d93cdca18521614",
+      "audio_sha256": "04de4ec694eed26ba8d5b45a3b50ec35f4efaefa38d2b0a51cf13d7b69a7a121"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-013",
+      "source_image": "pc_e618dc7e-8ffb-4a37-a317-9d3908c38395.png",
+      "source_instruction": "input method toolbar",
+      "image_sha256": "661c7738b7cc8394a2d9e66373c0bc1e11ce0b73a0081e4f35126a1567d682ad",
+      "audio_sha256": "cefc2847e5d74d08ed8f04623fb8103c14513f62e254aa5157e6f69e6b45bca2"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-014",
+      "source_image": "pc_54779155-8627-4cac-8ea6-98277cfe0647.png",
+      "source_instruction": "access the personal account interface",
+      "image_sha256": "99cc6f31b3253c8ff55d31175ffb20cb52599ba099811cacf4c02f29f5c0a143",
+      "audio_sha256": "ba2a45a469c869cdff0c3364781a6e18ab9d8a2fab72801cddb23cb28e47225e"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-015",
+      "source_image": "pc_ad16765f-de52-4903-b406-fb5213b94db9.png",
+      "source_instruction": "network and internet settings",
+      "image_sha256": "a2fbfa9dbf63e484031d92591dd6c03b9baaf969e3d0813368f9bdcfc9f301c5",
+      "audio_sha256": "328247fc40a6f2ec5f29e166e517a94aedab3cd2cf36274cdeeec71d86efe92d"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-016",
+      "source_image": "pc_1ebb6beb-3187-45a6-a5a6-e50aa9a327e5.png",
+      "source_instruction": "open a new tab",
+      "image_sha256": "74a56baf4fcc90db1b92e9e9e876b6aba95d03d2514f57c818e81ebf117796b0",
+      "audio_sha256": "de524815c6f2e41197f717948d794fb3195cd1ea3353f0bdf6b4a391fbb967c6"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-017",
+      "source_image": "pc_221d3c5a-0a1b-456e-9676-7b5ff95cc1b1.png",
+      "source_instruction": "file processing",
+      "image_sha256": "b5cc91150f267a64765c3a6dd6fe7a670da5c5f7da097baa4857fec403b7f654",
+      "audio_sha256": "54c57c39c186ea7cffbc2672caa6855811fa08a904c64a4c91dc146c01524bd7"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-018",
+      "source_image": "pc_a8b0f843-7aaf-4369-ac2b-a121f1ccb024.png",
+      "source_instruction": "open settings",
+      "image_sha256": "5e95ea992a2c9d078756327a9530da2c370784f8b424de4682de7971520b848b",
+      "audio_sha256": "62f353c12090fc4e6b9156afb0a8faa04f48f32f48b6d30fdeff13653e17231e"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-019",
+      "source_image": "pc_7f0b3e40-e5f5-462b-96c3-e8a97a3a504b.png",
+      "source_instruction": "open the music library",
+      "image_sha256": "b2de6938cd310c8dcba7b18430135ccd22e60bb46637efa0ac6a473be57af7fa",
+      "audio_sha256": "ea879cec800b2c46711c7972047ac02e2844d249140cd9880b00ba118d98917f"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-020",
+      "source_image": "pc_8f88d498-d49a-4ab5-8aa6-aafa1428c3b7.png",
+      "source_instruction": "copy the file",
+      "image_sha256": "8f4c22962a18dbf8f9c54af9c4d1654f96ad7a99888bbd60b62e32d41c94703b",
+      "audio_sha256": "45a1451d9f5bf1a20f4dfb576ceae1d766f10748f5266e67871bc32063f0243e"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-021",
+      "source_image": "pc_870d6da1-bc85-4e74-a1bd-ef6f975c2146.png",
+      "source_instruction": "date and time",
+      "image_sha256": "707cd54aea897339c40bcce504d7acde513cd9d07b217e5ae7eb4b5ce01e8784",
+      "audio_sha256": "20c9fda4e516d37f8ee943fc856fd423af61f6ddf0c534c394feb4273f55114e"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-022",
+      "source_image": "pc_45c2712a-337d-4b6b-a47b-37ca4d5bdddd.png",
+      "source_instruction": "sleep mode",
+      "image_sha256": "0d5c0df6232700049f78f4fc2b7567564ffa38f69e92b1d74cd6b1e02a329ef9",
+      "audio_sha256": "469768309698de1bc47c010f839493df95277e72658d4c8bcb2d5e4059413864"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-023",
+      "source_image": "pc_133ac2cd-3eb3-4d45-be35-255a83831f97.png",
+      "source_instruction": "search for local files",
+      "image_sha256": "8d8eca9a89d6165a3c6f82a133788a005c3ce2d79a815a34a89d5b9ee9f5b3b9",
+      "audio_sha256": "c34ecb89fcc529c28ce834ee6b826f8775ca6addd2809d20191c9dfc09f600d7"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-024",
+      "source_image": "pc_bd6711e1-ddc1-4873-8cf1-19654285f4ea.png",
+      "source_instruction": "personal account",
+      "image_sha256": "25cc03a4124debdf9541aa22aa3c771e59efb10da803016b2d03b8298d8fc170",
+      "audio_sha256": "0c4ec1a13305e887d877257932baad0d82cd5d16d20c69dd7a855aea6137d329"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-025",
+      "source_image": "pc_83462e63-b0cd-4921-9d19-8a534ed445c7.png",
+      "source_instruction": "settings and more",
+      "image_sha256": "9c26fc1d222cf84a98c541a06d33122c068925ae0f77be6253594dda583602aa",
+      "audio_sha256": "a96baff27c596cafa32ef23627003d9f237fcae0cee8e7c7a24cc28c67dd3c24"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-026",
+      "source_image": "pc_2b40c066-2f8f-4389-8df8-e70e8dfc1309.png",
+      "source_instruction": "full-screen display",
+      "image_sha256": "d3342d42a4ef0fe0d412aa29437572c9ac8b85dfba0dda14938f13b8b6bbb31e",
+      "audio_sha256": "28f7349e77642b870b76758de02204308177ae4cd5603289502600dee6b61b72"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-027",
+      "source_image": "pc_1f371830-d909-41ac-a340-921a594f05b0.png",
+      "source_instruction": "undo",
+      "image_sha256": "b459f54b13e96578ad3186403d568f8bd5e7accb03cc86df058ece86bd746f41",
+      "audio_sha256": "bfeee03c6ad8224e873973706d5ab9848d47fd0b4a27b1b4ebcd104da64b3a9c"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-028",
+      "source_image": "pc_14fd6f5f-37d5-4b22-953e-626e11044f3e.png",
+      "source_instruction": "customize",
+      "image_sha256": "1f9cb499a2d16c5733940e8eef3a0ddb0d38b4af98a34f96d20037022eb5cb80",
+      "audio_sha256": "73bbd38ce36c052a930b8b58583860b0d45679685a17dd44081a6f323b1fe2d7"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-029",
+      "source_image": "pc_8834317b-7d08-40f1-9036-40743aba5d70.png",
+      "source_instruction": "open local disk e",
+      "image_sha256": "0dd1e10443a9baf67a11b53b5f2d489e38a8d41ca2091ec8e0a11a8d2178225b",
+      "audio_sha256": "44302bc167a263eeaad7005dcd07d9fc04b939eb451df9f7731234b037f0a145"
+    },
+    {
+      "episode_id": "PUBLIC-GUI-030",
+      "source_image": "pc_fa28755f-aee4-48f3-a484-02e670a6ff8f.png",
+      "source_instruction": "add a new file",
+      "image_sha256": "a554c8d61dddc20ab00913cb5c408660a5fc2c31bb5db45dd560ddbdd92af679",
+      "audio_sha256": "951ebf171bb3530d84827b0cbbceb54549907051554f0f6b2026f686eb9698c0"
+    }
+  ],
+  "claim_policy": {
+    "real_gui_images": true,
+    "real_user_speech": false,
+    "real_end_to_end_interactions": false,
+    "public_benchmark_score": false,
+    "huawei_score": false
+  },
+  "limitations": [
+    "仅允许进入训练/开发集，不能进入验证集或封闭测试集。",
+    "语音为 Windows SAPI 合成，不是多说话人真实录音。",
+    "ScreenSpot 图像和标注的再分发许可尚未解决；提交包默认不包含媒体。",
+    "业务意图为派生 GUI grounding，不证明项目 RAG 或个性化应答。"
+  ]
+}

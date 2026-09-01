@@ -1,0 +1,24 @@
+{
+  "schema_version": "rag_locked_workspace_fail_closed_v0.1",
+  "performed_at": "2026-08-30T17:25:02+08:00",
+  "workspace": "runtime/workspace",
+  "read_only_diagnosis": {
+    "secure_vector_index_exists": true,
+    "secure_child_chunk_count": 404,
+    "secure_parent_count": 341,
+    "process_workspace_keys_present_before_change": false,
+    "previous_behavior": "opened an empty plaintext Chroma path and returned zero evidence"
+  },
+  "change": {
+    "file": "core/knowledge_base.py",
+    "behavior": "raise before index selection when an encrypted vector index exists but workspace keys are unavailable",
+    "error": "workspace keys are not available for encrypted index",
+    "plaintext_downgrade_prevented": true
+  },
+  "verification": {
+    "locked_runtime_smoke": "pass",
+    "targeted_tests": "48 passed, 1 warning",
+    "scope": "knowledge base paths, secure retrieval flow, and security endpoint regression"
+  },
+  "interpretation": "本次只证明锁定状态不会静默降级到空明文索引；没有使用或猜测工作区口令，因此未声称正式加密索引已解锁并完成问答。"
+}

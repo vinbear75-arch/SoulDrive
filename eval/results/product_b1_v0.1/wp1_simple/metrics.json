@@ -1,0 +1,92 @@
+{
+  "schema_version": "souldrive_project_query_metrics_v0.1",
+  "sample_count": 10,
+  "version_hit_at_1": 0.7,
+  "version_hit_at_k": 1.0,
+  "mean_reciprocal_rank": 0.8333333333333333,
+  "wrong_project_at_1_rate": 0.2,
+  "wrong_time_at_1_rate": 0.1111111111111111,
+  "wrong_asset_type_at_1_rate": 0.0,
+  "rows": [
+    {
+      "id": "PQ-001",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-002",
+      "hit_at_1": false,
+      "hit_at_k": true,
+      "wrong_project_at_1": true,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-003",
+      "hit_at_1": false,
+      "hit_at_k": true,
+      "wrong_project_at_1": true,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-004",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-005",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-006",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-007",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-008",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-009",
+      "hit_at_1": true,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": false,
+      "wrong_type_at_1": false
+    },
+    {
+      "id": "PQ-010",
+      "hit_at_1": false,
+      "hit_at_k": true,
+      "wrong_project_at_1": false,
+      "wrong_time_at_1": true,
+      "wrong_type_at_1": false
+    }
+  ]
+}

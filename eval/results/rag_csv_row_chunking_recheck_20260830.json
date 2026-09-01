@@ -1,0 +1,48 @@
+{
+  "schema_version": "souldrive_rag_csv_row_chunking_recheck_v0.1",
+  "performed_at": "2026-08-30T21:09:15.0125308+08:00",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "表格保留结构和表头，长表按可回溯的数据行切分，而不是按普通长文本截断"
+    },
+    {
+      "name": "Dify Knowledge Pipeline",
+      "url": "https://docs.dify.ai/en/cloud/use-dify/knowledge/knowledge-pipeline/knowledge-pipeline-orchestration",
+      "applied_principle": "结构化数据在摄取阶段保留字段关系，再交给父子检索上下文处理"
+    }
+  ],
+  "scope": "CSV 指标表的父子切片输入格式；不改变 PDF、向量模型、检索排序、Top-K、项目权限或 GraphRAG 路由",
+  "implementation": {
+    "normalization": "CSV 首行作为表头，自动补充 Markdown 表格分隔线，数据行保持原有顺序",
+    "chunking": "复用现有 table-aware child splitter，长表 child 重复表头并避免普通段落重叠跨行拼接",
+    "provenance": "沿用 source_locator=rows:2-N 和 source_locator_kind=csv_row_range",
+    "failure_boundary": "空表和只有表头的 CSV 不伪造数据行；原有解析失败仍 fail-closed"
+  },
+  "verification": {
+    "targeted_tests": "20 passed",
+    "full_backend_tests": "841 passed, 1 warning",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings",
+    "long_table_fixture": {
+      "input_data_rows": 29,
+      "child_count": 3,
+      "all_children_keep_header": true,
+      "last_data_row_preserved": true
+    },
+    "product_fixture": {
+      "file": "eval/fixtures/product_b1_current_v0.1/project_souldrive_agent/08_alignment_metrics.csv",
+      "child_count": 3,
+      "all_children_keep_header": true,
+      "source_locator": "rows:2-4"
+    }
+  },
+  "decision": "保留 CSV 表格化输入；它降低长指标表的字段/行错配风险，但本轮未以新索引重跑冻结检索集，因此不宣称召回率或答案准确率提升",
+  "limitations": [
+    "本轮只改变 CSV 的索引前格式；既有冻结盲测语料没有 CSV，未重新计算主集指标",
+    "XLSX 仍沿用现有轻量 XML 读取路径；完整 Excel 单元格类型、公式和共享字符串的业务验收仍需真实资产",
+    "行级 locator 仍可能覆盖一个 child 中的多行，精确单元格地址和答案数值人工/NLI 校验尚未完成",
+    "正式加密工作区仍锁定，GraphRAG 生产业务验收、真实多模态 30 episode、完整链路 P95 和 sealed-test 仍未完成"
+  ]
+}

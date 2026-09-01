@@ -1,0 +1,95 @@
+{
+  "schema_version": "souldrive_mintrec2_media_alignment_v0.1",
+  "created_at": "2026-08-19T08:06:10.609438+00:00",
+  "dataset": "MIntRec2.0",
+  "scope": "pinned in-scope public benchmark only; separate from SoulDrive-PC-MMI",
+  "archive": {
+    "path": "D:\\AI_AGENTS\\SoulDrive-main\\data\\public\\mintrec2_v0.1\\mmla_media\\MIntRec2.0_video.tar.gz",
+    "exists": true,
+    "expected_bytes": 9162133399,
+    "expected_sha256": "78bd9ab4a0f9e5768ed2a094524165ecc51926e210a4701a9548d036a68d5e29",
+    "actual_bytes": 9162133399,
+    "actual_sha256": "78bd9ab4a0f9e5768ed2a094524165ecc51926e210a4701a9548d036a68d5e29",
+    "status": "verified",
+    "verified": true
+  },
+  "labels": {
+    "source": "THUIAR/MMLA-Datasets pinned in-scope TSV mirror",
+    "id_mapping": {
+      "canonical_id": "dia{dialogue_id}_utt{utterance_id}",
+      "mmla_id": "{dialogue_id}_{utterance_id}",
+      "accepted_media_stems": [
+        "dia{dialogue_id}_utt{utterance_id}",
+        "MIntRec2.0_{dialogue_id}_{utterance_id}"
+      ]
+    },
+    "files": {
+      "train": {
+        "path": "D:\\AI_AGENTS\\SoulDrive-main\\data\\public\\mintrec2_v0.1\\mmla\\train.tsv",
+        "expected_bytes": 401279,
+        "expected_sha256": "e8b8767bd9a4de5833475db2438e63390c9674041a7b8ea39183a74fa4b624ef",
+        "status": "verified",
+        "sample_count": 6165,
+        "actual_bytes": 401279,
+        "actual_sha256": "e8b8767bd9a4de5833475db2438e63390c9674041a7b8ea39183a74fa4b624ef"
+      },
+      "dev": {
+        "path": "D:\\AI_AGENTS\\SoulDrive-main\\data\\public\\mintrec2_v0.1\\mmla\\dev.tsv",
+        "expected_bytes": 72199,
+        "expected_sha256": "f2f69111d0bd8c26681db0a613a0112f466c667d56a79949ce17ccadd1e6ae37",
+        "status": "verified",
+        "sample_count": 1106,
+        "actual_bytes": 72199,
+        "actual_sha256": "f2f69111d0bd8c26681db0a613a0112f466c667d56a79949ce17ccadd1e6ae37"
+      },
+      "test": {
+        "path": "D:\\AI_AGENTS\\SoulDrive-main\\data\\public\\mintrec2_v0.1\\mmla\\test.tsv",
+        "expected_bytes": 133630,
+        "expected_sha256": "6aa650afbaf40256afdbb546a9f7253511f3fe8d791a9acc7b6829824455a6ed",
+        "status": "verified",
+        "sample_count": 2033,
+        "actual_bytes": 133630,
+        "actual_sha256": "6aa650afbaf40256afdbb546a9f7253511f3fe8d791a9acc7b6829824455a6ed"
+      }
+    },
+    "cross_split_duplicate_ids": {},
+    "verified": true
+  },
+  "extraction": {
+    "path": "D:\\AI_AGENTS\\SoulDrive-main\\data\\public\\mintrec2_v0.1\\mmla_media\\extracted",
+    "status": "verified",
+    "verified": true,
+    "marker": {
+      "schema_version": "souldrive_mintrec2_extraction_v0.1",
+      "archive": {
+        "name": "MIntRec2.0_video.tar.gz",
+        "bytes": 9162133399,
+        "sha256": "78bd9ab4a0f9e5768ed2a094524165ecc51926e210a4701a9548d036a68d5e29"
+      },
+      "created_at": "2026-08-19T03:56:12.025974+00:00",
+      "file_count": 9304,
+      "uncompressed_bytes": 9184218550
+    }
+  },
+  "media": {
+    "status": "complete",
+    "video_files": 9304,
+    "audio_files": 0,
+    "expected_label_samples": 9304,
+    "matched_samples": 9304,
+    "missing_sample_ids": [],
+    "duplicate_video_paths": {},
+    "duplicate_audio_paths": {},
+    "unmatched_media_sample_ids": [],
+    "unrecognised_media_paths": [],
+    "unrecognised_media_path_count": 0,
+    "ready": true,
+    "note": "Presence means a matching audio or video file exists; this audit does not decode media or score a model."
+  },
+  "ready_for_multimodal_evaluation_preparation": true,
+  "score_status": "not_run",
+  "limitations": [
+    "This script does not train a model, invoke an evaluator, or calculate an audio/video score.",
+    "An audio/video result remains blocked until archive, labels, paths, official splits, and evaluator protocol are all verified."
+  ]
+}

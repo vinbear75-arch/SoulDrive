@@ -1,0 +1,103 @@
+{
+  "schema_version": "souldrive_functional_acceptance_recheck_v1",
+  "created_at": "2026-08-25T15:40:00+08:00",
+  "scope": "本机单用户 SoulDrive、公开赛题一功能通路验收；不把 mock、smoke 或独立测试 sidecar 冒充 Tauri 冷启动成功",
+  "verified": {
+    "local_contacts": {
+      "status": "pass",
+      "evidence": "eval/results/functional_acceptance_goal_after_smtp_ui_fix.json",
+      "checks": [
+        "联系人按钮与弹窗",
+        "保存后重新打开仍可加载",
+        "选择联系人自动填入收件人"
+      ]
+    },
+    "storage": {
+      "status": "pass_with_quarantined_legacy_event",
+      "evidence": "eval/results/storage_acceptance_20260825.json",
+      "checks": [
+        "文件归档跨重开读回",
+        "Redis 跨重开读回",
+        "PostgreSQL 5432 连接与 schema"
+      ],
+      "legacy_pending_outbox": 0,
+      "dead_letter_outbox": 1,
+      "quarantine_evidence": "eval/results/storage_outbox_quarantine_20260825.json"
+    },
+    "rag_and_graphrag": {
+      "status": "pass_functionally",
+      "evidence": "eval/results/rag_recheck_20260825.json",
+      "project_id": "rag-cn-demo-20260824",
+      "documents": 6,
+      "entities": 174,
+      "relationships": 241,
+      "leiden_communities": 4,
+      "routes": ["hybrid", "global", "local"],
+      "all_queries_cited": true,
+      "refusals": 0,
+      "latency_ready": false
+    },
+    "new_sidecar": {
+      "status": "pass",
+      "evidence": "eval/results/sidecar_live_recheck_20260825.json",
+      "health": "PostgreSQL 5432 + Redis + file archive ok",
+      "authenticated_project_chat": "HTTP 200, cited, no refusal"
+    },
+    "multimodal_media_fixture": {
+      "status": "pass",
+      "evidence": "eval/results/media_validation_goal_latest.json",
+      "episodes": 480,
+      "require_media": true,
+      "error_count": 0
+    },
+    "ppt_and_skill": {
+      "status": "pass_smoke",
+      "evidence": "eval/results/artifact_smoke_goal_full_recheck_live.json",
+      "ppt_openxml": true,
+      "ppt_slides": 4,
+      "ppt_evidence_coverage": 1.0,
+      "skill_download_review_approval": true,
+      "remote_scripts_auto_executed": false
+    }
+  },
+  "pending": {
+    "tauri_cold_restart": {
+      "status": "pending_user_action",
+      "reason": "现有 Tauri 窗口仍为旧实例，未关闭并通过启动SoulDrive.bat重新接管"
+    },
+    "qq_smtp_real_delivery": {
+      "status": "pending_user_action",
+      "sender": "1342325858@qq.com",
+      "recipient": "handsome_Vin <2956584050@qq.com>",
+      "authorization_code_stored_by_agent": false,
+      "external_receipt": false
+    },
+    "legacy_outbox_replay": {
+      "status": "quarantined_orphaned_test_event",
+      "reason": "源归档和 SQLite 均不存在，已保留 dead_letter 状态，不再无限重试"
+    },
+    "unreadable_test_session": {
+      "status": "pending_manual_cleanup",
+      "session_id": "goal-storage-recheck-2a709b8dc1",
+      "reason": "单个历史测试会话的加密记录认证失败，未删除或冒充恢复成功"
+    },
+    "competition_performance": {
+      "status": "not_ready",
+      "rag_latency_ms": {
+        "hybrid": 195293,
+        "global": 241084,
+        "local": 223966
+      }
+    }
+  },
+  "regression": {
+    "rag_specialized": "139 passed",
+    "storage_runtime": "30 passed",
+    "conversation_project": "37 passed, 1 warning",
+    "email_connector_and_drafts": "15 passed, 1 warning",
+    "frontend_ui_unit_assertions": "17 passed",
+    "full_python_before_final_artifact_only_changes": "566 passed, 1 warning",
+    "cargo_check": true,
+    "frontend_build_and_tests": true
+  }
+}

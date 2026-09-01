@@ -1,0 +1,56 @@
+{
+  "schema_version": "rag_answer_quality_eval_recheck_v0.1",
+  "performed_at": "2026-08-30T03:56:45+08:00",
+  "status": "diagnostic_recheck",
+  "change": "offline_answer_claim_support_metrics",
+  "design_basis": [
+    {
+      "name": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adapted_mechanism": "把检索质量、引用合法性和答案 claim 支持分开报告，而不是用单一检索命中率代表答案质量。"
+    },
+    {
+      "name": "CRAG",
+      "url": "https://arxiv.org/abs/2401.15884",
+      "adapted_mechanism": "当引用 ID 合法但内容不支持答案时，离线指标明确暴露该失败，生产路径继续使用受控重试/保守回退。"
+    },
+    {
+      "name": "SoulDrive production gate",
+      "path": "core/answer_quality.py",
+      "adapted_mechanism": "离线评测复用 semantic=true 的同源 claim-to-citation 支持校验，避免评测口径与生产口径分叉。"
+    }
+  ],
+  "evaluation_contract": {
+    "dataset": "eval/fixtures/rag_cn_raw_v0.1/dev.jsonl",
+    "result_file": "eval/results/rag_cn_dev_answer_quality_gate_recheck_20260830.jsonl",
+    "read_only_saved_results": true,
+    "citation_id_metric": "引用 ID 存在性单独统计为 citation_valid_rate。",
+    "claim_support_metric": "非空且非预期拒答答案进入 citation_support_valid_rate；复用 validate_answer_citations(semantic=true)。",
+    "scaffold_boundary": "固定的来源文档、证据章节、视觉范围、证据定位和直接证据引导语只作为定位脚手架；实际事实结论仍必须有引用并通过正文/上下文支持。",
+    "location_boundary": "页码、切片号和引用序号在数字事实检查前被限定性剥离，避免把证据位置编号当作业务数字；其他数字仍必须出现在证据正文中。"
+  },
+  "verification": {
+    "sample_count": 16,
+    "top_k": 6,
+    "retrieval_all_hit_rate": 1.0,
+    "retrieval_any_hit_rate": 1.0,
+    "citation_valid_rate": 1.0,
+    "citation_support_valid_rate": 1.0,
+    "citation_support_invalid_rate": 0.0,
+    "claim_support_checked_count": 39,
+    "claim_support_unsupported_claim_count": 0,
+    "answerable_pass_rate": 1.0,
+    "avg_saved_end_to_end_ms": 3390,
+    "targeted_regression": "57 passed",
+    "backend_full": "736 passed, 1 warning",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "interpretation": "该结果证明答案评测器能在同一批已保存 dev 回答上区分引用 ID 合法和引用内容支持，并发现/解释结构化定位语句；它是只读历史结果重算，不是本轮新模型、新索引或实时生产准确率提升。",
+  "limitations": [
+    "当前工作区没有对应 sealed-test 的完整答案生成结果，因此未对 sealed 回答 claim 支持率作结论。",
+    "支持判定仍是确定性词法代理，不是 NLI、事实真值验证或人工金标准；同义改写、跨段推理和单位换写需另行评测。",
+    "没有在正式加密工作区执行实时生成；当前结果不能替代真实跨项目 episode、端到端延迟和多模态消融。",
+    "本次未修改评测数据、模型权重、检索排序权重或 sealed-test 主口径。"
+  ]
+}

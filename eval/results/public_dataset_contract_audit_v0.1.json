@@ -1,0 +1,167 @@
+{
+  "schema_version": "souldrive_public_dataset_contract_audit_v0.1",
+  "created_at": "2026-08-18T09:39:11.677252+00:00",
+  "mintrec2": {
+    "source": "https://github.com/thuiar/MIntRec2.0",
+    "commit": "38cb8bf1841cfb9b410aa6a8731394ca5ba74a39",
+    "intent_labels": [
+      "Acknowledge",
+      "Advise",
+      "Agree",
+      "Apologise",
+      "Arrange",
+      "Ask for help",
+      "Asking for opinions",
+      "Care",
+      "Comfort",
+      "Complain",
+      "Confirm",
+      "Criticize",
+      "Doubt",
+      "Emphasize",
+      "Explain",
+      "Flaunt",
+      "Greet",
+      "Inform",
+      "Introduce",
+      "Invite",
+      "Joke",
+      "Leave",
+      "Oppose",
+      "Plan",
+      "Praise",
+      "Prevent",
+      "Refuse",
+      "Taunt",
+      "Thank",
+      "Warn"
+    ],
+    "intent_count": 30,
+    "oos_label": "UNK",
+    "official_splits": [
+      "train.tsv",
+      "dev.tsv",
+      "test.tsv"
+    ],
+    "tsv_contract": {
+      "dialogue_id_column": 0,
+      "utterance_id_column": 1,
+      "text_column": 2,
+      "intent_column": 3,
+      "speaker_column": 7
+    },
+    "metrics": {
+      "Metrics": [
+        "acc",
+        "weighted_f1",
+        "weighted_prec",
+        "f1",
+        "prec",
+        "rec"
+      ],
+      "OOD_Metrics": [
+        "auroc",
+        "aupr_in",
+        "aupr_out",
+        "fpr95",
+        "eer",
+        "der"
+      ],
+      "OID_Metrics": [
+        "oid_acc",
+        "f1-known",
+        "f1-open",
+        "oid_f1"
+      ]
+    },
+    "license_signal": "CC-BY-NC-SA-4.0 badge in README",
+    "license_file_present": false,
+    "download_sizes_from_readme": {
+      "in_scope": "13G",
+      "out_of_scope": "7.44G"
+    },
+    "contract_files": [
+      {
+        "path": "README.md",
+        "bytes": 8363,
+        "sha256": "1b41a36c5932c8af8e8272f7278c5af61744877cf04143ba0ff74db1040f7624"
+      },
+      {
+        "path": "data/single_turn/__init__.py",
+        "bytes": 3132,
+        "sha256": "64645f6856d12bd354938343e73d74b2118346232d94120964c334bc018d6aba"
+      },
+      {
+        "path": "data/single_turn/base.py",
+        "bytes": 9053,
+        "sha256": "663e60f5d4061f95ff00f02ecf16b05a094c3ffbbe73fbb81fd7a78da26c6790"
+      },
+      {
+        "path": "data/multi_turn/base.py",
+        "bytes": 13107,
+        "sha256": "7030c5e2a527c4c53b1ebb536f8a9a219a8ba8bc54518dcfd37f2ba3ec82fb2c"
+      },
+      {
+        "path": "utils/metrics.py",
+        "bytes": 8850,
+        "sha256": "d53bb47b4deffb74d662453807d943964600f029bf7b5b9e50b6797aec7e0b4a"
+      },
+      {
+        "path": "configs/single_turn/text.py",
+        "bytes": 2374,
+        "sha256": "3746596077e58556eea491b1b6d2b65a79273f66be7e9895460562516535d7c6"
+      }
+    ],
+    "ready_for_training": false,
+    "blockers": [
+      "Official data archive and TSV files are not downloaded or hashed.",
+      "README license badge is not accompanied by a repository LICENSE file.",
+      "Pretrained model paths in official configs are machine-specific and require local adaptation."
+    ]
+  },
+  "screenspot": {
+    "source": "https://github.com/njucckevin/SeeClick",
+    "commit": "0ef37ac4d7aaf37ba7b990e3e3c3ca77e1fb8f93",
+    "sample_contract": [
+      "img_filename",
+      "instruction",
+      "bbox",
+      "data_type",
+      "data_souce"
+    ],
+    "platforms": [
+      "iOS",
+      "Android",
+      "macOS",
+      "Windows",
+      "Web"
+    ],
+    "sample_count_claim": "over 1200",
+    "code_license": "Apache-2.0",
+    "dataset_license": "unresolved; README requires original dataset licenses",
+    "license_notice_present": true,
+    "download_links_present": true,
+    "contract_files": [
+      {
+        "path": "LICENSE",
+        "bytes": 11556,
+        "sha256": "5ad8c213095c573921d7388edf93f6a9f54490b8ebf3b165ae8ef1947cf70846"
+      },
+      {
+        "path": "readme.md",
+        "bytes": 9991,
+        "sha256": "2873b30cf8b3afa7846b6ae2e502059bd58c5948be705321ea3c1292553e0a1e"
+      }
+    ],
+    "ready_for_evaluation": false,
+    "blockers": [
+      "Official ScreenSpot archive is not downloaded or hashed.",
+      "Dataset-specific license is not stated in the repository LICENSE file."
+    ]
+  },
+  "notes": [
+    "This audit executes no third-party repository code.",
+    "Repository code licenses do not automatically license downloaded media or annotations.",
+    "No public benchmark score is claimed by this audit."
+  ]
+}

@@ -15,12 +15,24 @@ from core.model_runtime import (
 
 
 class ModelRuntimeTests(unittest.TestCase):
+    def setUp(self):
+        self.cloud_model_config_patch = patch(
+            "core.model_runtime.load_cloud_model_config",
+            return_value=None,
+        )
+        self.cloud_model_config_patch.start()
+
     def tearDown(self):
+        self.cloud_model_config_patch.stop()
         for name in (
             "SOULDRIVE_CHAT_MODEL",
             "SOULDRIVE_LLAMA_CHAT_CTX",
             "SOULDRIVE_LLAMA_MAX_TOKENS",
             "SOULDRIVE_MODEL_DIR",
+            "SOULDRIVE_CHAT_PROVIDER",
+            "SOULDRIVE_OLLAMA_MODEL",
+            "SOULDRIVE_EMBEDDING_PROVIDER",
+            "SOULDRIVE_OLLAMA_EMBEDDING_MODEL",
         ):
             os.environ.pop(name, None)
 
@@ -165,23 +177,40 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertTrue(report["ready"])
         self.assertEqual(report["embedding_model"]["name"], "Qwen3-Embedding-0.6B")
 
-    def test_load_llama_model_uses_cpu_runtime(self):
+    def test_model_runtime_diagnostics_reports_ollama_models(self):
+        with patch.dict(os.environ, {
+            "SOULDRIVE_CHAT_PROVIDER": "ollama",
+            "SOULDRIVE_OLLAMA_MODEL": "qwen3.5:9b",
+            "SOULDRIVE_EMBEDDING_PROVIDER": "ollama",
+            "SOULDRIVE_OLLAMA_EMBEDDING_MODEL": "qwen3-embedding:4b",
+        }, clear=False):
+            report = model_runtime_diagnostics()
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["chat_model"]["selected"], "qwen3.5:9b")
+        self.assertEqual(report["chat_model"]["provider"], "ollama")
+        self.assertEqual(report["embedding_model"]["name"], "qwen3-embedding:4b")
+
+    def test_load_llama_model_offloads_all_layers_when_supported(self):
         class FakeLlama:
             instances = []
 
-            def __init__(self, model_path, n_ctx, verbose):
+            def __init__(self, model_path, n_ctx, n_gpu_layers, verbose):
                 self.model_path = model_path
                 self.n_ctx = n_ctx
+                self.n_gpu_layers = n_gpu_layers
                 self.verbose = verbose
                 FakeLlama.instances.append(self)
 
         config = LlamaRuntimeConfig(model_filename="model.gguf")
 
-        with patch.dict("sys.modules", {"llama_cpp": type("M", (), {"Llama": FakeLlama})}):
+        with patch.dict("sys.modules", {"llama_cpp": type("M", (), {"Llama": FakeLlama, "llama_supports_gpu_offload": lambda: True})}):
             result = load_llama_model("model.gguf", config, n_ctx=1024)
 
         self.assertIs(result.effective_config, config)
         self.assertEqual(FakeLlama.instances[-1].n_ctx, 1024)
+        self.assertEqual(FakeLlama.instances[-1].n_gpu_layers, -1)
+        self.assertEqual(result.gpu_layers, -1)
 
 
 if __name__ == "__main__":

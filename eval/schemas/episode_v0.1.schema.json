@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://souldrive.local/schemas/episode_v0.1.schema.json",
+  "title": "SoulDrive multimodal episode v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "episode_id", "split", "events"],
+  "properties": {
+    "schema_version": {"const": "souldrive_episode_v0.1"},
+    "episode_id": {"type": "string", "minLength": 1},
+    "template_id": {"type": ["string", "null"]},
+    "split": {"enum": ["seed", "train", "validation", "test"]},
+    "project_id": {"type": ["string", "null"]},
+    "profile_id": {"type": ["string", "null"]},
+    "speaker_id": {"type": ["string", "null"], "minLength": 1},
+    "capture": {"$ref": "#/$defs/capture"},
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/event"}
+    },
+    "ground_truth": {"$ref": "#/$defs/ground_truth"},
+    "provenance": {"$ref": "#/$defs/provenance"}
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "modality", "start_ms", "end_ms", "confidence", "privacy_level", "payload"],
+      "properties": {
+        "event_id": {"type": "string", "minLength": 1},
+        "modality": {
+          "enum": ["audio", "speech_text", "screen", "ui_selection", "ocr_region", "pointer", "profile", "history"]
+        },
+        "start_ms": {"type": "integer", "minimum": 0},
+        "end_ms": {"type": "integer", "minimum": 0},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "privacy_level": {"enum": ["public", "project", "private", "restricted"]},
+        "payload_ref": {"type": ["string", "null"]},
+        "payload": {"type": "object"}
+      }
+    },
+    "ground_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent", "slots", "aligned_event_ids", "conflict_type", "expected_action"],
+      "properties": {
+        "intent": {"type": "string", "minLength": 1},
+        "slots": {"type": "object"},
+        "target_id": {"type": ["string", "null"]},
+        "target_bbox": {
+          "anyOf": [
+            {"$ref": "#/$defs/bbox"},
+            {"type": "null"}
+          ]
+        },
+        "aligned_event_ids": {"type": "array", "items": {"type": "string"}},
+        "conflict_type": {"type": "string"},
+        "expected_action": {"type": "string"},
+        "expected_response": {"type": ["string", "null"]}
+      }
+    },
+    "bbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "width": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "height": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "application": {"type": ["string", "null"], "minLength": 1},
+        "speaker_id": {"type": ["string", "null"], "minLength": 1},
+        "target_kind": {
+          "type": ["string", "null"],
+          "enum": ["text", "icon", "chart", "table", "window", "other", "none", "unknown", null]
+        },
+        "screen_size": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["width", "height"],
+              "properties": {
+                "width": {"type": "integer", "minimum": 1},
+                "height": {"type": "integer", "minimum": 1}
+              }
+            },
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {"type": "string"},
+        "license": {"type": ["string", "null"]},
+        "generator": {"type": ["string", "null"]},
+        "random_seed": {"type": ["integer", "null"]},
+        "review_status": {"enum": ["unreviewed", "reviewed", "sealed"]}
+      }
+    }
+  }
+}

@@ -7,7 +7,14 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "npm run test:chat-errors && npm run test:learning && npm run test:document-scope && npm run test:media-capture && npm run test:mindmap && npm run test:security-errors && npm run test:schedule",
+    "test:chat-errors": "tsc --target ES2020 --module ESNext --moduleResolution bundler --lib ES2020,DOM --skipLibCheck --noEmit false --outDir ../build/chat-errors-test src/chatErrors.ts && node scripts/chat-errors.test.mjs",
     "test:learning": "node scripts/learning-review.test.mjs",
+    "test:document-scope": "node scripts/document-scope.test.mjs",
+    "test:media-capture": "tsc --target ES2020 --module ESNext --moduleResolution bundler --lib ES2020,DOM --skipLibCheck --noEmit false --outDir ../build/media-capture-test src/mediaCapture.ts && node scripts/media-capture.test.mjs",
+    "test:mindmap": "tsc --target ES2020 --module ESNext --moduleResolution bundler --lib ES2020,DOM --skipLibCheck --noEmit false --outDir ../build/mindmap-test src/mindmap.ts && node scripts/mindmap.test.mjs",
+    "test:security-errors": "tsc --target ES2020 --module ESNext --moduleResolution bundler --lib ES2020,DOM --skipLibCheck --noEmit false --outDir ../build/security-errors-test src/securityErrors.ts && node scripts/security-errors.test.mjs",
+    "test:schedule": "node scripts/schedule.test.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

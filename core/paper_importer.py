@@ -2,16 +2,19 @@ import hashlib
 import shutil
 from pathlib import Path
 
+from core.document_types import SUPPORTED_DOCUMENT_EXTENSIONS, document_media_type
+from core.document_types import SUPPORTED_PAPER_EXTENSIONS
 from core.secure_document_store import SecureDocumentStore
 from core.security_context import get_workspace_keys
 from core.workspace import SoulDriveWorkspace
 
 
-def import_paper_into_workspace(workspace: SoulDriveWorkspace, source_path: str) -> dict:
+def import_paper_into_workspace(workspace: SoulDriveWorkspace, source_path: str, *, allowed_extensions=None) -> dict:
     source = Path(source_path)
     display_name = source.name or "unknown"
 
-    if source.suffix.lower() != ".pdf":
+    allowed_extensions = allowed_extensions or SUPPORTED_DOCUMENT_EXTENSIONS
+    if source.suffix.lower() not in allowed_extensions:
         return {
             "name": display_name,
             "status": "rejected",
@@ -26,7 +29,7 @@ def import_paper_into_workspace(workspace: SoulDriveWorkspace, source_path: str)
 
     papers_dir = Path(workspace.papers_path)
     papers_dir.mkdir(parents=True, exist_ok=True)
-    base_destination = papers_dir / safe_pdf_filename(source.name)
+    base_destination = papers_dir / safe_document_filename(source.name)
 
     workspace_keys = get_workspace_keys(workspace.root_path)
     if workspace_keys is not None:
@@ -41,6 +44,7 @@ def import_paper_into_workspace(workspace: SoulDriveWorkspace, source_path: str)
             return {
                 "name": base_destination.name,
                 "status": "already_present",
+                "media_type": document_media_type(base_destination.name),
             }
     except OSError:
         pass
@@ -49,6 +53,7 @@ def import_paper_into_workspace(workspace: SoulDriveWorkspace, source_path: str)
         return {
             "name": base_destination.name,
             "status": "already_present",
+            "media_type": document_media_type(base_destination.name),
         }
 
     destination = available_paper_path(base_destination)
@@ -56,10 +61,11 @@ def import_paper_into_workspace(workspace: SoulDriveWorkspace, source_path: str)
     return {
         "name": destination.name,
         "status": "imported",
+        "media_type": document_media_type(destination.name),
     }
 
 
-def safe_pdf_filename(filename: str) -> str:
+def safe_document_filename(filename: str) -> str:
     cleaned = "".join(
         "_" if character in '<>:"/\\|?*' or ord(character) < 32 else character
         for character in Path(filename).name
@@ -67,8 +73,16 @@ def safe_pdf_filename(filename: str) -> str:
     if not cleaned:
         cleaned = "paper.pdf"
     path = Path(cleaned)
-    if path.suffix.lower() != ".pdf":
+    if path.suffix.lower() not in SUPPORTED_DOCUMENT_EXTENSIONS:
         cleaned = f"{path.stem or 'paper'}.pdf"
+    return cleaned
+
+
+def safe_pdf_filename(filename: str) -> str:
+    cleaned = safe_document_filename(filename)
+    path = Path(cleaned)
+    if path.suffix.lower() != ".pdf":
+        return f"{path.stem or 'paper'}.pdf"
     return cleaned
 
 
@@ -96,6 +110,14 @@ def same_file_content(left: Path, right: Path) -> bool:
 
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def file_md5(path: Path) -> str:
+    digest = hashlib.md5()
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
             digest.update(chunk)

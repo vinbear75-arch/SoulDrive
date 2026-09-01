@@ -1,0 +1,60 @@
+{
+  "schema_version": "souldrive_product_b1_runtime_metrics_v0.1",
+  "status": "completed",
+  "discovered_files": 30,
+  "processed_files": 30,
+  "succeeded_files": 30,
+  "failed_files": 0,
+  "parse_success_rate": 1.0,
+  "chunk_count": 32,
+  "failure_summary": {},
+  "totals": {
+    "parse_ms": 24259,
+    "ingest_ms": 1648,
+    "graph_ms": 24,
+    "elapsed_ms": 26129,
+    "chunk_chars": 2258,
+    "child_count": 36,
+    "embedding_ms": 788,
+    "vector_store_ms": 628,
+    "keyword_index_ms": 97,
+    "parent_store_ms": 73,
+    "child_split_ms": 6,
+    "raw_items": 49,
+    "kept_items": 49,
+    "removed_page_artifacts": 0,
+    "removed_non_content": 0,
+    "removed_duplicates": 0,
+    "table_items": 0,
+    "image_items": 3,
+    "ocr_ms": 2577,
+    "ocr_region_count": 12,
+    "ocr_mean_confidence": 0.99235,
+    "pages": 30,
+    "parent_chunks": 32,
+    "conversion_error_count": 0,
+    "converted_pages": 30,
+    "failed_page_count": 0,
+    "formal_window_count": 28,
+    "boundary_overlap_opportunity_count": 0,
+    "boundary_overlap_count": 0,
+    "boundary_overlap_truncated_count": 0,
+    "boundary_overlap_token_skip_count": 0,
+    "boundary_overlap_coverage_rate": null,
+    "max_child_tokens": 66,
+    "max_embedding_input_tokens": 166,
+    "embedding_token_limit": 512,
+    "child_strategy_counts": {
+      "dynamic_structure_overlap_v1": 8,
+      "formal_structure_paragraph_window_v2": 28
+    },
+    "conversion_status_counts": {
+      "success": 30
+    },
+    "modality_counts": {
+      "document": 27,
+      "image": 3
+    }
+  },
+  "failures": []
+}

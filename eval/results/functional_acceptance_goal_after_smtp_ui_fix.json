@@ -1,0 +1,93 @@
+{
+  "schema_version": "souldrive_functional_acceptance_v1",
+  "generated_at": "2026-08-25T11:00:00+08:00",
+  "scope": "当前本机 PC 开发运行态逐项功能验收；不把 mock 或 smoke 结果冒充真实外部成功",
+  "runtime": {
+    "startup_script": "启动SoulDrive.bat",
+    "single_tauri_window_observed": true,
+    "sidecar_health": "pass",
+    "sidecar_api_port_observed": 55631,
+    "workspace_unlocked": true,
+    "storage_root": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace"
+  },
+  "email_and_contacts": {
+    "provider": "qq",
+    "sender": "1342325858@qq.com",
+    "recipient_contact": "handsome_Vin <2956584050@qq.com>",
+    "contact_button_and_modal": "pass",
+    "saved_contact_loaded_after_open": "pass",
+    "contact_selection_fills_recipient": "pass",
+    "smtp_ui_button_label": "保存并核验 SMTP 配置",
+    "smtp_ui_without_code": "correctly_disabled",
+    "smtp_status_without_credential": "credential_missing",
+    "smtp_tcp_465_reachable": true,
+    "windows_credential_round_trip_without_user_secret": "pass",
+    "mock_smtp_mime_and_confirmation_gate": "pass",
+    "real_delivery": "blocked_user_action",
+    "real_delivery_blocker": "用户尚未在界面保存本人的 QQ SMTP 授权码，也尚未确认真实发送",
+    "authorization_code_read_or_recorded_by_agent": false
+  },
+  "storage": {
+    "redis": "pass",
+    "postgresql": "pass",
+    "file_archive": "pass",
+    "redis_version": "8.10.0",
+    "postgresql_version": "17.11",
+    "postgresql_sessions": 28,
+    "postgresql_messages": 89,
+    "postgresql_summaries": 2,
+    "postgresql_memories": 245,
+    "history_root": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\runtime\\history"
+  },
+  "rag_and_graph_rag": {
+    "graph_index": "pass",
+    "documents": 10,
+    "entities": 242,
+    "relationships": 294,
+    "leiden_communities": 4,
+    "route_acceptance": "pass",
+    "candidate_answers_cited": "3/3",
+    "candidate_refusals": 0,
+    "elapsed_ms": {
+      "hybrid": 139714,
+      "global": 256498,
+      "local": 103973
+    },
+    "performance_status": "needs_optimization"
+  },
+  "multimodal": {
+    "model_smoke": "pass",
+    "asr": "pass",
+    "ocr": "pass",
+    "vlm": "pass",
+    "media_fixture_episodes_validated": 480,
+    "ocr_term_recall": 1.0,
+    "ocr_p95_ms": 2412,
+    "vlm_cold_load_ms": 49263,
+    "vlm_inference_ms": 56805,
+    "performance_status": "needs_optimization"
+  },
+  "artifacts": {
+    "ppt_openxml_and_evidence_smoke": "pass",
+    "schedule_ics_flow": "pass",
+    "skill_download_review_approval_smoke": "pass",
+    "skill_scripts_auto_executed": false
+  },
+  "regression": {
+    "python_tests": "564 passed, 1 warning",
+    "frontend_build": "pass",
+    "frontend_ui_unit_tests": "pass",
+    "rust_cargo_check": "pass",
+    "python_compileall": "pass"
+  },
+  "competition_gate": {
+    "mvp_ready": true,
+    "competition_ready_for_current_topic5_gate": false,
+    "not_used_as_open_topic1_score": true,
+    "remaining_external_or_performance_work": [
+      "真实 QQ SMTP 授权码保存与用户确认后的真实回执",
+      "GraphRAG/RAG 与 VLM 延迟优化",
+      "公开赛题一正式数据集、端到端样本与统一 P95 评测口径"
+    ]
+  }
+}

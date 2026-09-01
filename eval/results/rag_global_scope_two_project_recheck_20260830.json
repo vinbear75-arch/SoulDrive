@@ -1,0 +1,53 @@
+{
+  "schema_version": "souldrive_rag_global_scope_two_project_recheck_v0.1",
+  "performed_at": "2026-08-30T21:10:58.6550000+08:00",
+  "design_basis": [
+    {
+      "name": "Microsoft GraphRAG",
+      "url": "https://microsoft.github.io/graphrag/query/overview/",
+      "applied_principle": "查询范围先路由，再把共享知识和当前项目证据分层返回"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "来源身份和证据引用随检索结果保留，项目隔离不能丢失可追溯来源"
+    }
+  ],
+  "scope": "当前项目优先、全局未绑定文档回退以及跨项目私有来源隔离；使用临时隔离工作区，不触碰正式加密工作区",
+  "fixture": {
+    "global_source": "global-rag.pdf",
+    "project_a": "p1",
+    "project_a_private_source": "p1-rag.pdf",
+    "project_b": "p2",
+    "project_b_private_source": "p2-noise.pdf",
+    "query": "RAG retrieval generation"
+  },
+  "verification": {
+    "project_a": {
+      "route": "project_first_with_global",
+      "sources": ["p1-rag.pdf", "global-rag.pdf"],
+      "project_ids": ["p1", null],
+      "global_source_present": true,
+      "foreign_private_source_present": false,
+      "citation_ids": ["E1", "E2"]
+    },
+    "project_b": {
+      "route": "global_fallback",
+      "sources": ["global-rag.pdf"],
+      "project_ids": [null],
+      "global_source_present": true,
+      "foreign_private_source_present": false,
+      "citation_ids": ["E1"]
+    },
+    "global_source_available_in_both_projects": true,
+    "cross_project_private_leakage_detected": false,
+    "existing_contract_tests": "tests/test_secure_retrieval_flow.py project/global routing cases passed in full backend regression"
+  },
+  "decision": "保留当前项目优先、全局文档回退路由；该回放证明的是来源可见性和隔离契约，不是答案语义准确率或业务效果提升",
+  "limitations": [
+    "回放使用临时工作区和受控 embedding fixture，不代表正式加密工作区已经解锁或重建",
+    "本轮未运行本地生成模型，未测答案级事实/NLI、首 token 或完整回答延迟",
+    "真实项目中全局文档绑定、权限配置和同名来源仍需在正式工作区解锁后验收",
+    "sealed-test、真实多模态 30 episode、GraphRAG 生产业务验收和完整链路 P95 仍未完成"
+  ]
+}

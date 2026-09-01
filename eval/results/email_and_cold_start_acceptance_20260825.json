@@ -1,0 +1,64 @@
+{
+  "schema_version": "souldrive_email_cold_start_acceptance_v1",
+  "created_at": "2026-08-25T16:16:05+08:00",
+  "cold_start": {
+    "status": "pass",
+    "startup_script": "启动SoulDrive.bat",
+    "tauri_pid": 32352,
+    "sidecar_pid": 43672,
+    "sidecar_port": 52512,
+    "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace",
+    "runtime_unlocked": true,
+    "health_http_status": 200,
+    "ready_http_status": 200,
+    "storage_degraded": false,
+    "file_archive": "ok",
+    "redis": {
+      "status": "ok",
+      "version": "8.10.0",
+      "aof_enabled": true,
+      "vector_index": true,
+      "vector_index_status": "ready"
+    },
+    "postgresql": {
+      "status": "ok",
+      "dsn_host_port": "127.0.0.1:5432",
+      "pending_outbox": 0
+    },
+    "evidence": "sidecar /health and /ready response captured during this cold start"
+  },
+  "local_contact": {
+    "status": "pass",
+    "display_name": "handsome_Vin",
+    "email": "2956584050@qq.com",
+    "evidence": "project_catalog.sqlite contact record and confirmed email artifact"
+  },
+  "qq_smtp": {
+    "status": "pass_for_real_smtp_delivery",
+    "provider": "qq",
+    "sender": "1342325858@qq.com",
+    "smtp_status": "configured",
+    "authorization_code_read_or_recorded_by_agent": false,
+    "artifact_id": "artifact_325a9bee924742d29c89ea4818081b65",
+    "confirmation_status": "confirmed",
+    "delivery_status": "sent",
+    "recipient": "2956584050@qq.com",
+    "attachment_count": 0,
+    "audit_events": [
+      "email.smtp_configured",
+      "artifact.status_changed(status=confirmed)",
+      "email.sent"
+    ],
+    "audit_chain": {
+      "ready": true,
+      "event_count": 682,
+      "broken_at": null
+    },
+    "external_mailbox_receipt": "pending_user_observation",
+    "evidence": [
+      "runtime/workspace/audit/audit_log.jsonl",
+      "runtime/workspace/data/project_catalog.sqlite"
+    ]
+  },
+  "overall_status": "functional_mvp_pass_pending_performance_and_external_receipt"
+}

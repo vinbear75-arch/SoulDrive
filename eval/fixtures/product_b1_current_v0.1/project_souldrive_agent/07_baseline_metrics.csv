@@ -1,0 +1,4 @@
+metric,value
+macro_f1,0.741
+target_binding_accuracy,0.620
+p95_latency_ms,1840

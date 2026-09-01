@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from core.cloud_model import load_cloud_model_config
 from core.embedding_models import (
     DEFAULT_EMBEDDING_MODEL,
     preferred_embedding_model_path,
@@ -75,6 +76,7 @@ class LlamaLoadResult:
     model: Any
     load_ms: int
     effective_config: LlamaRuntimeConfig
+    gpu_layers: int
 
 
 def resolve_chat_model_path(workspace_path: str | None = None, config: LlamaRuntimeConfig | None = None) -> str:
@@ -101,32 +103,77 @@ def load_llama_model(
 ) -> LlamaLoadResult:
     from llama_cpp import Llama
 
+    gpu_layers = _gpu_layers()
+
     def load_cpu_model():
         return Llama(
             model_path=model_path,
             n_ctx=n_ctx,
+            n_gpu_layers=gpu_layers,
             verbose=False,
         )
 
     model, load_ms = timed_model_load(load_cpu_model)
-    return LlamaLoadResult(model=model, load_ms=load_ms, effective_config=config)
+    return LlamaLoadResult(model=model, load_ms=load_ms, effective_config=config, gpu_layers=gpu_layers)
+
+
+def _gpu_layers() -> int:
+    try:
+        from llama_cpp import llama_supports_gpu_offload
+
+        return -1 if llama_supports_gpu_offload() else 0
+    except Exception:
+        return 0
 
 
 def model_runtime_diagnostics(workspace_path: str | None = None) -> dict[str, Any]:
     config = llama_runtime_config(workspace_path)
-    chat_path = Path(resolve_chat_model_path(workspace_path, config))
-    embedding_path = Path(preferred_embedding_model_path(workspace_path))
     search_roots = model_search_dirs(workspace_path)
     reranker_report = reranker_runtime_diagnostics(workspace_path)
-    chat_model_status = _chat_model_status(chat_path, config.model_filename)
-    return {
-        "ready": chat_model_status["ready"] and embedding_path.exists(),
-        "config": config.public_dict(),
-        "chat_model": {
-            **chat_model_status,
+    chat_provider = str(os.environ.get("SOULDRIVE_CHAT_PROVIDER") or "").strip().lower()
+    embedding_provider = str(os.environ.get("SOULDRIVE_EMBEDDING_PROVIDER") or "").strip().lower()
+    cloud_config = load_cloud_model_config()
+    if cloud_config is not None and cloud_config.enabled:
+        chat_report = {
+            "ready": bool(cloud_config.model),
+            "name": cloud_config.model or "未选择模型",
+            "selected": cloud_config.model,
+            "provider": "openai-compatible",
+            "mode": "cloud",
+        }
+    elif chat_provider == "ollama":
+        chat_model = str(os.environ.get("SOULDRIVE_OLLAMA_MODEL") or "qwen3.5:9b").strip()
+        chat_report = {
+            "ready": True,
+            "name": chat_model,
+            "selected": chat_model,
+            "provider": "ollama",
+            "mode": "ollama",
+        }
+    else:
+        chat_path = Path(resolve_chat_model_path(workspace_path, config))
+        chat_report = {
+            **_chat_model_status(chat_path, config.model_filename),
             "selected": config.model_filename,
-        },
-        "embedding_model": _path_status(embedding_path),
+            "provider": "llama.cpp",
+            "mode": "gguf",
+        }
+    if embedding_provider == "ollama":
+        embedding_report = {
+            "ready": True,
+            "name": str(os.environ.get("SOULDRIVE_OLLAMA_EMBEDDING_MODEL") or "qwen3-embedding:4b").strip(),
+            "provider": "ollama",
+        }
+    else:
+        embedding_path = Path(preferred_embedding_model_path(workspace_path))
+        embedding_report = _path_status(embedding_path)
+        embedding_report["provider"] = "sentence-transformers"
+    return {
+        "ready": chat_report["ready"] and embedding_report["ready"],
+        "config": config.public_dict(),
+        "gpu_layers": _gpu_layers() if chat_provider != "ollama" else 0,
+        "chat_model": chat_report,
+        "embedding_model": embedding_report,
         "reranker": {
             "ready": reranker_report["ready"],
             "selected": reranker_report["model_name"],

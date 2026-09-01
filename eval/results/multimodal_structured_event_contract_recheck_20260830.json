@@ -1,0 +1,37 @@
+{
+  "schema_version": "souldrive_multimodal_structured_event_contract_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "屏幕感知先输出结构化元素，再交给后续目标绑定；本轮只借鉴事件类型与来源保留原则，不引入 OmniParser 模型或代码"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "视觉理解与文本检索分路，并在回答阶段合并可用证据；本轮保持 V# 与 E# 命名空间隔离"
+    }
+  ],
+  "implemented": {
+    "accepted_visual_event_modalities": ["image", "image_region", "ocr_region"],
+    "canonical_evidence_modality": "image",
+    "preserved_source_field": "source_modality",
+    "visual_query_requires_text": true,
+    "ui_automation_and_screen_metadata_are_not_visual_prose": true,
+    "authorization_or_document_evidence_gate_changed": false
+  },
+  "verification": {
+    "targeted_backend": "133 passed, 1 warning",
+    "structured_event_unit_and_rag_integration": "passed",
+    "frontend_test": "passed in the preceding runtime-contract increment",
+    "frontend_build": "passed in the preceding runtime-contract increment",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "limits": [
+    "This closes a silent event-drop path; it does not prove visual recognition accuracy or multimodal end-to-end gain",
+    "It does not add icon/chart parsing, cross-application UIA coverage, or a new visual model",
+    "Real 30 episode evaluation, full-chain P50/P95, calibrated visual confidence, and production encrypted index rebuild remain unfinished"
+  ]
+}

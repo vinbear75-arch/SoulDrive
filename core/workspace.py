@@ -41,12 +41,45 @@ class SoulDriveWorkspace:
         return str(Path(self.root_path) / "data" / "learning.sqlite")
 
     @property
+    def project_catalog_path(self):
+        return str(Path(self.root_path) / "data" / "project_catalog.sqlite")
+
+    @property
     def task_journal_path(self):
         return str(Path(self.root_path) / "runtime" / "task_journal.sqlite")
 
     @property
+    def history_path(self):
+        """本机完整会话、摘要、长期记忆和 outbox 的专用目录。"""
+        return str(Path(self.root_path) / "runtime" / "history")
+
+    @property
+    def conversation_store_path(self):
+        return str(Path(self.history_path) / "conversations.sqlite")
+
+    @property
+    def conversation_archive_path(self):
+        return str(Path(self.history_path) / "conversations")
+
+    @property
+    def memory_archive_path(self):
+        return str(Path(self.history_path) / "memories")
+
+    @property
+    def outbox_path(self):
+        return str(Path(self.history_path) / "outbox.jsonl.enc")
+
+    @property
     def presentations_path(self):
         return str(Path(self.root_path) / "data" / "presentations")
+
+    @property
+    def calendars_path(self):
+        return str(Path(self.root_path) / "data" / "calendars")
+
+    @property
+    def skills_path(self):
+        return str(Path(self.root_path) / "skills")
 
     @property
     def index_path(self):
@@ -109,16 +142,38 @@ class SoulDriveWorkspace:
             self.papers_path,
             self.documents_path,
             self.presentations_path,
+            self.calendars_path,
+            self.skills_path,
             self.index_path,
             self.chroma_path,
             str(Path(self.root_path) / "audit"),
             self.config_path,
             self.runtime_path,
+            self.history_path,
             self.models_path,
         ):
             Path(path).mkdir(parents=True, exist_ok=True)
+        self._migrate_legacy_history()
         self._ensure_manifest()
         return self
+
+    def _migrate_legacy_history(self):
+        """保留旧 runtime 布局，首次启动时复制到专用 history 目录。"""
+        legacy_root = Path(self.root_path) / "runtime"
+        history_root = Path(self.history_path)
+        legacy_db = legacy_root / "conversations.sqlite"
+        new_db = history_root / "conversations.sqlite"
+        if legacy_db.is_file() and not new_db.exists():
+            shutil.copy2(legacy_db, new_db)
+        for name in ("conversations", "memories"):
+            source = legacy_root / name
+            target = history_root / name
+            if source.is_dir() and not target.exists():
+                shutil.copytree(source, target)
+        legacy_outbox = legacy_root / "outbox.jsonl.enc"
+        new_outbox = history_root / "outbox.jsonl.enc"
+        if legacy_outbox.is_file() and not new_outbox.exists():
+            shutil.copy2(legacy_outbox, new_outbox)
 
     def _ensure_manifest(self):
         manifest = Path(self.manifest_path)
@@ -131,10 +186,13 @@ class SoulDriveWorkspace:
                 "papers": "data/papers",
                 "documents": "data/documents",
                 "presentations": "data/presentations",
+                "calendars": "data/calendars",
+                "skills": "skills",
                 "index": "index",
                 "audit": "audit",
                 "models": "models",
                 "runtime": "runtime",
+                "history": "runtime/history",
             },
         }
         manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -189,4 +247,6 @@ def is_souldrive_workspace(drive_path: str):
 def resolve_workspace(active_drive: str | None = None):
     if active_drive:
         return SoulDriveWorkspace.from_drive(active_drive).ensure()
+    if os.environ.get("SOULDRIVE_WORKSPACE"):
+        return SoulDriveWorkspace.default().ensure()
     raise RuntimeError("removable SoulDrive workspace is not mounted")

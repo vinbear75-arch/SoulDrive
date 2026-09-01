@@ -1,0 +1,42 @@
+{
+  "schema_version": "souldrive_rag_context_evidence_alignment_recheck_v0.1",
+  "performed_at": "2026-08-30T20:36:04.5780274+08:00",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "检索正文、上下文压缩和来源证据保持可追溯关联"
+    },
+    {
+      "name": "Dify Knowledge Pipeline",
+      "url": "https://docs.dify.ai/en/cloud/use-dify/knowledge/knowledge-pipeline/knowledge-pipeline-orchestration",
+      "applied_principle": "摄取/检索/上下文处理分层，适配器异常不能静默丢失可用内容"
+    }
+  ],
+  "scope": "上下文准入阶段的 documents/evidence 数组错位保护，不改变检索排序、Top-K、权限过滤或索引",
+  "implementation": {
+    "fallback_order": "正文槽为空时，使用同一证据项的 context，再使用 snippet",
+    "audit_marker": "context_recovered_from_evidence=true",
+    "fail_closed": "同一证据没有可用 context/snippet 时仍以 empty_context 拒绝；不跨证据借用正文"
+  },
+  "verification": {
+    "targeted_tests": "127 passed",
+    "full_backend_tests": "834 passed, 1 warning",
+    "contract_case": {
+      "documents": [""],
+      "evidence_context": "RAG 通过检索外部知识增强生成模型回答。",
+      "admitted": true,
+      "recovered_document": true,
+      "audit_marker": true
+    },
+    "graph_rag_regression": "tests/test_graph_rag.py included in targeted suite and passed",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "decision": "保留后处理错位恢复；不宣称检索精度、答案准确率或 GraphRAG 业务效果提升",
+  "limitations": [
+    "该契约只覆盖适配器返回列长度/空正文异常，不替代摄取层的数据一致性校验",
+    "未因该后处理改动重新计算冻结检索指标；检索精度仍以既有冻结配对结果为准",
+    "正式加密工作区仍锁定，GraphRAG 生产业务验收、真实多模态 30 episode 和答案级人工/NLI 仍未完成"
+  ]
+}

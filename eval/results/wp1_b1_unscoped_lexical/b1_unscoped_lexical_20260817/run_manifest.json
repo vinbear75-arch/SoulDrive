@@ -1,0 +1,146 @@
+{
+  "schema_version": "souldrive_run_manifest_v0.1",
+  "run_id": "b1_unscoped_lexical_20260817",
+  "created_at": "2026-08-17T13:52:06Z",
+  "baseline_level": "B1_SIMPLE",
+  "status": "complete",
+  "repository": {
+    "head": "0e216835775a93ed263e57911b6d6aa31d813acc",
+    "branch": "main",
+    "tracked_diff_sha256": "271938619df247feef7c51b09ecc1596a38d0dd32430b16d511a0fc12a5ae26a",
+    "untracked_files": [
+      {
+        "path": "core/document_types.py",
+        "sha256": "327196f8a29b57dc5575e765f093465548a8384db05beb32c62d3c44e9e669aa"
+      },
+      {
+        "path": "core/image_ocr.py",
+        "sha256": "174b8a715f0cbe82c280160309f7ee214c32af402f6104f16ac0460b32923f17"
+      },
+      {
+        "path": "core/interaction_context.py",
+        "sha256": "c219c672d9ccff4bf5fc49383260b9553dc48550a9888856d9b8dc19b8f88cff"
+      },
+      {
+        "path": "docs/contest_topic5_product_blueprint.md",
+        "sha256": "e8c18f6960f171f31081f7f01075d63df520da5274f04903f1d170ca6d235bf2"
+      },
+      {
+        "path": "docs/dataset_audit_topic5_v0.1.md",
+        "sha256": "ed29ab8ae44aa8295d40cbebcfef7478a671a6dde223d987b97c9008071244c1"
+      },
+      {
+        "path": "docs/image_ocr_evaluation_protocol.md",
+        "sha256": "0438f84623d7779b3f3465c4bb0a7acf97de25362e2ab336f05244959ba82489"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-17-souldrive-pc-multimodal-execution-plan.md",
+        "sha256": "cad1f26f1c638ad09e2ab77d78555611ad83e3cf59f0bdb253db3c1178b2ab5e"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-17-souldrive-pc-multimodal-project-spec.md",
+        "sha256": "43acdd2f87ac83c5ec58689c3fc7ad5cea11af9a968eed2a0763b5e9b8a7d213"
+      },
+      {
+        "path": "eval/project_query_benchmark_v0.1.json",
+        "sha256": "0c4f2e707e96d5e589143f1e1b1ca90a381d52a979432568391bd253c3f77fa8"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/failures.jsonl",
+        "sha256": "5855a9892173878ac2360bfeb081b346748036c39dc496378b6c5ee1b0aa706a"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/latency.jsonl",
+        "sha256": "d72f38ae7e1e9cc0152812dde825a2685828f35608bd0d3090556b9e33589475"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/metrics.json",
+        "sha256": "afdb3ed3435ee1e925e20c63e7bd37dea39ec7c456aa91e546fea2883848988e"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/predictions.jsonl",
+        "sha256": "1fe479d12b7ed9c68ffd8a572c747300143be2d5df00ef61726867fb0aa2b217"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/run_manifest.json",
+        "sha256": "ddc2afe2357a3d0b90d78965adf219e815a7cd9075143cae1a490ff654b1b006"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/summary.md",
+        "sha256": "cc103e1c4ef1896580d9250c23c1e1852543cccbbbe5a186a73f23af11f5c0a8"
+      },
+      {
+        "path": "eval/schemas/episode_v0.1.schema.json",
+        "sha256": "6d3be675383474a26c77e7f2ecc6566afc672fb2be07a436b6745d0043e43f3d"
+      },
+      {
+        "path": "eval/schemas/infer_response_v0.1.schema.json",
+        "sha256": "c1c44d3fe1617886c1d7a8e1c6f341edd21ce91020d0f49589fd83a3f73ec378"
+      },
+      {
+        "path": "eval/schemas/run_manifest_v0.1.schema.json",
+        "sha256": "5873b40893677443ef71f53a251781a3ba361e05944373493abaeb9ab82cada8"
+      },
+      {
+        "path": "scripts/capture_b0_baseline.py",
+        "sha256": "ae5527ff99e46938c8169bc4b877cd75db1e6b2a9e65227a03867f4c7cf74e9c"
+      },
+      {
+        "path": "scripts/eval_image_ocr.py",
+        "sha256": "181660272ec660fe5ad7c359c724b751304c32e37978839f75724ee732951ead"
+      },
+      {
+        "path": "scripts/eval_project_query.py",
+        "sha256": "cb4bd33e5e882769be9285b5f5a818d175df1514de4f723c8eefc79f59f04153"
+      },
+      {
+        "path": "tests/test_baseline_schemas.py",
+        "sha256": "b05fc90d1896f5be642310acb997b4aa86149f2eeb4b7b96e8a750a7264d8ea8"
+      },
+      {
+        "path": "tests/test_image_ocr.py",
+        "sha256": "835afb77578c7e66b1f491c3a2e4ab2c9feb428b61bf5b940242f80c14b92101"
+      },
+      {
+        "path": "tests/test_image_ocr_eval.py",
+        "sha256": "68a6ed9d5a2cda67225b1ea38f370a2bda2b67ddad1e4a6710b75adf8af582c6"
+      },
+      {
+        "path": "tests/test_interaction_context.py",
+        "sha256": "ccdc778c28c30bdb18dc13579c5949ee4ba5c2db16f79e0cdd3b080f7bb25584"
+      },
+      {
+        "path": "tests/test_project_query_eval.py",
+        "sha256": "51e76f0b89eb838aa999bc81b27a74bcb5c2e4ccb4560fccef85dc9cc9909add"
+      }
+    ],
+    "workspace_state_sha256": "bbfb5fa294a9a724003d5847cd57c947a3d3b8b3e21d233af7fe09bf57399b65"
+  },
+  "environment": {
+    "python": "3.10.20",
+    "mode": "deterministic-unscoped-lexical"
+  },
+  "inputs": [
+    {
+      "path": "eval/project_query_benchmark_v0.1.json",
+      "sha256": "0c4f2e707e96d5e589143f1e1b1ca90a381d52a979432568391bd253c3f77fa8",
+      "bytes": 7730,
+      "provenance": "frozen synthetic WP1 evaluation dataset"
+    }
+  ],
+  "components": {
+    "retriever": "character/token overlap; ties prefer latest imported_at; no project, performed_at, type, or version filtering",
+    "top_k": 3
+  },
+  "outputs": {
+    "predictions": "predictions.jsonl",
+    "metrics": "metrics.json",
+    "latency": "latency.jsonl",
+    "failures": "failures.jsonl",
+    "summary": "summary.md"
+  },
+  "limitations": [
+    "This B1 is a deterministic simple baseline, not a live replay of the archived RAG system.",
+    "The benchmark is synthetic and measures only project, time, type, and version isolation semantics."
+  ]
+}

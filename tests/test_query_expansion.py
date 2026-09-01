@@ -98,6 +98,28 @@ class QueryExpansionTests(unittest.TestCase):
                 for term in expected_terms:
                     self.assertIn(term, joined)
 
+    def test_expand_query_variants_maps_blind_document_descriptions_to_index_titles(self):
+        cases = [
+            (
+                "在不透露文档名的情况下，对比AI 安全治理框架与生成式 AI 安全规范两类资料：它们在治理框架、生成式 AI 和落地证据上的关注点有什么差异？",
+                ["人工智能安全治理框架", "生成式人工智能服务安全基本要求"],
+            ),
+            (
+                "在不透露文档名的情况下，对比个人信息保护标准与生成式 AI 安全规范两类资料：它们在个人信息、生成式 AI 和落地证据上的关注点有什么差异？",
+                ["个人信息保护国家标准体系（2025版）", "生成式人工智能服务安全基本要求"],
+            ),
+            (
+                "在不透露文档名的情况下，对比数据安全标准体系与生成式 AI 安全规范两类资料：它们在数据安全、生成式 AI 和落地证据上的关注点有什么差异？",
+                ["数据安全国家标准体系（2025版）", "生成式人工智能服务安全基本要求"],
+            ),
+        ]
+
+        for query, expected_terms in cases:
+            with self.subTest(query=query):
+                joined = " ".join(expand_query_variants(query))
+                for term in expected_terms:
+                    self.assertIn(term, joined)
+
 
 if __name__ == "__main__":
     unittest.main()

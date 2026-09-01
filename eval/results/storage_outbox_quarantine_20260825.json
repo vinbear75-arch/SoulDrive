@@ -1,0 +1,33 @@
+{
+  "schema_version": "souldrive_storage_outbox_quarantine_v1",
+  "created_at": "2026-08-25T15:45:00+08:00",
+  "event_id": "redis_msg_3827ff7e39e64ee3127bd2dc30e17a759144bda7",
+  "event_type": "redis.session_message",
+  "session_id": "integration-session",
+  "classification": "orphaned_test_event",
+  "verification": {
+    "postgres_pending_before": 1,
+    "archive_manifest_exists": false,
+    "sqlite_message_exists": false,
+    "source_recoverable_from_current_workspace": false
+  },
+  "action": {
+    "status_before": "pending",
+    "status_after": "dead_letter",
+    "data_file_deleted": false,
+    "manual_recovery_possible": true,
+    "reason": "source archive missing for integration-session; preserved for manual recovery"
+  },
+  "post_action": {
+    "postgres_status": "ok",
+    "pending_outbox": 0,
+    "redis_status": "not_modified",
+    "file_archive_status": "not_modified"
+  },
+  "remaining_archive_issue": {
+    "count": 1,
+    "session_id": "goal-storage-recheck-2a709b8dc1",
+    "status": "unreadable_encrypted_test_session",
+    "action_taken": "none"
+  }
+}

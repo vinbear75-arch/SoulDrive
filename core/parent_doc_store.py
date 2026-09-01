@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sqlite3
 from typing import Any
 
@@ -44,6 +45,13 @@ class ParentDocumentStore:
             "content": row[0],
             "metadata": json.loads(row[1]),
         }
+
+    def get_adjacent_parent(self, parent_id: str, offset: int = 1):
+        match = re.match(r"^(.*)_parent_(\d+)$", str(parent_id or ""))
+        if not match:
+            return None
+        target_id = f"{match.group(1)}_parent_{int(match.group(2)) + int(offset)}"
+        return self.get_parent(target_id)
 
     def delete_by_document_hash(self, document_hash: str):
         cursor = self.conn.cursor()

@@ -1,0 +1,22 @@
+{
+  "schema_version": "souldrive_crud_rag_local_slice_v0.1",
+  "source_file": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\third_party\\crud_rag\\data\\crud_split\\split_merged.json",
+  "source_sha256": "04ca93a935b8b6da3f4bc62e8b9f903aa4fbeb3b465ae79720baa75e2e40b082",
+  "selection_seed": "souldrive-crud-rag-v1",
+  "sample_count": 104,
+  "corpus_document_count": 175,
+  "task_counts": {
+    "qa": 72,
+    "summary": 16,
+    "hallucination_detection": 16
+  },
+  "split_counts": {
+    "calibration": 52,
+    "sealed_test": 52
+  },
+  "retrieval_metric_policy": "derived_retrieval_only_not_official_crud_rag_qrels",
+  "limitations": [
+    "No official qrels are supplied by CRUD-RAG split_merged.json.",
+    "Do not tune on sealed_test or claim an official CRUD-RAG retrieval ranking."
+  ]
+}

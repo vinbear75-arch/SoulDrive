@@ -1,0 +1,704 @@
+{
+  "schema_version": "souldrive_graphrag_acceptance_v1",
+  "created_at": "2026-08-25T04:51:24+0800",
+  "purpose": "同一工作区、同一查询、同一模型条件下的 GraphRAG 路由与证据闭环验收，不是竞赛成绩",
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace",
+  "models": {
+    "chat": "qwen3.5:9b",
+    "embedding": "qwen3-embedding:4b"
+  },
+  "index": {
+    "ready": true,
+    "schema_version": "souldrive_graphrag_index_v1",
+    "algorithm": "leiden_v1_local_move_refine",
+    "resolution": 1.5,
+    "entity_count": 426,
+    "relationship_count": 497,
+    "document_count": 15,
+    "community_count": 4,
+    "target_community_range": [
+      3,
+      4
+    ],
+    "target_range_ok": true,
+    "communities": [
+      {
+        "community_id": "C001",
+        "title": "AGI / AI 动态获取与利用外部知识的能力 / Advanced RAG",
+        "entity_count": 384,
+        "source_count": 15,
+        "entity_names": [
+          "AGI",
+          "AI 动态获取与利用外部知识的能力",
+          "Advanced RAG",
+          "Akari Asai",
+          "Allen Institute for AI",
+          "Amos Tversky",
+          "Angle-optimized text embeddings",
+          "Artificial Intelligence Review",
+          "Ask in any modality",
+          "Avirup Sil",
+          "BAAI",
+          "BAI (北京智源",
+          "BGE",
+          "BGE-M3",
+          "Beijing Institute of Mathematical Sciences and Applications",
+          "Boris Johnson",
+          "Bronx",
+          "Chain-of-verification",
+          "Chatrec",
+          "Code-related few-shot learning",
+          "Conditional generation and snapshot learning in neural dialogue systems",
+          "Corrective Retrieval Augmented Generation",
+          "CuratedTrec",
+          "D. Zhou et al."
+        ],
+        "source_filenames": [
+          "01_rag_foundations_2020.pdf",
+          "01_requirement.pdf",
+          "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+          "02_architecture.pdf",
+          "02_react_reasoning_acting_2022.pdf",
+          "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+          "03_dataset_audit.pdf",
+          "03_self_rag_2023.pdf",
+          "03_检索增强生成_BIMSA.pdf",
+          "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+          "04_corrective_rag_2024.pdf",
+          "05_rag_survey_2023.pdf"
+        ],
+        "report": "您好！我注意到您提供的内容包含了一系列关于**检索增强生成（RAG）**、**多模态智能体架构**以及**大语言模型推理技术**的文档摘要和知识图谱关系。这些内容涵盖了从基础理论到具体应用场景（如科学数据服务、PC 端办公助手）的技术细节。 为了更有效地协助您，请告诉我您的具体需求： 1. **深度解析某个主题？** （例如：详细解释 ReAct 范式如何解决幻觉问题，或对比不同 RAG 变体的优劣。） 2. **整合信息生成报告？** （例如：基于提供的文档摘要，撰写一份关于“端侧多模态智能体技术挑战与解决方案”的综述草稿。） 3. **分析特定关系链？** （例如：梳理从基础 RAG 到 Modular RAG 的技术演进路径及其背后的关键人物/机构贡献。） 4. **提取关键技术点或实体？** （例如：列出所有提到的开源项目、数据集名称及对应的性能指标约束。） 请随时指示，我将基于您提供的资料为您生成相应的内容。",
+        "report_method": "llm"
+      },
+      {
+        "community_id": "C002",
+        "title": "AI大模型 / AI大模型与科学大数据、关联数据的融合应用 / ALFWorld",
+        "entity_count": 129,
+        "source_count": 11,
+        "entity_names": [
+          "AI大模型",
+          "AI大模型与科学大数据、关联数据的融合应用",
+          "ALFWorld",
+          "Act-only prompting",
+          "AlfWorld",
+          "Arc-Challenge",
+          "Augmentation",
+          "BART",
+          "BIMSA",
+          "CRAG",
+          "Chain-of-thought (CoT",
+          "ChatGPT",
+          "Critic Model",
+          "DPR",
+          "Factual Errors",
+          "Fever",
+          "FiD",
+          "Fine-tuning",
+          "GPT",
+          "Generation",
+          "Gitee",
+          "GraphRAG",
+          "Hallucinations",
+          "HotpotQA"
+        ],
+        "source_filenames": [
+          "01_rag_foundations_2020.pdf",
+          "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+          "02_react_reasoning_acting_2022.pdf",
+          "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+          "03_self_rag_2023.pdf",
+          "03_检索增强生成_BIMSA.pdf",
+          "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+          "04_corrective_rag_2024.pdf",
+          "05_rag_survey_2023.pdf",
+          "06_检索增强生成_SciOpen.pdf",
+          "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+        ],
+        "report": "您好！我注意到您提供的信息包含了一系列关于**检索增强生成（RAG）**、**大型语言模型（LLM）**及其相关技术（如 SELF-RAG, ReAct, CRAG 等）的文档摘要和知识图谱关系。 这些信息非常宝贵，涵盖了从基础原理到具体应用场景（特别是科学数据服务领域）的技术演进。 为了给您提供最有价值的帮助，请问您希望我基于这些资料做什么？例如： 1. **技术综述与对比**：为您梳理 RAG、SELF-RAG、ReAct、CRAG 等主流框架的核心思想、优缺点及适用场景的对比分析。 2. **科学数据服务方案构建**：结合\"01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf\"等资料，协助您设计一个针对多格式科学文献（PDF, HTML 等）解析与问答的系统架构。 3. **关键挑战解决方案**：深入探讨如何解决大模型在垂直领域中的“幻觉”、“知识滞后”及“隐私安全”问题，并给出具体的技术路径建议。 4. **知识库构建指南**：基于文档摘要中提到的多元化加载器、细粒度解析和语义分割等技术点，提供构建高质量科学数据知识库的操作步骤或最佳实践。 5. **其他需求**：如果您有特定的研究课题需要文献支持，或者想探讨某个具体算法（如 FiD, DPR）的实现细节，也请随时告诉我。 请告诉我您的具体需求！",
+        "report_method": "llm"
+      },
+      {
+        "community_id": "C003",
+        "title": "C 盘旧安装 / D 盘实例 / PostgreSQL",
+        "entity_count": 21,
+        "source_count": 1,
+        "entity_names": [
+          "C 盘旧安装",
+          "D 盘实例",
+          "PostgreSQL",
+          "PostgreSQL/文件记录",
+          "Redis",
+          "SQLite/文件系统",
+          "SoulDrive",
+          "TTL",
+          "checkpoint",
+          "outbox schema",
+          "session metadata",
+          "事件",
+          "会话",
+          "冻结",
+          "回填",
+          "完整会话",
+          "故障恢复",
+          "短期消息",
+          "记忆",
+          "迁移回滚保障",
+          "锁"
+        ],
+        "source_filenames": [
+          "souldrive-local-agent-memory-and-storage-direction.md"
+        ],
+        "report": "社区报告 C003聚焦于SoulDrive本机基础设施架构与存储方向，旨在构建高可靠本地代理记忆系统。该系统采用单入口启动策略，将开发实例部署于 D 盘的 PostgreSQL（端口5433），并保留C盘旧安装作为迁移回滚保障。实施遵循渐进式迭代：首先冻结Schema并建立SQLite/文件降级路径；随后引入PostgreSQL管理会话元数据与持久化记忆，利用checkpoint和outbox schema机制确保完整会话不丢失及事件先冻结处理；接着接入Redis处理热缓存、短期消息回填、锁机制及故障恢复（设置TTL）；最后集成向量检索。关键结论表明系统具备重启后恢复热会话至文件记录的能力，拥有严格的数据一致性校验以拒绝静默摘要，并支持跨项目隔离。适用边界要求保留文件系统降级路径直至所有分布式组件通过幂等与一致性测试，以确保本地开发环境稳定。",
+        "report_method": "llm"
+      },
+      {
+        "community_id": "C004",
+        "title": "Differentiable retriever / Masked language models / ORQA",
+        "entity_count": 25,
+        "source_count": 6,
+        "entity_names": [
+          "Differentiable retriever",
+          "Masked language models",
+          "ORQA",
+          "REALM",
+          "REPLUG",
+          "事实准确性",
+          "产品手册",
+          "企业知识管理",
+          "基于科学数据的检索增强生成（RAG）技术研究与应用",
+          "外部知识源",
+          "开放域问答",
+          "微电子学与计算机",
+          "文本生成",
+          "时效性",
+          "智能客服",
+          "李子骏",
+          "李雪峰",
+          "检索器与生成器分离训练机制",
+          "检索增强生成",
+          "知识密集型任务",
+          "知识服务",
+          "知识覆盖率",
+          "肖辉",
+          "预训练语言模型"
+        ],
+        "source_filenames": [
+          "01_rag_foundations_2020.pdf",
+          "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+          "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+          "03_检索增强生成_BIMSA.pdf",
+          "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+          "06_检索增强生成_SciOpen.pdf"
+        ],
+        "report": "社区报告 C004 聚焦检索增强生成（RAG）技术，旨在解决大型预训练语言模型在知识密集型任务中表现受限、缺乏决策溯源及事实准确性不足的问题。该技术通过耦合外部知识库与生成器，有效提升了回答的时效性与覆盖率。核心架构包含负责筛选文档的可微分检索器或神经检索器，以及利用特征拼接提升准确率的融合模块（如 FiD）。典型变体包括基于掩码语言模型构建的 REALM 和 REPLUG，两者均采用检索器与生成器分离训练机制。RAG 广泛应用于开放域问答、智能客服实时调取产品手册及企业知识管理等领域。相关研究发表于《微电子学与计算机》等期刊，作者涉及李子骏与李雪峰等人。尽管面临长尾实体召回率低及多源信息冲突挑战，该技术仍为构建可解释、可扩展的通用 NLP 系统提供了新路径，助力科研创新与行业应用落地。",
+        "report_method": "llm"
+      }
+    ],
+    "built_at": 1787592903.5345604,
+    "memory_policy": "document_derived_index_only; user_memory_is_not_graph_data"
+  },
+  "runs": [
+    {
+      "query": "RAG 的核心流程包括哪些阶段？",
+      "route": {
+        "use_graph": false,
+        "mode": "hybrid",
+        "reason": "single_evidence_lookup",
+        "signals": [],
+        "estimated_cost": "low"
+      },
+      "index_snapshot": {
+        "document_count": 15,
+        "community_count": 4,
+        "algorithm": "leiden_v1_local_move_refine"
+      },
+      "b0_current": {
+        "graph_enabled": false,
+        "gate": {
+          "schema_version": "context_admission_gate_v1",
+          "decision": "accept",
+          "reason": "evidence accepted",
+          "accepted_count": 6,
+          "rejected_count": 0,
+          "budget_chars": 7600,
+          "accepted_chars": 1664,
+          "budget_utilization": 0.218947,
+          "query_term_coverage": 0.259259,
+          "source_count": 3,
+          "untrusted_instruction_count": 0,
+          "rejected": [],
+          "evidence": {
+            "count": 6,
+            "sources": [
+              "06_检索增强生成_SciOpen.pdf",
+              "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+              "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            ],
+            "source_count": 3,
+            "raw_sources_only": true,
+            "citation_ids": [
+              "E1",
+              "E2",
+              "E3",
+              "E4",
+              "E5",
+              "E6"
+            ]
+          }
+        }
+      },
+      "b1_simple_graph": {
+        "graph_enabled": false,
+        "graph": {
+          "enabled": false,
+          "route": {
+            "use_graph": false,
+            "mode": "hybrid",
+            "reason": "single_evidence_lookup",
+            "signals": [],
+            "estimated_cost": "low"
+          },
+          "communities": []
+        },
+        "context_gate": {
+          "schema_version": "context_admission_gate_v1",
+          "decision": "accept",
+          "reason": "evidence accepted",
+          "accepted_count": 6,
+          "rejected_count": 0,
+          "budget_chars": 7600,
+          "accepted_chars": 1664,
+          "budget_utilization": 0.218947,
+          "query_term_coverage": 0.259259,
+          "source_count": 3,
+          "untrusted_instruction_count": 0,
+          "rejected": [],
+          "evidence": {
+            "count": 6,
+            "sources": [
+              "06_检索增强生成_SciOpen.pdf",
+              "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+              "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            ],
+            "source_count": 3,
+            "raw_sources_only": true,
+            "citation_ids": [
+              "E1",
+              "E2",
+              "E3",
+              "E4",
+              "E5",
+              "E6"
+            ]
+          }
+        },
+        "evidence_gate": {
+          "allowed": true,
+          "reason": "evidence accepted",
+          "evidence_count": 6,
+          "max_score": 0.265315,
+          "decision": "accept"
+        }
+      },
+      "candidate_live_answer": {
+        "status": "pass",
+        "error": null,
+        "elapsed_ms": 26402,
+        "answer_chars": 199,
+        "refusal": false,
+        "has_citation": true,
+        "answer": "1. **向量化（Vectorization）阶段**：将领域特定的文本和用户查询转换为高维嵌入以捕捉语义细微差别 [E1]。\n2. **检索（Retrieval）阶段**：利用相似度搜索算法从向量化数据库中提取上下文相关的知识片段，确保与专业标准对齐 [E1]。\n3. **生成（Generation）阶段**：大语言模型综合检索到的内容与用户输入来产生输出，以平衡可读性与事实准确性 [E1]。",
+        "retrieved_sources": [
+          "06_检索增强生成_SciOpen.pdf",
+          "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+          "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+          "05_rag_survey_2023.pdf",
+          "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+          "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+        ],
+        "graph": {
+          "communities": [],
+          "enabled": false,
+          "route": {
+            "estimated_cost": "low",
+            "mode": "hybrid",
+            "reason": "single_evidence_lookup",
+            "signals": [],
+            "use_graph": false
+          }
+        }
+      }
+    },
+    {
+      "query": "请从这些中文资料总结 RAG 检索、重排与生成的共同优化思路。",
+      "route": {
+        "use_graph": true,
+        "mode": "global",
+        "reason": "cross_document_or_global_synthesis",
+        "signals": [
+          "共同"
+        ],
+        "estimated_cost": "high_once_per_indexed_corpus"
+      },
+      "index_snapshot": {
+        "document_count": 15,
+        "community_count": 4,
+        "algorithm": "leiden_v1_local_move_refine"
+      },
+      "b0_current": {
+        "graph_enabled": false,
+        "gate": {
+          "schema_version": "context_admission_gate_v1",
+          "decision": "accept",
+          "reason": "evidence accepted",
+          "accepted_count": 6,
+          "rejected_count": 0,
+          "budget_chars": 7600,
+          "accepted_chars": 2507,
+          "budget_utilization": 0.329868,
+          "query_term_coverage": 0.254545,
+          "source_count": 4,
+          "untrusted_instruction_count": 0,
+          "rejected": [],
+          "evidence": {
+            "count": 6,
+            "sources": [
+              "03_检索增强生成_BIMSA.pdf",
+              "06_检索增强生成_SciOpen.pdf",
+              "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+              "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            ],
+            "source_count": 4,
+            "raw_sources_only": true,
+            "citation_ids": [
+              "E1",
+              "E2",
+              "E3",
+              "E4",
+              "E5",
+              "E6"
+            ]
+          }
+        }
+      },
+      "b1_simple_graph": {
+        "graph_enabled": true,
+        "graph": {
+          "enabled": true,
+          "route": {
+            "use_graph": true,
+            "mode": "global",
+            "reason": "cross_document_or_global_synthesis",
+            "signals": [
+              "共同"
+            ],
+            "estimated_cost": "high_once_per_indexed_corpus"
+          },
+          "communities": [
+            "C001",
+            "C002",
+            "C004",
+            "C003"
+          ],
+          "report_count": 4,
+          "source_evidence_count": 3,
+          "source_count": 2
+        },
+        "context_gate": {
+          "schema_version": "context_admission_gate_v1",
+          "decision": "accept",
+          "reason": "evidence accepted",
+          "accepted_count": 6,
+          "rejected_count": 3,
+          "budget_chars": 7600,
+          "accepted_chars": 2900,
+          "budget_utilization": 0.381579,
+          "query_term_coverage": 0.163636,
+          "source_count": 3,
+          "untrusted_instruction_count": 0,
+          "rejected": [
+            {
+              "candidate_id": "fa3190960402473a8b0449e057640c7b_9671e9ea067b_schema_10_parent_9_child_0",
+              "source_filename": "06_检索增强生成_SciOpen.pdf",
+              "score": 0.316254,
+              "reason": "evidence_limit"
+            },
+            {
+              "candidate_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_65_child_0",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+              "score": 0.302627,
+              "reason": "evidence_limit"
+            },
+            {
+              "candidate_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_20_child_0",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+              "score": 0.298362,
+              "reason": "evidence_limit"
+            }
+          ],
+          "evidence": {
+            "count": 9,
+            "sources": [
+              "03_检索增强生成_BIMSA.pdf",
+              "05_rag_survey_2023.pdf",
+              "06_检索增强生成_SciOpen.pdf",
+              "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+              "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            ],
+            "source_count": 5,
+            "raw_sources_only": true,
+            "citation_ids": [
+              "E1",
+              "E2",
+              "E3",
+              "E1",
+              "E2",
+              "E3",
+              "E4",
+              "E5",
+              "E6"
+            ]
+          }
+        },
+        "evidence_gate": {
+          "allowed": true,
+          "reason": "evidence accepted",
+          "evidence_count": 9,
+          "max_score": 0.343027,
+          "decision": "accept"
+        }
+      },
+      "candidate_live_answer": {
+        "status": "pass",
+        "error": null,
+        "elapsed_ms": 56801,
+        "answer_chars": 422,
+        "refusal": false,
+        "has_citation": true,
+        "answer": "基于提供的文档证据，RAG（检索增强生成）系统的核心目标是通过耦合外部知识库与大语言模型来解决幻觉和知识滞后问题 [E3]。其整体架构通常包含向量化嵌入、相似度搜索以及融合模块三个关键阶段 [E6]。以下是关于 RAG 在检索、重排与生成环节的共同优化思路总结：\n\n1. **构建高维向量表示以支持精准语义匹配**\n   系统首先利用如 BGE 或 Text-Embedding 等嵌入模型将文本和查询转化为高维向量，通过计算距离来捕捉细微的语义差异并实现高效检索 [E5]。[E6]\n\n2. **采用混合框架整合结构化知识库与生成能力**\n   RAG 系统作为混合架构，旨在结合大语言模型的流畅性与外部知识源的权威性，确保输出内容既可读又准确 [E6]。[E3]\n\n3. **通过检索优化使最终性能接近理想情况**\n   经过一系列针对检索环节的持续优化（如引入可微分检索器或神经检索器），系统的整体表现能够逼近理论上的最佳状态 [E1]。",
+        "retrieved_sources": [
+          "03_检索增强生成_BIMSA.pdf",
+          "03_检索增强生成_BIMSA.pdf",
+          "05_rag_survey_2023.pdf",
+          "03_检索增强生成_BIMSA.pdf",
+          "06_检索增强生成_SciOpen.pdf",
+          "06_检索增强生成_SciOpen.pdf"
+        ],
+        "graph": {
+          "communities": [
+            "C001",
+            "C002",
+            "C004",
+            "C003"
+          ],
+          "enabled": true,
+          "report_count": 4,
+          "route": {
+            "estimated_cost": "high_once_per_indexed_corpus",
+            "mode": "global",
+            "reason": "cross_document_or_global_synthesis",
+            "signals": [
+              "共同"
+            ],
+            "use_graph": true
+          },
+          "source_count": 2,
+          "source_evidence_count": 3
+        }
+      }
+    },
+    {
+      "query": "GraphRAG 中实体、关系、社区报告之间是什么关系？",
+      "route": {
+        "use_graph": true,
+        "mode": "local",
+        "reason": "entity_relation_or_multi_hop_question",
+        "signals": [
+          "关系",
+          "社区",
+          "graphrag"
+        ],
+        "estimated_cost": "medium_index_lookup"
+      },
+      "index_snapshot": {
+        "document_count": 15,
+        "community_count": 4,
+        "algorithm": "leiden_v1_local_move_refine"
+      },
+      "b0_current": {
+        "graph_enabled": false,
+        "gate": {
+          "schema_version": "context_admission_gate_v1",
+          "decision": "accept",
+          "reason": "evidence accepted",
+          "accepted_count": 6,
+          "rejected_count": 0,
+          "budget_chars": 7600,
+          "accepted_chars": 2439,
+          "budget_utilization": 0.320921,
+          "query_term_coverage": 0.333333,
+          "source_count": 4,
+          "untrusted_instruction_count": 0,
+          "rejected": [],
+          "evidence": {
+            "count": 6,
+            "sources": [
+              "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+              "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+              "05_rag_survey_2023.pdf",
+              "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            ],
+            "source_count": 4,
+            "raw_sources_only": true,
+            "citation_ids": [
+              "E1",
+              "E2",
+              "E3",
+              "E4",
+              "E5",
+              "E6"
+            ]
+          }
+        }
+      },
+      "b1_simple_graph": {
+        "graph_enabled": true,
+        "graph": {
+          "enabled": true,
+          "route": {
+            "use_graph": true,
+            "mode": "local",
+            "reason": "entity_relation_or_multi_hop_question",
+            "signals": [
+              "关系",
+              "社区",
+              "graphrag"
+            ],
+            "estimated_cost": "medium_index_lookup"
+          },
+          "communities": [
+            "C004",
+            "C003",
+            "C001",
+            "C002"
+          ],
+          "report_count": 4,
+          "source_evidence_count": 3,
+          "source_count": 2
+        },
+        "context_gate": {
+          "schema_version": "context_admission_gate_v1",
+          "decision": "accept",
+          "reason": "evidence accepted",
+          "accepted_count": 6,
+          "rejected_count": 3,
+          "budget_chars": 7600,
+          "accepted_chars": 3821,
+          "budget_utilization": 0.502763,
+          "query_term_coverage": 0.4,
+          "source_count": 3,
+          "untrusted_instruction_count": 0,
+          "rejected": [
+            {
+              "candidate_id": "16df9323f053c7755ecefb25c2b7a771_3f49e939aaee_schema_10_parent_20_child_5",
+              "source_filename": "05_rag_survey_2023.pdf",
+              "score": 0.1532,
+              "reason": "evidence_limit"
+            },
+            {
+              "candidate_id": "16df9323f053c7755ecefb25c2b7a771_3f49e939aaee_schema_10_parent_16_child_23",
+              "source_filename": "05_rag_survey_2023.pdf",
+              "score": 0.127795,
+              "reason": "evidence_limit"
+            },
+            {
+              "candidate_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_13_child_0",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+              "score": 0.112885,
+              "reason": "evidence_limit"
+            }
+          ],
+          "evidence": {
+            "count": 9,
+            "sources": [
+              "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+              "05_rag_survey_2023.pdf",
+              "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+              "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            ],
+            "source_count": 4,
+            "raw_sources_only": true,
+            "citation_ids": [
+              "E1",
+              "E2",
+              "E3",
+              "E1",
+              "E2",
+              "E3",
+              "E4",
+              "E5",
+              "E6"
+            ]
+          }
+        },
+        "evidence_gate": {
+          "allowed": true,
+          "reason": "evidence accepted",
+          "evidence_count": 9,
+          "max_score": 0.269425,
+          "decision": "accept"
+        }
+      },
+      "candidate_live_answer": {
+        "status": "pass",
+        "error": null,
+        "elapsed_ms": 59954,
+        "answer_chars": 169,
+        "refusal": false,
+        "has_citation": true,
+        "answer": "1. **实体**是从文本块（TextUnit）中提取的人物、地点或事件等具体对象，作为知识图谱的基础节点 [E4]。\n2. **关系**是连接两个实体的声明信息，由协变量生成并代表具有评估状态的积极事实陈述 [E4]。\n3. **社区报告**是在对提取出的实体执行分层检测后生成的摘要描述，用于组织特定层次结构中的实体与知识 [E4]。",
+        "retrieved_sources": [
+          "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+          "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+          "05_rag_survey_2023.pdf",
+          "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+          "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+          "05_rag_survey_2023.pdf"
+        ],
+        "graph": {
+          "communities": [
+            "C004",
+            "C003",
+            "C001",
+            "C002"
+          ],
+          "enabled": true,
+          "report_count": 4,
+          "route": {
+            "estimated_cost": "medium_index_lookup",
+            "mode": "local",
+            "reason": "entity_relation_or_multi_hop_question",
+            "signals": [
+              "关系",
+              "社区",
+              "graphrag"
+            ],
+            "use_graph": true
+          },
+          "source_count": 2,
+          "source_evidence_count": 3
+        }
+      }
+    }
+  ],
+  "acceptance": {
+    "index_ready": true,
+    "community_target_ok": true,
+    "candidate_all_completed": true,
+    "candidate_no_refusal": true,
+    "candidate_all_cited": true,
+    "global_route_enabled": true,
+    "local_route_enabled": true,
+    "ordinary_route_keeps_hybrid": true
+  }
+}

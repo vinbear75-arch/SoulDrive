@@ -1,0 +1,26 @@
+{
+  "schema_version": "mintrec2_text_b1_metrics_v0.1",
+  "baseline": "B1_SIMPLE_TFIDF_LOGREG",
+  "sample_counts": {
+    "train": 6165,
+    "dev": 1106,
+    "test": 2033
+  },
+  "accuracy": 0.42400393507132317,
+  "macro_f1": 0.38292118928608104,
+  "weighted_f1": 0.4191350171588113,
+  "macro_precision": 0.3765050231691554,
+  "macro_recall": 0.41228963183980605,
+  "oos_threshold": 0.0,
+  "oos_threshold_selected_on_dev": false,
+  "task_scope": "in_scope_closed_set",
+  "latency_ms": {
+    "train": 4399.284399987664,
+    "test_total": 4.177000024355948,
+    "test_per_sample": 0.0020545991265892515
+  },
+  "limitations": [
+    "Text-only classical baseline; no audio, video, or dialogue fusion.",
+    "This run contains only in-scope samples and does not measure OOS detection."
+  ]
+}

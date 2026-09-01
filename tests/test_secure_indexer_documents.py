@@ -80,6 +80,37 @@ class SecureIndexerDocumentsTests(unittest.TestCase):
         self.assertEqual(plaintext_documents, [])
         self.assertEqual(runtime_pdfs, [])
 
+    def test_indexer_dispatches_encrypted_image_and_removes_plaintext_temp_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            source_image = Path(temp_dir) / "screen.png"
+            source_image.write_bytes(b"private image payload")
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+            store = SecureDocumentStore(workspace, keys)
+            try:
+                store.import_document(str(source_image))
+            finally:
+                store.close()
+
+            parser = _RecordingParser()
+            indexer = DriveIndexer()
+            indexer.image_parser = parser
+            with patch("core.knowledge_base.LocalKnowledgeBase", _FakeKnowledgeBase):
+                try:
+                    indexer.sync_workspace(workspace, auth_level="BASIC")
+                finally:
+                    indexer.close()
+                    clear_workspace_keys(workspace.root_path)
+
+            runtime_images = list(Path(workspace.runtime_path).rglob("*.png"))
+
+        self.assertEqual(parser.contents, [b"private image payload"])
+        self.assertEqual(parser.paths[0].suffix, ".png")
+        self.assertFalse(parser.paths[0].exists())
+        self.assertEqual(runtime_images, [])
+
 
 if __name__ == "__main__":
     unittest.main()

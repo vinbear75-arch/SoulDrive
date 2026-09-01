@@ -1,0 +1,16 @@
+{
+  "schema_version": "souldrive_multimodal_chat_bridge_baseline_v0.1",
+  "captured_at": "2026-08-19T12:00:00+08:00",
+  "scope": "authorized local media perception to RAG interaction context",
+  "baseline": {
+    "runtime_exposes_ocr_or_vlm_text": true,
+    "frontend_forwards_visual_text_to_chat": false,
+    "visual_text_changes_retrieval_context": false,
+    "stale_media_context_is_consumed_once": false
+  },
+  "evidence": [
+    "core/topic5_runtime.py returned OCR/VLM text only inside stage diagnostics",
+    "souldrive-ui/src/App.tsx submitted only activeDocumentName as perception context"
+  ],
+  "claim_boundary": "Code-path baseline only; not a model accuracy or Huawei competition score."
+}

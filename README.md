@@ -1,5 +1,7 @@
 # SoulDrive
 
+比赛主线定位：用户指着屏幕中的实验结果说“为什么比上个月差”，SoulDrive 在当前项目内对齐语音、授权选区、实验版本和历史偏好，在端侧给出可验证差异、原因证据等级和最小验证实验，并生成带引用的汇报草稿；歧义时先澄清，未经确认不执行外部动作。
+
 SoulDrive 是一个面向私有资产的端侧知识引擎，核心目标是把本地知识文档的解析、索引、检索增强生成、证据链和知识图谱打磨稳定。当前演示与测试仍以论文作为默认切入口，但系统能力不局限于论文场景。
 
 ## 核心模块
@@ -8,6 +10,25 @@ SoulDrive 是一个面向私有资产的端侧知识引擎，核心目标是把�
 - `souldrive-ui/`：React + Tauri 桌面界面，用于展示知识文档、运行态、问答、证据链和导图。
 - `tests/`：后端核心逻辑的 `unittest` 测试。
 - `config/enterprise-policy.json`：本地运行策略，保留 API 限流、CORS、lite/license 等基础约束。
+
+## 本地业务验证
+
+发布前请在同一 Windows 本机环境验证文档摄取、检索问答、证据引用、项目隔离、端侧多模态感知与人工确认链路：
+
+```powershell
+conda run -n souldrive python -m pytest -q
+npm.cmd --prefix souldrive-ui run build
+cargo check --locked --manifest-path souldrive-ui/src-tauri/Cargo.toml
+```
+
+## 参赛文档
+
+- [项目总览](docs/competition_project_overview.md)
+- [运行与模型](docs/competition_runtime_and_model.md)
+- [实验与证据](docs/competition_experiment_and_evidence.md)
+- [参赛文稿总稿](docs/competition_submission_narrative.md)
+- [参赛 PPT 大纲](docs/competition_ppt_outline.md)
+- [提交清单](docs/competition_submission_checklist.md)
 
 ## 重装系统后从零恢复
 
@@ -82,16 +103,16 @@ hf download BAAI/bge-small-zh-v1.5 `
   --revision 7999e1d3359715c523056ef9478215996d62a620 `
   --local-dir models\bge-small-zh-v1.5
 
-hf download nreimers/mmarco-mMiniLMv2-L6-H384-v1 `
-  --revision 4ceabf2d1e212e16da0d1fb94d5dea66a9a1cca0 `
-  --local-dir models\mmarco-mMiniLMv2-L6-H384-v1
+hf download Qwen/Qwen3-Reranker-0.6B `
+  --revision e61197ed45024b0ed8a2d74b80b4d909f1255473 `
+  --local-dir models\Qwen3-Reranker-0.6B
 ```
 
 模型用途：
 
 - `qwen2.5-3b-instruct-q4_k_m.gguf`：必需，本地聊天生成模型；来源为 [Qwen 官方 GGUF 仓库](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF)。
 - `bge-small-zh-v1.5/`：必需，本地中文嵌入模型；来源为 [BAAI 官方模型仓库](https://huggingface.co/BAAI/bge-small-zh-v1.5)。
-- `mmarco-mMiniLMv2-L6-H384-v1/`：可选，本地重排模型；来源为 [nreimers 模型仓库](https://huggingface.co/nreimers/mmarco-mMiniLMv2-L6-H384-v1)。缺失时系统关闭重排，但基础检索仍可工作。
+- `Qwen3-Reranker-0.6B/`：推荐，本地中文/多语言轻量重排模型；来源为 [Qwen 官方模型仓库](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B)。缺失时系统关闭重排，但基础检索仍可工作。
 
 校验关键权重：
 
@@ -99,7 +120,7 @@ hf download nreimers/mmarco-mMiniLMv2-L6-H384-v1 `
 Get-FileHash -Algorithm SHA256 `
   models\qwen2.5-3b-instruct-q4_k_m.gguf, `
   models\bge-small-zh-v1.5\model.safetensors, `
-  models\mmarco-mMiniLMv2-L6-H384-v1\pytorch_model.bin
+  models\Qwen3-Reranker-0.6B\model.safetensors
 ```
 
 预期 SHA-256：
@@ -108,7 +129,7 @@ Get-FileHash -Algorithm SHA256 `
 | --- | --- |
 | `qwen2.5-3b-instruct-q4_k_m.gguf` | `626B4A6678B86442240E33DF819E00132D3BA7DDDFE1CDC4FBB18E0A9615C62D` |
 | `bge-small-zh-v1.5/model.safetensors` | `354763B9B1357BC9C44F62C6BE2276321081ED2567773608C0D0785B61D5A026` |
-| `mmarco-mMiniLMv2-L6-H384-v1/pytorch_model.bin` | `795F7056AC9D129F5A7FE4BB77CDA35CBEFA5E5E98B507CF8EE0B2C6DB122796` |
+| `Qwen3-Reranker-0.6B/model.safetensors` | `27CD75A405B9C1B46B59ABFD88AAA209E6FED2A1972CDE9B70E7659537C5E65B` |
 
 如果哈希不一致，应删除对应模型并从固定 revision 重新下载，不要继续加载。
 
@@ -132,17 +153,13 @@ cd ..\..
 .\scripts\check.ps1
 ```
 
-### 7. 启动开发版桌面端
+### 7. 启动桌面端
 
-插入一个可移动存储设备。桌面端会在盘符根目录自动创建或接管 `SoulDrive/` 工作区，并从项目根目录的 `models/` 同步所需模型。然后运行：
+桌面端默认使用系统应用数据目录中的 `workspace/` 作为 PC 本地加密工作区，不需要插入可移动存储设备。首次启动会创建工作区，之后需要在界面中初始化或输入口令解锁。运行：
 
-```powershell
-conda activate souldrive
-cd souldrive-ui
-npm.cmd run tauri dev
-```
+开发阶段直接在项目根目录双击 `启动SoulDrive.bat`。它启动 Vite、Tauri 和本地 sidecar 的完整开发链路；保持弹出的终端窗口运行，关闭终端即可停止 SoulDrive。
 
-调试构建会通过 `conda run -n souldrive python -m core.sidecar_runtime` 启动源码 sidecar。没有检测到可移动工作区时，API 会保持锁定，这是预期行为。
+发布版工作区未完成口令初始化或尚未解锁时，涉及文档、索引和问答的 API 会保持锁定，这是预期行为。
 
 ### 8. 重新生成便携程序
 
@@ -208,9 +225,11 @@ cargo check --locked
 非公开本地 API 默认要求 `X-SoulDrive-Token`。仅本地调试时可设置 `SOULDRIVE_ALLOW_UNAUTHENTICATED_API=1` 临时放开。
 `test.http` 中的 `{{souldrive_token}}` 需要替换为当前 sidecar 运行时 token，或在 IDE HTTP Client 环境变量里配置。
 
-## 参赛便携形态
+## PC 默认形态与便携扩展
 
-桌面端启动 sidecar 时会设置 `SOULDRIVE_WATCH_REMOVABLE=1`，后端会等待并接管已插入的移动存储工作区；工作区应位于可移动盘根目录下的 `SoulDrive/`。不要把固定盘符写入业务代码，盘符变化时由可移动盘探测逻辑处理。
+桌面端默认设置 `SOULDRIVE_WORKSPACE_MODE=local`，并把 `SOULDRIVE_WORKSPACE` 指向系统应用数据目录中的 `workspace/`。这是参赛演示和日常使用的主路径：数据、索引、审计与密钥材料均留在 PC 本地加密工作区内。
+
+U 盘是可选的便携扩展。需要演示即插即用时，可将 `SOULDRIVE_WORKSPACE_MODE` 设置为 `removable`；后端会启用可移动盘监听并接管盘符根目录下的 `SoulDrive/` 工作区。不要把固定盘符写入业务代码，盘符变化由可移动盘探测逻辑处理。
 
 推荐的 U 盘目录：
 
@@ -241,7 +260,12 @@ cargo check --locked
 
 ## 工作区约定
 
-SoulDrive 只把可移动盘根目录下的 `SoulDrive/` 作为业务工作区。桌面端未检测到该工作区时保持锁定，不会回退到项目目录或本机 `souldrive_db/`。
+SoulDrive 支持两种显式工作区模式：
+
+- PC 默认模式：系统应用数据目录中的 `workspace/`，由桌面端显式传入 `SOULDRIVE_WORKSPACE`。
+- 可移动扩展模式：可移动盘根目录下的 `SoulDrive/`，由监听器发现并接管。
+
+两种模式都必须经过口令初始化和解锁，且都不会回退到项目目录或旧的本机 `souldrive_db/`。业务工作区包含：
 
 - `data/documents/`：加密后的导入文档，是当前默认文档库。
 - `data/papers/`：兼容旧版本的明文 PDF 目录，只用于读取历史资料。
@@ -249,6 +273,17 @@ SoulDrive 只把可移动盘根目录下的 `SoulDrive/` 作为业务工作区�
 - `audit/`：hash-chain 审计日志。
 - `models/`：本地 GGUF 聊天模型和 BGE 嵌入模型。
 - `runtime/`：工作区运行态、索引状态和临时文件。
+
+当前可导入格式为 PDF、PNG、JPG/JPEG 和 WebP。图片在索引阶段由本地 RapidOCR/ONNX Runtime 识别，OCR 文本、置信度和归一化位置坐标会作为加密索引证据；原图与元数据仍保存在加密文档库中，索引临时明文会在任务结束后清理。用户把已索引图片设为当前上下文后，问答请求会携带带时间戳的 `image` 感知事件。
+
+图像 OCR 评测：
+
+```powershell
+conda activate souldrive
+python scripts\eval_image_ocr.py --dataset <数据集.jsonl> --output-json eval\results\image_ocr_v0.1.json
+```
+
+评测输出包括识别成功率、关键词召回率、区域定位 IoU、OCR 置信度、P50/P95 延迟和 `<5s` 达标率。数据格式与比赛采集口径见 `docs/image_ocr_evaluation_protocol.md`。当前图像能力聚焦截图和扫描件中的文字证据，不把 OCR 宣传为通用图表语义理解；图表关系、无文字物体和复杂视觉推理仍需后续本地 VLM。
 
 当前开发重点是先把这些内部链路做清楚：文档进入、索引更新、检索证据、回答生成、运行态锁定和审计记录。
 

@@ -1,9 +1,11 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from core.knowledge_base import LocalKnowledgeBase
+from core.rag_engine import RAGEngine
 from core.retrieval import SearchCandidate
 from core.security_context import clear_workspace_keys, set_workspace_keys
 from core.workspace import SoulDriveWorkspace
@@ -11,6 +13,509 @@ from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class SecureRetrievalFlowTests(unittest.TestCase):
+    def test_project_fallback_when_project_candidates_are_not_relevant(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-project-noise",
+                        [_FakeChunk(
+                            "cafeteria menu and parking instructions",
+                            {"source_filename": "noise.pdf", "page": 1, "project_id": "p1"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global-rag",
+                        [_FakeChunk(
+                            "zero trust policy requires device verification",
+                            {"source_filename": "global.pdf", "page": 1},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "zero trust device",
+                        top_k=1,
+                        project_id="p1",
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual({item["source_filename"] for item in result["metadatas"]}, {"global.pdf"})
+        self.assertEqual(result["observability"]["project_focus"]["route"], "global_fallback")
+
+    def test_project_noise_does_not_block_relevant_global_evidence(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-project-noise",
+                        [_FakeChunk(
+                            "RAG 项目采购和预算审批流程",
+                            {"source_filename": "noise.pdf", "page": 1, "project_id": "p1"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global-rag",
+                        [_FakeChunk(
+                            "RAG 的核心思想是先从外部知识库检索相关证据，再生成回答",
+                            {"source_filename": "global.pdf", "page": 1},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "RAG 的核心思想是什么？",
+                        top_k=1,
+                        project_id="p1",
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual({item["source_filename"] for item in result["metadatas"]}, {"global.pdf"})
+        self.assertEqual(result["observability"]["project_focus"]["route"], "global_fallback")
+
+    def test_image_asset_title_keeps_project_relevance_for_scoped_queries(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-project-screen",
+                        [_FakeChunk(
+                            "SoulDrive PC project workspace target_binding_accuracy 0.620 -> 0.790 -> 0.850",
+                            {
+                                "source_filename": "08_selection_ui.png",
+                                "document_title": "选区绑定界面示意",
+                                "page": 1,
+                                "project_id": "p1",
+                            },
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global-noise",
+                        [_FakeChunk(
+                            "unrelated guidance for a different project",
+                            {"source_filename": "noise.pdf", "page": 1},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "请在当前项目语料中查找‘选区绑定界面示意’的记录。",
+                        top_k=1,
+                        project_id="p1",
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual({item["source_filename"] for item in result["metadatas"]}, {"08_selection_ui.png"})
+        self.assertIn(result["observability"]["project_focus"]["route"], {"project_first", "project_first_with_global"})
+
+    def test_global_document_is_available_from_multiple_projects_without_cross_project_leakage(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-global-rag",
+                        [_FakeChunk(
+                            "RAG combines retrieval with generation",
+                            {"source_filename": "global-rag.pdf", "page": 1},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-other-project",
+                        [_FakeChunk(
+                            "cafeteria menu and parking instructions",
+                            {"source_filename": "other.pdf", "page": 1, "project_id": "p2"},
+                        )],
+                    )
+                    p1 = kb.search_with_evidence("RAG retrieval generation", top_k=1, project_id="p1")
+                    p2 = kb.search_with_evidence("RAG retrieval generation", top_k=1, project_id="p2")
+                finally:
+                    kb.close()
+
+        self.assertEqual({item["source_filename"] for item in p1["metadatas"]}, {"global-rag.pdf"})
+        self.assertEqual({item["source_filename"] for item in p2["metadatas"]}, {"global-rag.pdf"})
+        self.assertNotIn("other.pdf", {item["source_filename"] for item in p1["metadatas"]})
+
+    def test_global_evidence_reaches_generated_answer_from_each_project(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-project-noise",
+                        [_FakeChunk(
+                            "cafeteria menu and parking instructions",
+                            {"source_filename": "noise.pdf", "page": 1, "project_id": "p1"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-other-project-noise",
+                        [_FakeChunk(
+                            "cafeteria menu and parking instructions",
+                            {"source_filename": "other-noise.pdf", "page": 1, "project_id": "p2"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global-rag",
+                        [_FakeChunk(
+                            "zero trust policy requires device verification",
+                            {"source_filename": "global.pdf", "page": 1},
+                        )],
+                    )
+                    outputs = {}
+                    audit_logs = {}
+                    for project_id in ("p1", "p2"):
+                        engine = RAGEngine.__new__(RAGEngine)
+                        engine.kb = kb
+                        engine.graph_db = None
+                        engine.llm = _StaticRagLlm("zero trust policy requires device verification。[E1]")
+                        engine.audit_logger = _NoopAuditLogger()
+                        engine.runtime_config = SimpleNamespace(
+                            temperature=0.01,
+                            top_p=0.85,
+                            repeat_penalty=1.12,
+                            max_tokens=256,
+                        )
+                        outputs[project_id] = "".join(engine.generate_response_stream(
+                            "zero trust policy requires what?",
+                            top_k=1,
+                            interaction_context={
+                                "active_context": {"project_id": project_id},
+                            },
+                        ))
+                        audit_logs[project_id] = engine.audit_logger.events
+                finally:
+                    kb.close()
+
+        for output in outputs.values():
+            self.assertIn("zero trust policy requires device verification", output)
+            self.assertIn("[E1]", output)
+            self.assertIn("global.pdf", output)
+            self.assertNotIn("noise.pdf", output)
+            self.assertNotIn("other-noise.pdf", output)
+        for events in audit_logs.values():
+            retrieved = next(payload for event_type, payload in events if event_type == "rag.retrieved")
+            self.assertEqual(
+                retrieved["retrieval_observability"]["project_focus"]["route"],
+                "global_fallback",
+            )
+
+    def test_new_project_session_without_document_selection_combines_global_and_visual_evidence(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path, enable_usage_ledger=False)
+                try:
+                    kb.ingest_chunks(
+                        "doc-global-rag",
+                        [_FakeChunk(
+                            "zero trust policy requires device verification",
+                            {"source_filename": "global-rag.pdf", "page": 1},
+                        )],
+                    )
+                    engine = RAGEngine.__new__(RAGEngine)
+                    engine.kb = kb
+                    engine.graph_db = None
+                    engine.llm = _StaticRagLlm(
+                        "文档说明 zero trust policy requires device verification。[E1] "
+                        "当前授权截图显示本地项目界面。[V1]"
+                    )
+                    engine.audit_logger = _NoopAuditLogger()
+                    engine.runtime_config = SimpleNamespace(
+                        temperature=0.01,
+                        top_p=0.85,
+                        repeat_penalty=1.12,
+                        max_tokens=256,
+                    )
+                    context = {
+                        "session_id": "session-new-project",
+                        "active_context": {"project_id": "project-new"},
+                        "events": [{
+                            "event_id": "capture-1",
+                            "modality": "image",
+                            "text": "本地项目界面",
+                            "timestamp_ms": 1000,
+                            "project_id": "project-new",
+                            "source": "ocr",
+                            "confidence": 0.98,
+                            "bbox": {"x": 0.1, "y": 0.1, "width": 0.8, "height": 0.3},
+                        }],
+                    }
+                    output = "".join(engine.generate_response_stream(
+                        "zero trust policy requires what?",
+                        top_k=1,
+                        interaction_context=context,
+                    ))
+                finally:
+                    kb.close()
+
+        self.assertIn("global-rag.pdf", output)
+        self.assertIn("[E1]", output)
+        self.assertIn("[V1]", output)
+        self.assertNotIn("请选择要处理的文档", output)
+        retrieved = next(payload for event_type, payload in engine.audit_logger.events if event_type == "rag.retrieved")
+        self.assertEqual(retrieved["retrieval_observability"]["project_focus"]["route"], "global_fallback")
+        self.assertEqual(retrieved["visual_evidence"]["decision"], "accept")
+        self.assertEqual(retrieved["visual_evidence"]["evidence_count"], 1)
+
+    def test_full_ingestion_routes_ancestor_query_through_persisted_section_tree(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(
+                    workspace_path=workspace.root_path,
+                    enable_usage_ledger=False,
+                )
+                try:
+                    kb.ingest_chunks(
+                        "paper-1",
+                        [
+                            _FakeChunk(
+                                "稠密检索负责找到语义相关的原文证据。",
+                                {
+                                    "source_filename": "paper.md",
+                                    "section_path": ["总览", "检索", "稠密"],
+                                    "page": 1,
+                                },
+                            ),
+                            _FakeChunk(
+                                "生成阶段只使用通过证据门的内容。",
+                                {
+                                    "source_filename": "paper.md",
+                                    "section_path": ["总览", "生成"],
+                                    "page": 1,
+                                },
+                            ),
+                        ],
+                    )
+                    result = kb.search_with_evidence(
+                        "请定位“检索”的原文",
+                        top_k=1,
+                    )
+                finally:
+                    kb.close()
+
+        evidence = result["evidence"][0]
+        assert evidence["section_route_mode"] == "descendant"
+        assert evidence["section_route_node"] == "总览 > 检索"
+        assert result["observability"]["section_route"][0]["modes"] == ["descendant"]
+        assert result["metadatas"][0]["section_tree_document_id"] == "paper-1"
+
+    def test_bounded_rerank_keeps_full_pool_for_source_diverse_queries(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with (
+                patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()),
+                patch("core.knowledge_base.LocalReranker", return_value=type("Reranker", (), {"ready": False})()),
+            ):
+                kb = LocalKnowledgeBase(
+                    workspace_path=workspace.root_path,
+                    enable_usage_ledger=False,
+                    rerank_candidate_limit=1,
+                )
+                try:
+                    kb.ingest_chunks(
+                        "doc-a",
+                        [_FakeChunk("Alpha 方案采用检索增强生成。", {"source_filename": "alpha.pdf", "page": 1})],
+                    )
+                    kb.ingest_chunks(
+                        "doc-b",
+                        [_FakeChunk("Beta 方案采用检索增强生成。", {"source_filename": "beta.pdf", "page": 1})],
+                    )
+                    result = kb.search_with_evidence(
+                        "比较 Alpha 与 Beta 两个方案的核心思路",
+                        top_k=2,
+                    )
+                finally:
+                    kb.close()
+
+        observability = result["observability"]
+        self.assertEqual(observability["rerank_candidate_limit"], 1)
+        self.assertEqual(observability["rerank_limit_bypassed_reason"], "source_diversity")
+        self.assertEqual(
+            observability["stage_counts"]["rerank_input"],
+            observability["stage_counts"]["hydrated"],
+        )
+
+    def test_relevant_project_candidates_do_not_hide_shared_global_evidence(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-project-rag",
+                        [_FakeChunk(
+                            "RAG 的核心思想在当前项目中用于组织向量检索、关键词检索和权限控制",
+                            {"source_filename": "project-rag.pdf", "page": 1, "project_id": "p1"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global-rag",
+                        [_FakeChunk(
+                            "RAG 的核心思想是先从外部知识库检索相关证据，再生成回答",
+                            {"source_filename": "global-rag.pdf", "page": 1},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "RAG 的核心思想是什么？",
+                        top_k=2,
+                        project_id="p1",
+                    )
+                finally:
+                    kb.close()
+
+        sources = {item["source_filename"] for item in result["metadatas"]}
+        self.assertIn("project-rag.pdf", sources)
+        self.assertIn("global-rag.pdf", sources)
+        self.assertEqual(result["observability"]["project_focus"]["route"], "project_first_with_global")
+        self.assertEqual(result["observability"]["project_focus"]["global_candidate_count"], 1)
+        self.assertEqual(result["observability"]["project_focus"]["boost"], 1.12)
+
+    def test_broad_summary_stays_in_current_project_without_explicit_global_scope(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-current",
+                        [_FakeChunk(
+                            "zero trust architecture current project summary",
+                            {"source_filename": "current.pdf", "page": 1, "project_id": "p1"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-other",
+                        [_FakeChunk(
+                            "zero trust architecture other project summary",
+                            {"source_filename": "other.pdf", "page": 1, "project_id": "p2"},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "概述当前项目的 zero trust 方案",
+                        top_k=2,
+                        project_id="p1",
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual({item["project_id"] for item in result["metadatas"]}, {"p1"})
+        self.assertIn(result["observability"]["project_focus"]["route"], {"project_first", "project_first_with_global"})
+
+    def test_project_fallback_uses_only_unbound_global_documents(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-other",
+                        [_FakeChunk(
+                            "zero trust other project evidence",
+                            {"source_filename": "other.pdf", "page": 1, "project_id": "p2"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global",
+                        [_FakeChunk(
+                            "zero trust global policy evidence",
+                            {"source_filename": "global.pdf", "page": 1},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "zero trust policy",
+                        top_k=2,
+                        project_id="missing-project",
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual(
+            {item["source_filename"] for item in result["metadatas"]},
+            {"global.pdf"},
+        )
+        self.assertEqual(result["observability"]["project_focus"]["route"], "global_fallback")
+        self.assertEqual(result["observability"]["project_focus"]["global_candidate_count"], 1)
+        self.assertEqual(result["observability"]["project_focus"]["boost"], 1.0)
+
+    def test_project_id_prefers_current_project_candidates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            embedding_model_path = Path(workspace.models_path) / "bge-small-zh-v1.5"
+            embedding_model_path.mkdir(parents=True, exist_ok=True)
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+            try:
+                with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                    try:
+                        kb.ingest_chunks(
+                            "doc-current",
+                            [_FakeChunk(
+                                "zero trust architecture requires device verification",
+                                {"source_filename": "current.pdf", "page": 1, "chunk_index": 0, "project_id": "project-current"},
+                            )],
+                        )
+                        kb.ingest_chunks(
+                            "doc-global",
+                            [_FakeChunk(
+                                "zero trust device verification is required globally",
+                                {"source_filename": "global.pdf", "page": 1, "chunk_index": 0, "project_id": "project-other"},
+                            )],
+                        )
+                        result = kb.search_with_evidence(
+                            "zero trust device",
+                            top_k=2,
+                            project_id="project-current",
+                        )
+                    finally:
+                        kb.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
+        self.assertEqual(
+            {metadata["project_id"] for metadata in result["metadatas"]},
+            {"project-current"},
+        )
+        self.assertEqual(result["observability"]["project_focus"]["boosted_candidate_count"], 1)
+        self.assertEqual(result["observability"]["project_focus"]["global_candidate_count"], 0)
+        self.assertEqual(result["observability"]["project_focus"]["indexed_candidate_count"], 2)
+        self.assertIn(result["observability"]["project_focus"]["route"], {"project_first", "project_first_with_global"})
+
+    def test_cross_project_comparison_explicitly_uses_global_scope(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks("doc-a", [_FakeChunk("zero trust current", {"source_filename": "a.pdf", "page": 1, "project_id": "p1"})])
+                    kb.ingest_chunks("doc-b", [_FakeChunk("zero trust other", {"source_filename": "b.pdf", "page": 1, "project_id": "p2"})])
+                    result = kb.search_with_evidence("比较两个项目的 zero trust 方案", top_k=2, project_id="p1")
+                finally:
+                    kb.close()
+
+        self.assertEqual({item["project_id"] for item in result["metadatas"]}, {"p1", "p2"})
+        self.assertEqual(result["observability"]["project_focus"]["route"], "global_explicit")
+
     def test_secure_retrieval_decrypts_only_merged_candidate_text(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -108,6 +613,54 @@ class SecureRetrievalFlowTests(unittest.TestCase):
 
         self.assertEqual(result["metadatas"][0]["source_filename"], "graph.pdf")
 
+    def test_selected_document_scope_excludes_other_documents_and_graph_recall(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            embedding_model_path = Path(workspace.models_path) / "bge-small-zh-v1.5"
+            embedding_model_path.mkdir(parents=True, exist_ok=True)
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+            try:
+                with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                    try:
+                        kb.ingest_chunks(
+                            "doc-selected",
+                            [_FakeChunk(
+                                "zero trust selected document evidence",
+                                {"source_filename": "selected.pdf", "page": 1, "chunk_index": 0},
+                            )],
+                        )
+                        kb.ingest_chunks(
+                            "doc-other",
+                            [_FakeChunk(
+                                "zero trust other document evidence",
+                                {"source_filename": "other.pdf", "page": 1, "chunk_index": 0},
+                            )],
+                        )
+
+                        class ExplodingGraphStore:
+                            def recall_chunk_ids(self, *args, **kwargs):
+                                raise AssertionError("selected document retrieval must skip GraphRAG")
+
+                        result = kb.search_with_evidence(
+                            "zero trust evidence",
+                            graph_db=ExplodingGraphStore(),
+                            top_k=2,
+                            document_names=["selected.pdf"],
+                        )
+                    finally:
+                        kb.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
+        self.assertEqual(
+            {item["source_filename"] for item in result["metadatas"]},
+            {"selected.pdf"},
+        )
+        self.assertEqual(result["observability"]["stage_counts"]["graph"], 0)
+
     def test_candidate_merge_preserves_graph_score_for_existing_dense_candidate(self):
         kb = object.__new__(LocalKnowledgeBase)
         merged = kb._merge_candidates(
@@ -189,6 +742,24 @@ class _GraphRecallEmbeddingModel:
 class _EmbeddingResult(list):
     def tolist(self):
         return list(self)
+
+
+class _StaticRagLlm:
+    def __init__(self, content):
+        self.content = content
+
+    def create_chat_completion(self, messages, stream, temperature, top_p, repeat_penalty, max_tokens, stop):
+        _ = (messages, stream, temperature, top_p, repeat_penalty, max_tokens, stop)
+        return iter([{"choices": [{"delta": {"content": self.content}}]}])
+
+
+class _NoopAuditLogger:
+    def __init__(self):
+        self.events = []
+
+    def append_event(self, event_type, payload, trace_id=None):
+        _ = trace_id
+        self.events.append((event_type, payload))
 
 
 class _FakeGraphStore:

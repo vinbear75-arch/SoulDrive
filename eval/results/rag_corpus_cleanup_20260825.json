@@ -1,0 +1,45 @@
+{
+  "schema_version": "souldrive_rag_corpus_cleanup_v1",
+  "created_at": "2026-08-25T14:49:30+08:00",
+  "project_id": "rag-cn-demo-20260824",
+  "reason": "按用户此前明确要求移除中文 RAG 验收项目中的旧英文论文",
+  "removed_assets": [
+    "01_rag_foundations_2020.pdf",
+    "02_react_reasoning_acting_2022.pdf",
+    "03_self_rag_2023.pdf",
+    "04_corrective_rag_2024.pdf",
+    "05_rag_survey_2023.pdf"
+  ],
+  "removed_count": 5,
+  "cleanup_scope": [
+    "加密本地文档对象",
+    "向量子块与父文档索引",
+    "图谱实体/关系的旧 chunk 指针",
+    "项目 catalog 资产与版本记录"
+  ],
+  "remaining_project_corpus": {
+    "document_count": 6,
+    "english_legacy_sources_seen": [],
+    "sources": [
+      "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+      "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "03_检索增强生成_BIMSA.pdf",
+      "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "06_检索增强生成_SciOpen.pdf",
+      "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+    ]
+  },
+  "rebuilt_project_graphrag": {
+    "index_name": "project:rag-cn-demo-20260824",
+    "document_count": 6,
+    "entity_count": 174,
+    "relationship_count": 241,
+    "community_count": 4,
+    "algorithm": "leiden_v1_local_move_refine",
+    "target_range_ok": true
+  },
+  "recoverability": {
+    "local_backup_kept": false,
+    "note": "已从本机加密对象库和派生索引移除；如需恢复，只能重新导入原始 PDF。"
+  }
+}

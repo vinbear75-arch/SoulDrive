@@ -1,0 +1,57 @@
+{
+  "schema_version": "souldrive_closeout_v1",
+  "created_at": "2026-08-26T13:08:00+08:00",
+  "scope": "SoulDrive PC 本机工程收尾；不将外部数据、人工采集或未发布评测器伪装为已完成事项。",
+  "verified": {
+    "python_regression": {
+      "status": "pass",
+      "command": "python -m pytest -q --cache-clear",
+      "evidence": "全量测试完成后不存在 .pytest_cache/v/cache/lastfailed"
+    },
+    "frontend_build": {
+      "status": "pass",
+      "command": "npm.cmd run build",
+      "output": "souldrive-ui/dist"
+    },
+    "tauri_check": {
+      "status": "pass",
+      "command": "cargo check --locked"
+    },
+    "artifact_smoke": {
+      "status": "pass",
+      "evidence": "eval/results/artifact_smoke_current_20260826.json",
+      "checks": [
+        "邮件 MIME mock 与授权码不泄露",
+        "4 页可编辑 PPTX OpenXML 校验",
+        "Skill 下载审核后启用且不自动执行脚本"
+      ]
+    },
+    "functional_cold_start_and_smtp": {
+      "status": "pass",
+      "evidence": "eval/results/email_and_cold_start_acceptance_20260825.json"
+    },
+    "release_gate": {
+      "mvp_ready": true,
+      "competition_ready": false,
+      "evidence": "eval/results/competition_release_gate_current_20260825.json"
+    }
+  },
+  "external_gates": {
+    "real_business_end_to_end_runtime": {
+      "status": "blocked_external_input_required",
+      "requirement": "至少 30 个独立、用户授权的真实 PC 业务 episode，以及对应冷启动和热运行 P50/P95、资源、失败率记录。",
+      "reason": "当前合成媒体与 10 条真实试点不能替代该数据。"
+    },
+    "huawei_hidden_set": {
+      "status": "blocked_external_input_required",
+      "requirement": "组委会发布或授权华为隐藏集与官方评测协议。",
+      "reason": "本机代码和公开数据不能替代官方最终评测。"
+    },
+    "public_dataset_final_audit": {
+      "status": "blocked_manual_review_required",
+      "requirement": "确认 MIntRec2.0 与 ScreenSpot 的原始数据许可证、归档和官方评测口径。",
+      "reason": "仓库代码许可证不自动覆盖媒体和标注数据。"
+    }
+  },
+  "overall_status": "local_engineering_closeout_complete_external_competition_gates_remaining"
+}

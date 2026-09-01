@@ -1,0 +1,1063 @@
+{
+  "schema_version": "souldrive_competition_scorecard_v0.1",
+  "created_at": "2026-08-20T11:17:47.059207+00:00",
+  "product": "SoulDrive-PC",
+  "official_track_alignment": "Huawei Topic 5 candidate; official hidden-set protocol not published to this workspace",
+  "public_benchmarks": {
+    "MIntRec2.0": {
+      "status": "mmla_mirror_text_b1_and_raw_media_b1",
+      "protocol": "Pinned THUIAR/MMLA in-scope mirror; separate from the original WavLM/Swin feature runner",
+      "proves": "closed-set intent classification on the pinned MMLA train/dev/test mirror",
+      "does_not_prove": "original official-feature reproduction, OOS performance, PC UI grounding, or Huawei internal generalization",
+      "text_only_metrics": {
+        "schema_version": "mintrec2_text_b1_metrics_v0.1",
+        "baseline": "B1_SIMPLE_TFIDF_LOGREG",
+        "sample_counts": {
+          "train": 6165,
+          "dev": 1106,
+          "test": 2033
+        },
+        "accuracy": 0.42400393507132317,
+        "macro_f1": 0.38292118928608104,
+        "weighted_f1": 0.4191350171588113,
+        "macro_precision": 0.3765050231691554,
+        "macro_recall": 0.41228963183980605,
+        "oos_threshold": 0.0,
+        "oos_threshold_selected_on_dev": false,
+        "task_scope": "in_scope_closed_set",
+        "latency_ms": {
+          "train": 4399.284399987664,
+          "test_total": 4.177000024355948,
+          "test_per_sample": 0.0020545991265892515
+        },
+        "limitations": [
+          "Text-only classical baseline; no audio, video, or dialogue fusion.",
+          "This run contains only in-scope samples and does not measure OOS detection."
+        ]
+      },
+      "raw_media_metrics": {
+        "schema_version": "mintrec2_mmla_raw_media_b1_metrics_v0.1",
+        "protocol": "THUIAR/MMLA pinned raw-video mirror; not original WavLM/Swin runner",
+        "sample_counts": {
+          "train": 6165,
+          "dev": 1106,
+          "test": 2033
+        },
+        "feature_version": "mmla_raw_media_av_v0.1",
+        "feature_dimensions": {
+          "visual": 51,
+          "audio": 18,
+          "total": 69
+        },
+        "variants": {
+          "text_only_control": {
+            "accuracy": 0.42400393507132317,
+            "macro_f1": 0.38292118928608104,
+            "weighted_f1": 0.4191350171588113
+          },
+          "media_only": {
+            "accuracy": 0.05853418593212002,
+            "macro_f1": 0.04996688237596396,
+            "weighted_f1": 0.059867182704928225
+          },
+          "text_audio_video_early_fusion": {
+            "accuracy": 0.35956714215445157,
+            "macro_f1": 0.3260827503584748,
+            "weighted_f1": 0.36414053911610184
+          }
+        },
+        "media_delta_macro_f1": -0.05683843892760626,
+        "latency_ms": {
+          "feature_extraction_total": 1211963.8282000087,
+          "feature_extraction_per_sample": 130.26266425193558
+        },
+        "limitations": [
+          "Handcrafted B1 features establish a real-media floor; they are not learned WavLM/Swin embeddings.",
+          "This in-scope closed-set run does not measure OOS detection, PC grounding, or Huawei hidden-set generalization."
+        ]
+      }
+    },
+    "ScreenSpot": {
+      "status": "real_screenshot_ocr_candidate",
+      "proves": "desktop/web/mobile screenshot target grounding; text fast path",
+      "does_not_prove": "speech alignment, project knowledge, personalization",
+      "metrics": {
+        "schema_version": "screenspot_metrics_v0.1",
+        "sample_count": 1272,
+        "accuracy": 0.39544025157232704,
+        "by_platform": {
+          "mobile": 0.4262948207171315,
+          "desktop": 0.45808383233532934,
+          "web": 0.3119266055045872
+        },
+        "by_type": {
+          "text": 0.7058823529411765,
+          "icon": 0.019130434782608695
+        },
+        "missing_predictions": 0,
+        "latency_ms": {
+          "p50": 1152.4166500021238,
+          "p95": 2743.3957000030205
+        },
+        "official_rule": "normalized predicted point lies inside pixel bbox converted from [x,y,width,height]",
+        "limitations": []
+      }
+    }
+  },
+  "product_benchmarks": {
+    "project_query": {
+      "schema_version": "souldrive_project_query_metrics_v0.1",
+      "sample_count": 10,
+      "version_hit_at_1": 1.0,
+      "version_hit_at_k": 1.0,
+      "mean_reciprocal_rank": 1.0,
+      "wrong_project_at_1_rate": 0.0,
+      "wrong_time_at_1_rate": 0.0,
+      "wrong_asset_type_at_1_rate": 0.0,
+      "rows": [
+        {
+          "id": "PQ-001",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-002",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-003",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-004",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-005",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-006",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-007",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-008",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-009",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        },
+        {
+          "id": "PQ-010",
+          "hit_at_1": true,
+          "hit_at_k": true,
+          "wrong_project_at_1": false,
+          "wrong_time_at_1": false,
+          "wrong_type_at_1": false
+        }
+      ]
+    },
+    "ingestion": {
+      "schema_version": "souldrive_product_b1_ingestion_metrics_v0.1",
+      "sample_count": 30,
+      "current_format_support_rate": 1.0,
+      "asset_file_integrity_rate": 1.0,
+      "catalog_registration_rate": 0.0,
+      "supported_format_catalog_rate": 0.0,
+      "latency_ms": {
+        "p50": 0.268,
+        "p95": 0.822
+      },
+      "unsupported_extensions": [],
+      "rows": [
+        {
+          "asset_id": "sd_requirement",
+          "filename": "01_requirement.pdf",
+          "asset_type": "requirement",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 89.83
+        },
+        {
+          "asset_id": "sd_architecture",
+          "filename": "02_architecture.pdf",
+          "asset_type": "technical_plan",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.593
+        },
+        {
+          "asset_id": "sd_dataset",
+          "filename": "03_dataset_audit.pdf",
+          "asset_type": "dataset_note",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.953
+        },
+        {
+          "asset_id": "sd_baseline_report",
+          "filename": "07_baseline_report.pdf",
+          "asset_type": "experiment_report",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.628
+        },
+        {
+          "asset_id": "sd_baseline_config",
+          "filename": "07_baseline_config.yaml",
+          "asset_type": "experiment_config",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.279
+        },
+        {
+          "asset_id": "sd_baseline_metrics",
+          "filename": "07_baseline_metrics.csv",
+          "asset_type": "metrics",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.219
+        },
+        {
+          "asset_id": "sd_baseline_log",
+          "filename": "07_baseline_training.log",
+          "asset_type": "training_log",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.34
+        },
+        {
+          "asset_id": "sd_ui_report",
+          "filename": "08_ui_context_report.pdf",
+          "asset_type": "experiment_report",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.822
+        },
+        {
+          "asset_id": "sd_ui_config",
+          "filename": "08_ui_context_config.json",
+          "asset_type": "experiment_config",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.346
+        },
+        {
+          "asset_id": "sd_ui_metrics",
+          "filename": "08_ui_context_metrics.xlsx",
+          "asset_type": "metrics",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.257
+        },
+        {
+          "asset_id": "sd_opt_report",
+          "filename": "08_alignment_report.pdf",
+          "asset_type": "experiment_report",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.521
+        },
+        {
+          "asset_id": "sd_opt_config",
+          "filename": "08_alignment_config.yaml",
+          "asset_type": "experiment_config",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.233
+        },
+        {
+          "asset_id": "sd_opt_metrics",
+          "filename": "08_alignment_metrics.csv",
+          "asset_type": "metrics",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.181
+        },
+        {
+          "asset_id": "sd_meeting",
+          "filename": "08_review_minutes.docx",
+          "asset_type": "meeting_minutes",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.512
+        },
+        {
+          "asset_id": "sd_decision",
+          "filename": "08_decision.pdf",
+          "asset_type": "decision",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.482
+        },
+        {
+          "asset_id": "sd_task",
+          "filename": "08_tasks.md",
+          "asset_type": "task_list",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.179
+        },
+        {
+          "asset_id": "sd_screen",
+          "filename": "08_selection_ui.png",
+          "asset_type": "screenshot",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.19
+        },
+        {
+          "asset_id": "sd_chart",
+          "filename": "08_metrics_chart.png",
+          "asset_type": "chart",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.257
+        },
+        {
+          "asset_id": "sd_ppt_template",
+          "filename": "presentation_template.pptx",
+          "asset_type": "presentation_template",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.152
+        },
+        {
+          "asset_id": "sd_report_template",
+          "filename": "report_template.md",
+          "asset_type": "report_template",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.156
+        },
+        {
+          "asset_id": "vis_plan",
+          "filename": "vision_plan.pdf",
+          "asset_type": "technical_plan",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.411
+        },
+        {
+          "asset_id": "vis_jul_report",
+          "filename": "vision_july_report.pdf",
+          "asset_type": "experiment_report",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.572
+        },
+        {
+          "asset_id": "vis_jul_config",
+          "filename": "vision_july_config.yaml",
+          "asset_type": "experiment_config",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.388
+        },
+        {
+          "asset_id": "vis_jul_metrics",
+          "filename": "vision_july_metrics.csv",
+          "asset_type": "metrics",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.168
+        },
+        {
+          "asset_id": "vis_aug_report",
+          "filename": "vision_august_report.pdf",
+          "asset_type": "experiment_report",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.325
+        },
+        {
+          "asset_id": "vis_aug_metrics",
+          "filename": "vision_august_metrics.xlsx",
+          "asset_type": "metrics",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.171
+        },
+        {
+          "asset_id": "vis_meeting",
+          "filename": "vision_review.docx",
+          "asset_type": "meeting_minutes",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.244
+        },
+        {
+          "asset_id": "vis_screen",
+          "filename": "vision_confusion_matrix.png",
+          "asset_type": "chart",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.208
+        },
+        {
+          "asset_id": "missing_date",
+          "filename": "undated_note.txt",
+          "asset_type": "experiment_note",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.148
+        },
+        {
+          "asset_id": "ambiguous_metric",
+          "filename": "ambiguous_metric.txt",
+          "asset_type": "experiment_note",
+          "supported_by_current_indexer": true,
+          "file_exists": true,
+          "content_hash_matches": true,
+          "catalog_registered": false,
+          "elapsed_ms": 0.146
+        }
+      ]
+    },
+    "catalog_registration": {
+      "schema_version": "souldrive_product_catalog_registration_metrics_v0.1",
+      "sample_count": 30,
+      "registered_count": 30,
+      "registration_rate": 1.0,
+      "elapsed_ms": 150.34030005335808,
+      "workspace": "C:\\Users\\13423\\AppData\\Local\\Temp\\souldrive-catalog-registration-20260819"
+    },
+    "multimodal_business_harness": {
+      "dataset_id": "SoulDrive-PC-MMI-480-v0.1",
+      "split": {
+        "train": 320,
+        "validation": 80,
+        "test": 80
+      },
+      "b1_text_only_validation": {
+        "sample_count": 80,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_accuracy_on_targeted": 0.0,
+        "alignment_exact_match": 0.075,
+        "conflict_accuracy": 0.925,
+        "action_accuracy": 0.7,
+        "clarification_accuracy": 0.7
+      },
+      "selected_confidence_threshold": 0.7,
+      "b1_text_only_test": {
+        "sample_count": 80,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_accuracy_on_targeted": 0.0,
+        "alignment_exact_match": 0.075,
+        "conflict_accuracy": 0.925,
+        "action_accuracy": 0.7,
+        "clarification_accuracy": 0.7
+      },
+      "candidate_soulalign_test": {
+        "sample_count": 80,
+        "intent_accuracy": 1.0,
+        "intent_macro_f1": 1.0,
+        "target_accuracy_on_targeted": 1.0,
+        "alignment_exact_match": 1.0,
+        "conflict_accuracy": 1.0,
+        "action_accuracy": 1.0,
+        "clarification_accuracy": 1.0,
+        "latency_ms": {
+          "p50": 0.0025999615900218487,
+          "p95": 0.004100031219422817
+        }
+      },
+      "limitations": [
+        "Synthetic structured episodes; results validate harness behavior, not competition performance.",
+        "No audio waveform, screenshot pixels, VLM, or QLoRA weights are used in this run."
+      ]
+    },
+    "soulalign_lite_training": {
+      "status": "synthetic_train_validation_only",
+      "proves": "a JSON-only lightweight fusion-head training and safe runtime loading path, with sealed test excluded",
+      "does_not_prove": "competition accuracy, real-media generalization, or a replacement for the rule safety gate",
+      "metrics": {
+        "schema_version": "souldrive_soulalign_lite_training_report_v0.1",
+        "checkpoint": "configs/soulalign_lite_v0.1.json",
+        "checkpoint_sha256": "591857064edfeb0ec0ee46643978ef793468ce4b5578fef0ecafa03c9d9bab46",
+        "baseline": "eval/results/souldrive_pc_mmi_480/candidate_soulalign_v0.1_20260818/metrics.json",
+        "train_count": 320,
+        "validation_count": 80,
+        "test_count_excluded": 80,
+        "validation_threshold_candidates": [
+          {
+            "threshold": 0.45,
+            "accuracy": 1.0,
+            "macro_f1": 1.0
+          },
+          {
+            "threshold": 0.55,
+            "accuracy": 1.0,
+            "macro_f1": 1.0
+          },
+          {
+            "threshold": 0.65,
+            "accuracy": 1.0,
+            "macro_f1": 1.0
+          },
+          {
+            "threshold": 0.75,
+            "accuracy": 1.0,
+            "macro_f1": 1.0
+          },
+          {
+            "threshold": 0.85,
+            "accuracy": 1.0,
+            "macro_f1": 1.0
+          }
+        ],
+        "selected_minimum_confidence": 0.85,
+        "limitations": [
+          "The source is the synthetic SoulDrive-PC-MMI v0.1 fixture; this checkpoint is an engineering integration artifact, not a competition model claim.",
+          "The sealed test split is excluded from training, threshold selection, and this report.",
+          "Rules remain the final safety boundary for destructive requests, confirmation, cancellation, target ambiguity, and external side effects."
+        ]
+      }
+    },
+    "runtime_smoke": {
+      "readiness": {
+        "schema_version": "souldrive_competition_runtime_readiness_v0.1",
+        "platform": "Windows-11-10.0.26200-SP0",
+        "gpu": {
+          "available": true,
+          "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+          "memory_gib": 7.96,
+          "runtime_python": "python.exe"
+        },
+        "dependencies": {
+          "rapidocr": true,
+          "torch": true,
+          "transformers": true,
+          "sklearn": true
+        },
+        "model_assets": {
+          "embedding": true,
+          "qwen_vl_3b": true,
+          "sensevoice_small": true
+        },
+        "ready_for_real_multimodal_run": true,
+        "next_required": []
+      },
+      "model_smoke": {
+        "schema_version": "souldrive_topic5_model_smoke_v0.1",
+        "image": "data/public/screenspot_v0.1/images/mobile_043c3a5e-c12c-4991-bb7f-676c617b2f9b.png",
+        "gpu_before": {
+          "available": true,
+          "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+          "total_gib": 7.96,
+          "allocated_gib": 0.0,
+          "reserved_gib": 0.0
+        },
+        "models": {
+          "sensevoice_small": {
+            "status": "pass",
+            "loaded_ms": 16223.862599988934,
+            "inference_ms": 443.1308999774046,
+            "text_preview": "开饭时间早上9点至下午五点。"
+          },
+          "rapidocr": {
+            "status": "pass",
+            "loaded_ms": 567.5265999743715,
+            "inference_ms": 1145.89420001721,
+            "text_count": 20
+          },
+          "qwen2.5_vl_3b_4bit": {
+            "status": "pass",
+            "loaded_ms": 6395.910699968226,
+            "inference_ms": 2108.145500009414,
+            "text_preview": "图中显示的是一个平板电脑的桌面，桌面上有多个应用程序图标和标签。",
+            "gpu_after": {
+              "available": true,
+              "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+              "total_gib": 7.96,
+              "allocated_gib": 2.302,
+              "reserved_gib": 2.65
+            }
+          }
+        },
+        "limitations": [
+          "Smoke tests are not public benchmark scores and use one sample per modality."
+        ],
+        "gpu_after": {
+          "available": true,
+          "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+          "total_gib": 7.96,
+          "allocated_gib": 1.705,
+          "reserved_gib": 2.65
+        },
+        "all_pass": true
+      },
+      "media_fixture_validation": {
+        "dataset": "eval\\fixtures\\souldrive_pc_mmi_media_runtime_smoke_v0.1\\episodes.jsonl",
+        "media_root": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\fixtures\\souldrive_pc_mmi_media_runtime_smoke_v0.1",
+        "episode_count": 3,
+        "require_media": true,
+        "valid": true,
+        "error_count": 0,
+        "errors": []
+      },
+      "latency_budget": {
+        "schema_version": "souldrive_topic5_latency_budget_v0.1",
+        "components_ms": {
+          "sensevoice_asr_ms": 443.1308999774046,
+          "rapidocr_ms": 1145.89420001721,
+          "qwen_vl_ms": 2108.145500009414,
+          "soulalign_p95_ms": 0.004100031219422817
+        },
+        "serial_component_sum_ms": 3697.174700035248,
+        "under_5s_component_sum": true,
+        "status": "smoke_budget_only",
+        "limitations": [
+          "Components were measured in separate smoke runs, not one recorded business episode.",
+          "OCR and VLM are alternative fast/slow paths in production; this sum is conservative.",
+          "Do not report this as Topic 5 P95 until a real episode run is frozen."
+        ]
+      },
+      "does_not_prove": "formal held-out real-business generalization, complete RAG/VLM response latency, or Huawei hidden-set generalization"
+    },
+    "media_business_runtime": {
+      "status": "synthetic_media_full_test_actual_local_runtime",
+      "proves": "SenseVoiceSmall ASR + RapidOCR + SoulAlign on 80 synthetic WAV/UI test episodes; hot fast-path latency and failure logs",
+      "does_not_prove": "human recordings, public benchmark score, VLM accuracy, or Huawei hidden-set generalization",
+      "metrics": {
+        "schema_version": "souldrive_pc_mmi_media_runtime_metrics_v0.2",
+        "dataset_id": "SoulDrive-PC-MMI-media-480-v0.2",
+        "dataset_sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+        "evaluated_split": "test",
+        "evaluated_count": 80,
+        "full_test": true,
+        "selection_policy": "frozen test file order; no test labels used for threshold/model selection",
+        "threshold": {
+          "value": 0.7,
+          "source": "validation-only selection from B1/Candidate harness"
+        },
+        "b1_original_transcript_test": {
+          "sample_count": 80,
+          "intent_accuracy": 0.625,
+          "intent_macro_f1": 0.6430543815159199,
+          "target_binding_accuracy_on_targeted": 0.0,
+          "conflict_accuracy": 0.925,
+          "action_accuracy": 0.4875,
+          "clarification_accuracy": 0.7
+        },
+        "candidate_actual_asr_ocr_soulalign_test": {
+          "sample_count": 80,
+          "intent_accuracy": 0.65,
+          "intent_macro_f1": 0.669463368932865,
+          "target_binding_accuracy_on_targeted": 1.0,
+          "conflict_accuracy": 1.0,
+          "action_accuracy": 0.7625,
+          "clarification_accuracy": 0.7625
+        },
+        "runtime": {
+          "status_before": {
+            "schema_version": "souldrive_topic5_runtime_status_v0.1",
+            "mode": "lazy_local",
+            "gpu": {
+              "installed": true,
+              "cuda_available": true,
+              "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+              "memory_gib": 7.96
+            },
+            "dependencies": {
+              "funasr": true,
+              "rapidocr": true,
+              "transformers": true,
+              "qwen_vl_utils": true,
+              "bitsandbytes": true,
+              "pillow": true
+            },
+            "assets": {
+              "sensevoice_small": {
+                "ready": true,
+                "name": "SenseVoiceSmall"
+              },
+              "rapidocr": {
+                "ready": true,
+                "name": "RapidOCR"
+              },
+              "qwen2.5_vl_3b": {
+                "ready": true,
+                "name": "Qwen2.5-VL-3B-Instruct"
+              }
+            },
+            "loaded": {
+              "sensevoice_small": false,
+              "rapidocr": false,
+              "qwen2.5_vl_3b": false
+            },
+            "policy": {
+              "asr_requires_cuda": true,
+              "vlm_requires_cuda": true,
+              "media_scope": "workspace-relative-only",
+              "max_audio_seconds": 15,
+              "max_image_bytes": 8388608
+            }
+          },
+          "vlm_smoke_count": 0,
+          "stage_summary": {
+            "asr": {
+              "statuses": {
+                "pass": 80
+              },
+              "latency_ms": {
+                "count": 80,
+                "p50": 80.352,
+                "p95": 144.989,
+                "max": 21773.396
+              }
+            },
+            "ocr": {
+              "statuses": {
+                "pass": 80
+              },
+              "latency_ms": {
+                "count": 80,
+                "p50": 599.4259999999999,
+                "p95": 711.091,
+                "max": 1355.185
+              }
+            },
+            "vlm": {
+              "statuses": {
+                "skipped": 80
+              },
+              "latency_ms": {
+                "count": 80,
+                "p50": 0.0,
+                "p95": 0.0,
+                "max": 0.0
+              }
+            },
+            "soulalign": {
+              "statuses": {
+                "pass": 80
+              },
+              "latency_ms": {
+                "count": 80,
+                "p50": 0.0275,
+                "p95": 0.043,
+                "max": 0.123
+              }
+            }
+          },
+          "runtime_total_latency_ms": {
+            "count": 80,
+            "p50": 688.855,
+            "p95": 787.239,
+            "max": 23129.619
+          },
+          "wall_clock_latency_ms": {
+            "count": 80,
+            "p50": 688.882,
+            "p95": 787.269,
+            "max": 23129.656
+          },
+          "cold_start": {
+            "episode_id": "MMI-TE-SELE-0000",
+            "runtime_total_ms": 23129.619,
+            "wall_clock_ms": 23129.656
+          },
+          "fast_path_all_latency_ms": {
+            "runtime": {
+              "count": 80,
+              "p50": 688.855,
+              "p95": 787.239,
+              "max": 23129.619
+            },
+            "wall_clock": {
+              "count": 80,
+              "p50": 688.882,
+              "p95": 787.269,
+              "max": 23129.656
+            }
+          },
+          "fast_path_hot_latency_ms": {
+            "runtime": {
+              "count": 79,
+              "p50": 688.179,
+              "p95": 787.239,
+              "max": 810.71
+            },
+            "wall_clock": {
+              "count": 79,
+              "p50": 688.209,
+              "p95": 787.269,
+              "max": 810.744
+            }
+          },
+          "vlm_sample_latency_ms": {
+            "runtime": {
+              "count": 0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            },
+            "wall_clock": {
+              "count": 0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0
+            }
+          },
+          "gpu_peak_allocated_mib": {
+            "count": 80,
+            "p50": 960.815,
+            "p95": 963.16,
+            "max": 963.17
+          }
+        },
+        "failure_count": 19,
+        "limitations": [
+          "This is an actual local SenseVoice + RapidOCR + SoulAlign runtime run on synthetic TTS/UI media, not a Huawei Topic 5 competition score.",
+          "The test split is used only once for post-hoc evaluation. Threshold 0.7 is fixed before this run from validation; no test-driven tuning is permitted.",
+          "B1 sees the provided synthetic transcript; Candidate transcribes local WAV and reads local synthetic screenshots. The two scores do not measure a public benchmark or human interaction quality.",
+          "VLM is sampled only on a fixed prefix when requested. Fast-path P95 and VLM-sampled P95 must be reported separately and cannot be averaged into a competition claim."
+        ]
+      }
+    },
+    "real_mmi_pilot": {
+      "status": "10_user_authorized_real_pc_pilot",
+      "proves": "real WAV + authorized screenshot fast-path plumbing and target-binding gain over text-only B1",
+      "does_not_prove": "formal held-out generalization, VLM, complete RAG response latency, public benchmark score, or Huawei score",
+      "metrics": {
+        "sample_count": 10,
+        "intent_accuracy": 1.0,
+        "target_binding_accuracy_on_targeted": 1.0,
+        "action_accuracy": 1.0,
+        "clarification_accuracy": 1.0,
+        "latency_ms": {
+          "p50": 1203.6135,
+          "p95": 12479.43,
+          "max": 12479.43
+        },
+        "cold_start_ms": 12479.43,
+        "warm_latency_ms": {
+          "count": 9,
+          "p50": 1199.973,
+          "p95": 1400.718,
+          "max": 1400.718
+        },
+        "failure_count": 0,
+        "text_only_baseline": {
+          "intent_accuracy": 1.0,
+          "target_binding_accuracy_on_targeted": 0.0,
+          "action_accuracy": 1.0,
+          "clarification_accuracy": 1.0
+        },
+        "limitations": [
+          "真实用户授权 WAV/截图，但仅 10 条 pilot；不是公开集或华为隐藏集成绩。",
+          "本轮使用快路径，未包含 VLM、完整 RAG、首 token 和完整回答生成。",
+          "PILOT-11/12 未采集，不补造样本。"
+        ]
+      }
+    },
+    "real_mmi_runtime_repeats": {
+      "status": "10_unique_real_pilot_episodes_30_perception_measurements",
+      "proves": "repeatable local ASR + OCR + SoulAlign perception timing on the authorized pilot",
+      "does_not_prove": "30 independent business episodes, retrieval latency, first-token latency, complete response P95, public benchmark score, or Huawei score",
+      "metrics": {
+        "unique_episode_count": 10,
+        "repeat_count": 3,
+        "measurement_count": 30,
+        "latency_ms": {
+          "warm_wall_clock": {
+            "count": 20,
+            "p50": 1189.98,
+            "p95": 1228.806,
+            "max": 1293.16
+          },
+          "warm_runtime_total": {
+            "count": 20,
+            "p50": 1189.9344999999998,
+            "p95": 1228.783,
+            "max": 1293.134
+          }
+        },
+        "stage_latency_ms": {
+          "asr": {
+            "count": 20,
+            "p50": 0.398,
+            "p95": 0.536,
+            "max": 0.546
+          },
+          "ocr": {
+            "count": 20,
+            "p50": 1187.982,
+            "p95": 1226.978,
+            "max": 1291.053
+          },
+          "soulalign": {
+            "count": 20,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0
+          }
+        },
+        "pipeline_coverage": {
+          "perception": "measured",
+          "retrieval": "not_integrated",
+          "first_token": "not_integrated",
+          "complete_response": "not_integrated"
+        }
+      }
+    },
+    "public_gui_speech_augmentation_b1": {
+      "status": "30_screen_spot_desktop_images_plus_synthetic_mandarin_speech_train_only",
+      "proves": "current CUDA ASR/OCR/SoulAlign plumbing on a derived GUI grounding development set",
+      "does_not_prove": "natural-speaker generalization, official ScreenSpot score, project RAG, public benchmark score, or Huawei score",
+      "metrics": {
+        "schema_version": "souldrive_public_gui_speech_baseline_v0.1",
+        "dataset_sha256": "f17bb3b918717f92348927628865d6196aee1736623ee82d499d3801db3b43d2",
+        "sample_count": 30,
+        "asr_mean_cer": 0.0047619047619047615,
+        "asr_exact_match": 0.9666666666666667,
+        "ocr_pass_rate": 1.0,
+        "target_binding_accuracy": 1.0,
+        "intent_distribution": {
+          "search_document": 16,
+          "clarify_target": 12,
+          "switch_template": 1,
+          "cancel": 1
+        },
+        "action_distribution": {
+          "respond": 17,
+          "clarify": 12,
+          "cancel": 1
+        },
+        "cold_start_ms": 65854.286,
+        "warm_latency_ms": {
+          "count": 29,
+          "p50": 549.185,
+          "p95": 1021.819,
+          "max": 1285.311
+        },
+        "claim_policy": {
+          "baseline_only": true,
+          "real_user_speech": false,
+          "public_benchmark_score": false,
+          "huawei_score": false
+        },
+        "limitations": [
+          "ScreenSpot 真实 GUI 与合成中文语音的派生训练集，不是官方 ScreenSpot 协议。",
+          "显式 target_id 测量对齐管线，不等价于从截图自主预测 bbox。",
+          "当前 baseline 不包含项目检索或生成回答。"
+        ]
+      }
+    }
+  },
+  "not_reported": [
+    "MIntRec2.0 original WavLM/Swin runner score: official feature packages are not available locally.",
+    "Huawei internal dataset score: hidden dataset and evaluator are not published.",
+    "An aggregate competition score: tasks have different labels and must not be averaged."
+  ],
+  "submission_gate": {
+    "allow_public_score_claims": true,
+    "allow_topic5_final_claim": false,
+    "blocking_items": [
+      "formal held-out real business dataset with more speakers and scenarios",
+      "complete retrieval + first-token + full-response P95 on real business episodes",
+      "official Huawei evaluator or published protocol"
+    ]
+  }
+}

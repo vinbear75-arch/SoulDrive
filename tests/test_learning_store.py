@@ -24,6 +24,22 @@ class LearningStoreTests(unittest.TestCase):
         normalized = workspace.learning_store_path.replace("\\", "/")
         self.assertTrue(normalized.endswith("data/learning.sqlite"))
 
+    def test_get_skill_reads_only_the_requested_active_skill(self):
+        _workspace, store = self._store()
+        store.sync_project_skill({
+            "title": "requested-skill",
+            "content": "Use the requested skill.",
+            "source_path": "requested-skill/SKILL.md",
+            "source_digest": "requested-digest",
+        })
+
+        [created] = store.list_skills()
+        loaded = store.get_skill(created["skill_id"])
+
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["skill_id"], created["skill_id"])
+        self.assertIsNone(store.get_skill("skill_missing"))
+
     def test_new_store_lists_no_pending_reviews_or_assets(self):
         _workspace, store = self._store()
         self.assertEqual(store.list_pending_reviews(), [])
@@ -50,7 +66,16 @@ class LearningStoreTests(unittest.TestCase):
                     "memory_id": "mem_1",
                     "subtype": "user_preference",
                     "status": "active",
+                    "scope": "global",
+                    "project_id": None,
                     "source_candidate_id": candidate_id,
+                    "source_message_indexes": [],
+                    "source_excerpt": "",
+                    "source_trace": {
+                        "candidate_id": candidate_id,
+                        "message_indexes": [],
+                        "excerpt": "",
+                    },
                     "created_at": 1.0,
                     "updated_at": 2.0,
                     "title": "关闭前审核",
@@ -235,6 +260,28 @@ class LearningStoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.list_skills()
 
+    def test_delete_skill_removes_active_skill_chunks(self):
+        _workspace, store = self._store()
+        candidate_id = self._seed_candidate(store, asset_type="skill")
+        nonce, ciphertext = store._encrypt_payload(
+            {"title": "deletable skill", "content": "delete me"},
+            table="skills",
+            pk_name="skill_id",
+            pk_value="skill_deletable",
+            asset_type="skill",
+        )
+
+        self._insert_skill(store, "skill_deletable", candidate_id, nonce, ciphertext)
+        self._insert_learning_chunk(store, "chunk_skill_deletable", "skill_deletable", "skill")
+
+        self.assertTrue(store.delete_skill("skill_deletable"))
+        self.assertEqual(store.list_skills(), [])
+        chunk_count = store.conn.execute(
+            "SELECT COUNT(*) FROM learning_chunks WHERE asset_type = 'skill' AND asset_id = ?",
+            ("skill_deletable",),
+        ).fetchone()[0]
+        self.assertEqual(chunk_count, 0)
+
     def test_referenced_memory_candidate_cannot_be_made_unaccepted(self):
         _workspace, store = self._store()
         candidate_id = self._seed_candidate(store, asset_type="memory")
@@ -397,6 +444,235 @@ class LearningStoreTests(unittest.TestCase):
         self.assertEqual(chunk["subtype"], "user_preference")
         self.assertEqual(chunk["status"], "active")
 
+    def test_memory_edit_updates_encrypted_search_chunk_and_usage_metadata(self):
+        _workspace, store = self._store()
+        review = store.create_review("manual", [{
+            "asset_type": "memory",
+            "subtype": "user_preference",
+            "title": "old_pref_token",
+            "content": "old_content_token 只用于本次编辑回归。",
+            "confidence": 0.9,
+            "selected_by_default": True,
+            "source_message_indexes": [3],
+            "source_excerpt": "用户明确要求旧内容。",
+        }])
+        accepted = store.decide_review(review["review_id"], [{
+            "candidate_id": review["candidates"][0]["candidate_id"],
+            "action": "accept",
+        }])
+        memory_id = accepted["accepted_assets"][0]["memory_id"]
+        before = store.list_memories(include_metadata=True)[0]
+
+        updated = store.update_memory(
+            memory_id,
+            title="new_pref_token",
+            content="new_content_token 只用于本次编辑回归。",
+            expected_updated_at=before["updated_at"],
+        )
+        self.assertEqual(updated["title"], "new_pref_token")
+        self.assertEqual(updated["content"], "new_content_token 只用于本次编辑回归。")
+        self.assertEqual(updated["record_version"], 2)
+        self.assertEqual(updated["source_trace"]["message_indexes"], [3])
+        self.assertIsNone(updated["last_used_at"])
+
+        old_result = store.search("old_pref_token old_content_token", top_k_memory=3)
+        new_result = store.search("new_pref_token new_content_token", top_k_memory=3)
+        self.assertEqual(old_result["memories"], [])
+        self.assertEqual(new_result["memories"][0]["title"], "new_pref_token")
+
+        self.assertEqual(store.touch_memories([memory_id], used_at=123.0), 1)
+        [used] = store.list_memories(include_metadata=True)
+        self.assertEqual(used["last_used_at"], 123.0)
+
+    def test_memory_delete_removes_active_record_and_search_chunk(self):
+        _workspace, store = self._store()
+        review = store.create_review("manual", [{
+            "asset_type": "memory",
+            "subtype": "user_preference",
+            "title": "待删除偏好",
+            "content": "这条偏好应从活动索引消失。",
+            "confidence": 0.9,
+            "selected_by_default": True,
+            "source_message_indexes": [],
+        }])
+        result = store.decide_review(review["review_id"], [{
+            "candidate_id": review["candidates"][0]["candidate_id"],
+            "action": "accept",
+        }])
+        memory_id = result["accepted_assets"][0]["memory_id"]
+
+        deleted = store.delete_memory(memory_id)
+        self.assertEqual(deleted["status"], "deleted")
+        self.assertEqual(store.list_memories(), [])
+        self.assertEqual(
+            store.conn.execute(
+                "SELECT COUNT(*) FROM learning_chunks WHERE asset_id = ?",
+                (memory_id,),
+            ).fetchone()[0],
+            0,
+        )
+        self.assertIsNone(store.delete_memory(memory_id))
+
+    def test_retrieval_feedback_is_encrypted_scoped_and_exactly_reusable(self):
+        workspace, store = self._store()
+        global_feedback = store.save_retrieval_feedback(
+            "RAG 的核心思想是什么？",
+            "RAG 的核心思想是什么？ 检索增强生成 retrieval augmented generation",
+        )
+        project_feedback = store.save_retrieval_feedback(
+            "RAG 的核心思想是什么？",
+            "RAG 的核心思想是什么？ 外部知识库 证据引用",
+            scope="project",
+            project_id="project-a",
+        )
+
+        self.assertEqual(
+            [item["feedback_id"] for item in store.list_retrieval_feedback(
+                "RAG 的核心思想是什么？", project_id="project-a"
+            )],
+            [project_feedback["feedback_id"], global_feedback["feedback_id"]],
+        )
+        self.assertEqual(
+            store.list_retrieval_feedback("RAG 的核心思想是什么？", project_id="project-b")[0]["feedback_id"],
+            global_feedback["feedback_id"],
+        )
+        self.assertEqual(store.list_retrieval_feedback("完全不同的问题"), [])
+
+        raw_database = Path(workspace.learning_store_path).read_bytes()
+        self.assertNotIn("检索增强生成".encode("utf-8"), raw_database)
+        self.assertNotIn("外部知识库".encode("utf-8"), raw_database)
+
+    def test_retrieval_feedback_update_replaces_previous_variant_and_revoke_is_fail_closed(self):
+        _workspace, store = self._store()
+        first = store.save_retrieval_feedback("问题 A", "问题 A 改写一")
+        second = store.save_retrieval_feedback("问题 A", "问题 A 改写二")
+
+        self.assertEqual(first["feedback_id"], second["feedback_id"])
+        [stored] = store.list_retrieval_feedback("问题 A")
+        self.assertEqual(stored["corrected_query"], "问题 A 改写二")
+
+        revoked = store.revoke_retrieval_feedback(first["feedback_id"])
+        self.assertEqual(revoked["status"], "revoked")
+        self.assertEqual(store.list_retrieval_feedback("问题 A"), [])
+        self.assertIsNone(store.revoke_retrieval_feedback(first["feedback_id"]))
+
+    def test_retrieval_feedback_rejects_blank_same_query_and_missing_project_scope(self):
+        _workspace, store = self._store()
+        for query, corrected in (("", "改写"), ("问题", ""), ("问题", "问题")):
+            with self.assertRaises(ValueError):
+                store.save_retrieval_feedback(query, corrected)
+        with self.assertRaises(ValueError):
+            store.save_retrieval_feedback("问题", "问题 改写", scope="project")
+
+    def test_memory_metadata_marks_runtime_signal_as_unconfirmed(self):
+        _workspace, store = self._store()
+        review = store.create_review("runtime", [{
+            "asset_type": "memory",
+            "subtype": "user_preference",
+            "title": "运行时偏好",
+            "content": "这是显式信号但尚未人工审核。",
+            "confidence": 0.9,
+            "selected_by_default": True,
+            "source_message_indexes": [0],
+        }])
+        store.decide_review(review["review_id"], [{
+            "candidate_id": review["candidates"][0]["candidate_id"],
+            "action": "accept",
+        }])
+        [memory] = store.list_memories(include_metadata=True)
+        self.assertEqual(memory["confirmation_status"], "explicit_signal")
+        self.assertIsNone(memory["confirmed_at"])
+
+    def test_project_memory_is_visible_with_global_memory_but_not_in_other_project(self):
+        _workspace, store = self._store()
+        global_review = store.create_review("manual", [{
+            "asset_type": "memory", "subtype": "user_preference", "title": "全局偏好",
+            "content": "回答使用中文。", "confidence": 0.9,
+            "selected_by_default": True, "source_message_indexes": [],
+        }])
+        store.decide_review(global_review["review_id"], [{
+            "candidate_id": global_review["candidates"][0]["candidate_id"], "action": "accept",
+        }], project_id="project-a")
+
+        project_review = store.create_review("manual", [{
+            "asset_type": "memory", "subtype": "project_fact", "title": "项目事实",
+            "content": "项目 A 使用本地模型。", "confidence": 0.9,
+            "selected_by_default": True, "source_message_indexes": [],
+        }])
+        store.decide_review(project_review["review_id"], [{
+            "candidate_id": project_review["candidates"][0]["candidate_id"], "action": "accept",
+        }], project_id="project-a")
+
+        other_project = store.list_memories(project_id="project-b")
+        current_project = store.list_memories(project_id="project-a")
+        self.assertEqual({item["title"] for item in other_project}, {"全局偏好"})
+        self.assertEqual({item["title"] for item in current_project}, {"全局偏好", "项目事实"})
+        self.assertEqual(
+            {item["scope"] for item in current_project},
+            {"global", "project"},
+        )
+
+    def test_context_memory_search_is_scoped_before_top_k_ranking(self):
+        _workspace, store = self._store()
+        for project_id, title in (("project-a", "项目 A 事实"), ("project-b", "项目 B 事实")):
+            review = store.create_review("manual", [{
+                "asset_type": "memory", "subtype": "project_fact", "title": title,
+                "content": "项目使用本地模型进行检索。", "confidence": 0.9,
+                "selected_by_default": True, "source_message_indexes": [],
+            }])
+            store.decide_review(review["review_id"], [{
+                "candidate_id": review["candidates"][0]["candidate_id"], "action": "accept",
+            }], project_id=project_id)
+
+        scoped = store.search(
+            "项目使用本地模型检索",
+            top_k_memory=1,
+            project_id="project-a",
+            context_only=True,
+        )
+        global_only = store.list_memories(context_only=True)
+
+        self.assertEqual(scoped["memories"][0]["title"], "项目 A 事实")
+        self.assertEqual(global_only, [])
+
+    def test_context_memory_search_without_project_is_global_only_and_keeps_source_trace(self):
+        _workspace, store = self._store()
+        for project_id, subtype, title in (
+            (None, "user_preference", "全局偏好"),
+            ("project-a", "project_fact", "项目 A 事实"),
+        ):
+            review = store.create_review("manual", [{
+                "asset_type": "memory", "subtype": subtype, "title": title,
+                "content": "回答使用中文并优先引用原始来源。", "confidence": 0.9,
+                "selected_by_default": True, "source_message_indexes": [2],
+                "source_excerpt": title,
+            }])
+            store.decide_review(review["review_id"], [{
+                "candidate_id": review["candidates"][0]["candidate_id"], "action": "accept",
+            }], project_id=project_id)
+
+        global_only = store.search(
+            "回答使用中文原始来源",
+            top_k_memory=5,
+            context_only=True,
+        )
+        scoped = store.search(
+            "回答使用中文原始来源",
+            top_k_memory=5,
+            project_id="project-a",
+            context_only=True,
+        )
+
+        self.assertEqual([item["title"] for item in global_only["memories"]], ["全局偏好"])
+        self.assertEqual(
+            {item["title"] for item in scoped["memories"]},
+            {"全局偏好", "项目 A 事实"},
+        )
+        project_memory = next(item for item in scoped["memories"] if item["title"] == "项目 A 事实")
+        self.assertEqual(project_memory["scope"], "project")
+        self.assertEqual(project_memory["project_id"], "project-a")
+        self.assertEqual(project_memory["source_trace"]["excerpt"], "项目 A 事实")
+
     def test_rejecting_skill_candidate_does_not_create_skill(self):
         _workspace, store = self._store()
         review = store.create_review(
@@ -498,6 +774,16 @@ class LearningStoreTests(unittest.TestCase):
         self.assertEqual(stored_run["query"], "Implement learning validator")
         raw_database = Path(workspace.learning_store_path).read_bytes()
         self.assertNotIn(b"Implement learning validator", raw_database)
+
+        completed = store.update_skill_run(
+            run["run_id"],
+            status="completed",
+            outcome='{"response_emitted": true}',
+        )
+        self.assertEqual(completed["status"], "completed")
+        self.assertEqual(completed["outcome"], '{"response_emitted": true}')
+        self.assertEqual(store.list_skill_runs()[0]["status"], "completed")
+        self.assertNotIn(b"response_emitted", raw_database)
 
     def test_search_recalls_memory_and_skill(self):
         _workspace, store = self._store()

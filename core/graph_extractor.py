@@ -24,6 +24,18 @@ class GraphExtractor:
         self.max_chars_per_chunk = max_chars_per_chunk
         logger.info("[Graph Extractor] 正在点火大模型图谱抽取引擎...")
         self.runtime_config = llama_runtime_config(workspace_path)
+        chat_provider = str(os.environ.get("SOULDRIVE_CHAT_PROVIDER") or "").strip().lower()
+        if chat_provider == "ollama":
+            from core.rag_engine import _OllamaChatModel
+
+            model_name = str(os.environ.get("SOULDRIVE_OLLAMA_MODEL") or "qwen3.5:9b").strip()
+            base_url = str(os.environ.get("SOULDRIVE_OLLAMA_URL") or "http://127.0.0.1:11434").strip()
+            logger.info("[Graph Extractor] 使用本地 Ollama 模型: %s", model_name)
+            self.llm = _OllamaChatModel(model_name, base_url)
+            runtime_metrics.record_model_load(0)
+            self.db = self._build_graph_store(graph_db_path, workspace_path)
+            return
+
         model_path = resolve_chat_model_path(workspace_path, self.runtime_config)
 
         if not os.path.exists(model_path):
@@ -70,7 +82,22 @@ class GraphExtractor:
             "failed_chunks": 0,
             "entities": 0,
             "relationships": 0,
+            "documents": 0,
         }
+
+        document_chunk_ids = [
+            chunk_id
+            for chunk in selected_chunks
+            for chunk_id in (getattr(chunk, "metadata", {}) or {}).get("child_ids") or []
+        ]
+        project_ids = {
+            str((getattr(chunk, "metadata", {}) or {}).get("project_id") or "").strip()
+            for chunk in selected_chunks
+            if str((getattr(chunk, "metadata", {}) or {}).get("project_id") or "").strip()
+        }
+        project_id = next(iter(project_ids)) if len(project_ids) == 1 else ""
+        document_keywords = []
+        document_texts = []
 
         for index, chunk in enumerate(selected_chunks, start=1):
             text = getattr(chunk, "page_content", str(chunk)).strip()
@@ -82,6 +109,7 @@ class GraphExtractor:
 
             if source_filename:
                 text = f"文档来源：{source_filename}\n片段序号：{index}/{len(selected_chunks)}\n\n{text}"
+            document_texts.append(text)
 
             summary["attempted_chunks"] += 1
             chunk_ids = list(getattr(chunk, "metadata", {}).get("child_ids") or [])
@@ -93,6 +121,28 @@ class GraphExtractor:
             summary["chunks"] += 1
             summary["entities"] += len(data.get("entities", []))
             summary["relationships"] += len(data.get("relationships", []))
+            document_keywords.extend(item.get("name") for item in data.get("entities", []))
+
+        if source_filename and hasattr(self.db, "add_document"):
+            digest = _document_digest(document_texts, source_filename)
+            generated_summary = self.generate_document_summary(
+                source_filename,
+                document_texts,
+                document_keywords,
+            )
+            document_kwargs = {
+                "source_filename": source_filename,
+                "title": source_filename,
+                "summary": generated_summary or digest,
+                "keywords": document_keywords[:40],
+                "chunk_ids": document_chunk_ids,
+            }
+            if project_id:
+                document_kwargs["project_id"] = project_id
+            self.db.add_document(
+                **document_kwargs,
+            )
+            summary["documents"] = 1
 
         logger.info(
             "[Graph Extractor] 文档图谱抽取完成: 成功 %s/%s 个片段, 失败 %s 个片段, %s 个实体, %s 条关系。",
@@ -103,6 +153,69 @@ class GraphExtractor:
             summary["relationships"],
         )
         return summary
+
+    def generate_document_summary(
+        self,
+        source_filename: str,
+        texts: list[str],
+        keywords: list[str],
+    ) -> str:
+        """在索引期生成文档级压缩摘要；失败时由调用方保留结构化摘录兜底。"""
+        excerpts = [str(item).strip()[:1200] for item in texts if str(item).strip()]
+        if not excerpts:
+            return ""
+        prompt = (
+            "你是中文论文知识索引器。请根据给定文档片段生成 120-360 字的文档级摘要，"
+            "概括研究问题、方法、关键结论和适用边界。只能使用输入信息，不要补充外部事实，"
+            "不要输出 Markdown、JSON、标题或提示词。该摘要仅用于 GraphRAG 导航，具体事实必须回到原文。\n\n"
+            f"文档：{source_filename}\n"
+            f"已提取关键词：{'、'.join(str(item) for item in keywords[:20])}\n"
+            "文档片段：\n"
+            + "\n\n".join(excerpts[:8])
+        )
+        try:
+            response = self.llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": "你只输出严谨、简洁的中文文档摘要。"},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=min(0.2, self.runtime_config.graph_temperature),
+                top_p=self.runtime_config.top_p,
+                max_tokens=min(700, self.runtime_config.graph_max_tokens),
+                repeat_penalty=self.runtime_config.graph_repeat_penalty,
+            )
+            content = str(response.get("choices", [{}])[0].get("message", {}).get("content") or "")
+            content = re.sub(r"```(?:text|markdown)?|```", "", content, flags=re.IGNORECASE)
+            return " ".join(content.split()).strip()[:2200]
+        except Exception as exc:
+            logger.warning("[Graph Extractor] document summary degraded: %s", exc)
+            return ""
+
+    def generate_community_report(self, community: dict) -> str:
+        """用索引阶段已加载的模型生成社区摘要；失败时由构建器使用模板兜底。"""
+        system_prompt = (
+            "你是本地文档索引阶段的知识抽象器。"
+            "请根据给定的实体、关系和来源文件，生成一段 120-400 字的中文社区报告。"
+            "只描述输入中能支持的主题、关系和来源，不补充外部事实；不要输出 Markdown、JSON、"
+            "提示词或行动指令。社区报告是检索摘要，回答时必须回到原始证据核验。"
+        )
+        user_prompt = json.dumps(community, ensure_ascii=False)
+        try:
+            response = self.llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=min(0.2, self.runtime_config.graph_temperature),
+                max_tokens=min(800, self.runtime_config.graph_max_tokens),
+                repeat_penalty=self.runtime_config.graph_repeat_penalty,
+            )
+            content = str(response["choices"][0]["message"].get("content") or "").strip()
+            content = re.sub(r"```(?:text|markdown)?|```", "", content, flags=re.IGNORECASE).strip()
+            return content[:2200]
+        except Exception as exc:
+            logger.warning("[Graph Extractor] community report degraded: %s", exc)
+            return ""
 
     def close(self):
         """主动释放图谱抽取器资源，避免进程退出阶段触发析构异常。"""
@@ -298,6 +411,18 @@ class GraphExtractor:
         if not text:
             return ""
         return text[:max_len]
+
+
+def _document_digest(texts: list[str], source_filename: str) -> str:
+    """保留原文前提下的轻量文档级知识单元，供社区报告回溯。"""
+    normalized = [re.sub(r"\s+", " ", str(text or "")).strip() for text in texts]
+    normalized = [text for text in normalized if text]
+    if not normalized:
+        return f"文档：{source_filename}；索引阶段未提取到可用正文。"
+    excerpts = normalized[:2]
+    if len(normalized) > 2:
+        excerpts.append(normalized[-1])
+    return f"文档：{source_filename}\n索引阶段保留的结构化摘要片段：" + "\n".join(excerpts)[:3800]
 
 # ==================== 自动化点火测试 ====================
 if __name__ == "__main__":

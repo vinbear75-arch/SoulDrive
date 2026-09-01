@@ -1,0 +1,80 @@
+{"intent": "selection_summary", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0000", "low_ocr_test_0000"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "selection_summary", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0001", "low_ocr_test_0001"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "selection_summary", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0002", "low_ocr_test_0002"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "selection_summary", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0003", "low_ocr_test_0003"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "selection_summary", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0004", "low_ocr_test_0004"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "selection_summary", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0005", "low_ocr_test_0005"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "rewrite_selection", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0000", "selection_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "rewrite_selection", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0001", "selection_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "rewrite_selection", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0002", "selection_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "rewrite_selection", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0003", "selection_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "rewrite_selection", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0004", "selection_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "rewrite_selection", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0005", "selection_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "private_qa", "target_id": null, "aligned_event_ids": ["speech_test_0000"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "private_qa", "target_id": null, "aligned_event_ids": ["speech_test_0001"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "private_qa", "target_id": null, "aligned_event_ids": ["speech_test_0002"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "private_qa", "target_id": null, "aligned_event_ids": ["speech_test_0003"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "private_qa", "target_id": null, "aligned_event_ids": ["speech_test_0004"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "private_qa", "target_id": null, "aligned_event_ids": ["speech_test_0005"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "project_compare", "target_id": null, "aligned_event_ids": ["speech_test_0000", "selection_a_test_0000", "selection_b_test_0000"], "conflict_type": "project_mismatch", "clarification_required": true, "action": "clarify"}
+{"intent": "project_compare", "target_id": null, "aligned_event_ids": ["speech_test_0001", "selection_a_test_0001", "selection_b_test_0001"], "conflict_type": "project_mismatch", "clarification_required": true, "action": "clarify"}
+{"intent": "project_compare", "target_id": null, "aligned_event_ids": ["speech_test_0002", "selection_a_test_0002", "selection_b_test_0002"], "conflict_type": "project_mismatch", "clarification_required": true, "action": "clarify"}
+{"intent": "project_compare", "target_id": null, "aligned_event_ids": ["speech_test_0003", "selection_a_test_0003", "selection_b_test_0003"], "conflict_type": "project_mismatch", "clarification_required": true, "action": "clarify"}
+{"intent": "project_compare", "target_id": null, "aligned_event_ids": ["speech_test_0004", "selection_a_test_0004", "selection_b_test_0004"], "conflict_type": "project_mismatch", "clarification_required": true, "action": "clarify"}
+{"intent": "project_compare", "target_id": null, "aligned_event_ids": ["speech_test_0005", "selection_a_test_0005", "selection_b_test_0005"], "conflict_type": "project_mismatch", "clarification_required": true, "action": "clarify"}
+{"intent": "extract_tasks", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0000", "selection_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "extract_tasks", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0001", "selection_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "extract_tasks", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0002", "selection_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "extract_tasks", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0003", "selection_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "extract_tasks", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0004", "selection_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "extract_tasks", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0005", "selection_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "schedule_draft", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0000", "selection_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "schedule_draft", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0001", "selection_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "schedule_draft", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0002", "selection_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "schedule_draft", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0003", "selection_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "schedule_draft", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0004", "selection_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "schedule_draft", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0005", "selection_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "email_draft", "target_id": null, "aligned_event_ids": ["speech_test_0000", "profile_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "email_draft", "target_id": null, "aligned_event_ids": ["speech_test_0001", "profile_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "email_draft", "target_id": null, "aligned_event_ids": ["speech_test_0002", "profile_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "email_draft", "target_id": null, "aligned_event_ids": ["speech_test_0003", "profile_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "email_draft", "target_id": null, "aligned_event_ids": ["speech_test_0004", "profile_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "email_draft", "target_id": null, "aligned_event_ids": ["speech_test_0005", "profile_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "search_document", "target_id": null, "aligned_event_ids": ["speech_test_0000", "screen_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "search_document", "target_id": null, "aligned_event_ids": ["speech_test_0001", "screen_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "search_document", "target_id": null, "aligned_event_ids": ["speech_test_0002", "screen_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "search_document", "target_id": null, "aligned_event_ids": ["speech_test_0003", "screen_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "search_document", "target_id": null, "aligned_event_ids": ["speech_test_0004", "screen_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "search_document", "target_id": null, "aligned_event_ids": ["speech_test_0005", "screen_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "switch_template", "target_id": null, "aligned_event_ids": ["speech_test_0000", "profile_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "switch_template", "target_id": null, "aligned_event_ids": ["speech_test_0001", "profile_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "switch_template", "target_id": null, "aligned_event_ids": ["speech_test_0002", "profile_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "switch_template", "target_id": null, "aligned_event_ids": ["speech_test_0003", "profile_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "switch_template", "target_id": null, "aligned_event_ids": ["speech_test_0004", "profile_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "switch_template", "target_id": null, "aligned_event_ids": ["speech_test_0005", "profile_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "respond"}
+{"intent": "confirm", "target_id": null, "aligned_event_ids": ["speech_test_0000", "screen_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "confirm"}
+{"intent": "confirm", "target_id": null, "aligned_event_ids": ["speech_test_0001", "screen_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "confirm"}
+{"intent": "confirm", "target_id": null, "aligned_event_ids": ["speech_test_0002", "screen_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "confirm"}
+{"intent": "confirm", "target_id": null, "aligned_event_ids": ["speech_test_0003", "screen_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "confirm"}
+{"intent": "confirm", "target_id": null, "aligned_event_ids": ["speech_test_0004", "screen_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "confirm"}
+{"intent": "confirm", "target_id": null, "aligned_event_ids": ["speech_test_0005", "screen_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "confirm"}
+{"intent": "cancel", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0000", "selection_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "cancel"}
+{"intent": "cancel", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0001", "selection_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "cancel"}
+{"intent": "cancel", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0002", "selection_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "cancel"}
+{"intent": "cancel", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0003", "selection_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "cancel"}
+{"intent": "cancel", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0004", "selection_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "cancel"}
+{"intent": "cancel", "target_id": "sd_opt_report", "aligned_event_ids": ["speech_test_0005", "selection_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "cancel"}
+{"intent": "clarify_target", "target_id": null, "aligned_event_ids": ["speech_test_0000", "profile_test_0000"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "clarify_target", "target_id": null, "aligned_event_ids": ["speech_test_0001", "profile_test_0001"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "clarify_target", "target_id": null, "aligned_event_ids": ["speech_test_0002", "profile_test_0002"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "clarify_target", "target_id": null, "aligned_event_ids": ["speech_test_0003", "profile_test_0003"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "clarify_target", "target_id": null, "aligned_event_ids": ["speech_test_0004", "profile_test_0004"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "clarify_target", "target_id": null, "aligned_event_ids": ["speech_test_0005", "profile_test_0005"], "conflict_type": "none", "clarification_required": true, "action": "clarify"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0000", "screen_test_0000"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0001", "screen_test_0001"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0002", "screen_test_0002"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0003", "screen_test_0003"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0004", "screen_test_0004"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0005", "screen_test_0005"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0006", "screen_test_0006"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}
+{"intent": "out_of_scope", "target_id": null, "aligned_event_ids": ["speech_test_0007", "screen_test_0007"], "conflict_type": "none", "clarification_required": false, "action": "refuse"}

@@ -1,0 +1,67 @@
+{
+  "schema_version": "rag_playbook_contract_recheck_v0.1",
+  "performed_at": "2026-08-30T02:58:00+08:00",
+  "status": "implemented_increment",
+  "change": "versioned_multimodal_playbook_contract_and_project_review_gate",
+  "design_basis": [
+    {
+      "name": "Claude Code permissions and hooks",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "adapted_mechanism": "把权限/确认作为强制执行边界，而不是依赖提示词"
+    },
+    {
+      "name": "SoulDrive roadmap",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "S5 版本化 Playbook、输入契约、证据范围、副作用和确认点"
+    }
+  ],
+  "playbooks": [
+    "paper_review@1.0",
+    "experiment_compare@1.0",
+    "meeting_actions@1.0"
+  ],
+  "contract": {
+    "declared_fields": [
+      "playbook_id",
+      "playbook_version",
+      "input_contract",
+      "output",
+      "evidence_plan",
+      "side_effects",
+      "confirmation_points"
+    ],
+    "approval_scope": "project_id + playbook_id",
+    "approval_statuses": ["approved", "revoked", "stale", "unreviewed"],
+    "storage": "project_catalog.sqlite playbook_approvals table, schema version 5",
+    "stale_version_behavior": "HTTP 409 and no approval write",
+    "unreviewed_execution_behavior": "workflow plan is not ready and /chat returns before RAG/model execution",
+    "external_side_effects": "none during review; workflow declarations retain existing draft/confirmation boundaries"
+  },
+  "endpoints": {
+    "list": "GET /multimodal/workflows?project_id=...",
+    "plan": "POST /multimodal/workflows/plan",
+    "review": "POST /projects/{project_id}/playbooks/{playbook_id}/approval"
+  },
+  "verification": {
+    "backend_targeted": "42 passed, 1 warning",
+    "backend_full": "724 passed, 1 warning",
+    "frontend_tests": "npm test passed",
+    "frontend_build": "npm run build passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "coverage": [
+      "catalog contract fields",
+      "project approval persistence and revocation",
+      "approval endpoint and stale version rejection",
+      "unreviewed /chat blocks before RAG",
+      "approved /chat preserves the workflow RAG contract"
+    ]
+  },
+  "interpretation": "The increment proves that the three built-in multimodal business flows have explicit versioned contracts and that execution is gated by a project-scoped human review record. It does not prove end-to-end task quality, answer accuracy, or multimodal benchmark improvement.",
+  "limitations": [
+    "Only the three built-in Playbooks are declared; user-authored Playbook editing and version migration are not implemented.",
+    "Generated artifact source-version IDs, generation plan, confirmation record, and change summary are not yet linked automatically to every workflow result.",
+    "The gate is a local project catalog policy; real cross-application episodes and the 30-episode competition evaluation remain incomplete.",
+    "No sealed-test data, RAG metric definition, model, or external side effect was changed."
+  ]
+}

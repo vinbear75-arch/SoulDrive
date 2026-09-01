@@ -1,0 +1,85 @@
+{
+  "schema_version": "souldrive_multimodal_multi_paper_ppt_acceptance_v2",
+  "case": "multi_paper",
+  "generated_at": "2026-08-25T19:50:34+0800",
+  "project_id": "rag-cn-demo-20260824",
+  "selected_sources": [
+    "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+    "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+    "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+  ],
+  "task_id": "task_5cf4879dec81fd5bcd4e",
+  "status": "completed",
+  "result": {
+    "outline_source": "local_ollama",
+    "slide_count": 8,
+    "renderer": "SoulDrive OpenXML",
+    "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825 修复验收-fd5bcd4e.pptx",
+    "elapsed_ms": 32156.0,
+    "evidence_metrics": {
+      "attributed_slide_count": 6,
+      "cited_source_count": 3,
+      "evidence_bound_point_count": 18,
+      "evidence_slide_count": 6,
+      "evidence_slide_coverage": 1.0,
+      "selected_source_count": 3,
+      "selected_source_coverage": 1.0
+    },
+    "verify": {
+      "errors": [],
+      "expected_slide_count": 8,
+      "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825 修复验收-fd5bcd4e.pptx",
+      "size_bytes": 20015,
+      "slide_count": 8,
+      "valid": true
+    }
+  },
+  "outline_quality": {
+    "content_slide_count": 6,
+    "selected_source_coverage": 1.0,
+    "source_slide_counts": {
+      "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf": 1,
+      "02_面向知识密集型任务的检索增强生成技术综述.pdf": 3,
+      "07_GraphRAG原理源码及应用介绍_Gitee.pdf": 3
+    },
+    "point_count": 18,
+    "contains_markdown_hash": false,
+    "contains_truncation_ellipsis": false,
+    "titles": [
+      "RAG 技术演进与核心价值",
+      "RAG 在科学数据领域的应用实践",
+      "传统 RAG 的局限性与 GraphRAG 诞生背景",
+      "GraphRAG 核心概念与数据处理流程",
+      "GraphRAG 与 RAG 的技术差异对比分析",
+      "当前 RAG 研究面临的挑战与展望"
+    ]
+  },
+  "step_status": [
+    {
+      "step_name": "collect_evidence",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "build_outline",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "render_pptx",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "verify_pptx",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "open_in_wps",
+      "status": "completed",
+      "error": null
+    }
+  ],
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace"
+}

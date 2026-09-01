@@ -1,0 +1,30 @@
+{
+  "schema_version": "mintrec2_text_b1_manifest_v0.1",
+  "data_files": [
+    {
+      "path": "train.tsv",
+      "sha256": "e8b8767bd9a4de5833475db2438e63390c9674041a7b8ea39183a74fa4b624ef"
+    },
+    {
+      "path": "dev.tsv",
+      "sha256": "f2f69111d0bd8c26681db0a613a0112f466c667d56a79949ce17ccadd1e6ae37"
+    },
+    {
+      "path": "test.tsv",
+      "sha256": "6aa650afbaf40256afdbb546a9f7253511f3fe8d791a9acc7b6829824455a6ed"
+    }
+  ],
+  "components": {
+    "vectorizer": "TF-IDF word 1-2 grams",
+    "classifier": "LogisticRegression C=1.0 balanced seed=42"
+  },
+  "outputs": {
+    "metrics": "metrics.json",
+    "predictions": "predictions.jsonl"
+  },
+  "status": "complete",
+  "limitations": [
+    "Text-only classical baseline; no audio, video, or dialogue fusion.",
+    "This run contains only in-scope samples and does not measure OOS detection."
+  ]
+}

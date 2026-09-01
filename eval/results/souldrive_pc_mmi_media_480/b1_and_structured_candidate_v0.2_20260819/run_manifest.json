@@ -1,0 +1,58 @@
+{
+  "schema_version": "souldrive_run_manifest_v0.1",
+  "run_id": "b1_and_structured_candidate_v0.2_20260819",
+  "created_at": "2026-08-19T01:54:52.016660+00:00",
+  "status": "complete",
+  "repository": {
+    "head": "0e216835775a93ed263e57911b6d6aa31d813acc",
+    "branch": "main",
+    "tracked_diff_sha256": "8700071d13fd340f1b1bb3b79804ecf0722d014cb146688705519b9af642ab06"
+  },
+  "environment": {
+    "python": "3.10.20",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "conda_environment": "souldrive"
+  },
+  "inputs": {
+    "dataset": "eval/fixtures/souldrive_pc_mmi_media_480_v0.2/episodes.jsonl",
+    "dataset_sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+    "media_index": "media/index.jsonl"
+  },
+  "baseline": "B1: TF-IDF char 2-5 + LogisticRegression over provided synthetic transcript; no media access",
+  "candidate": "C0: same transcript classifier + validated local WAV/PNG headers + 2500 ms timestamp/project/confidence event gate",
+  "validation_selection": {
+    "parameter": "target_confidence_threshold",
+    "candidates": [
+      {
+        "threshold": 0.4,
+        "action_accuracy": 0.65
+      },
+      {
+        "threshold": 0.5,
+        "action_accuracy": 0.725
+      },
+      {
+        "threshold": 0.6,
+        "action_accuracy": 0.725
+      },
+      {
+        "threshold": 0.7,
+        "action_accuracy": 0.725
+      }
+    ],
+    "selected": 0.7
+  },
+  "test_used_after_selection": true,
+  "outputs": [
+    "predictions.jsonl",
+    "latency.jsonl",
+    "failures.jsonl",
+    "metrics.json",
+    "summary.md"
+  ],
+  "limitations": [
+    "This is a synthetic media-backed harness result, not a public benchmark or Huawei Topic 5 score.",
+    "B1 uses the provided synthetic transcript only; the candidate reads WAV/PNG headers and structured events, but does not run ASR, OCR, VLM, QLoRA, or a learned multimodal fusion model.",
+    "The result proves media-file integrity and target/timestamp gate behavior only. It must not be presented as real speech or visual recognition accuracy."
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "schema_version": "screenspot_subgroup_eval_v0.1",
+  "source_results": "eval\\results\\screenspot_candidate_rapidocr_20260818\\scored_predictions.jsonl",
+  "input_kind": "saved_scored_predictions",
+  "metrics": {
+    "overall": {
+      "sample_count": 1272,
+      "correct_count": 503,
+      "accuracy": 0.395440251572,
+      "missing_prediction_count": 0,
+      "latency_count": 1272,
+      "latency_ms": {
+        "p50": 1151.8013,
+        "p95": 2745.5925
+      }
+    },
+    "by_platform": {
+      "desktop": {
+        "sample_count": 334,
+        "correct_count": 153,
+        "accuracy": 0.458083832335,
+        "missing_prediction_count": 0,
+        "latency_count": 334,
+        "latency_ms": {
+          "p50": 1130.2577,
+          "p95": 2785.5786
+        }
+      },
+      "mobile": {
+        "sample_count": 502,
+        "correct_count": 214,
+        "accuracy": 0.426294820717,
+        "missing_prediction_count": 0,
+        "latency_count": 502,
+        "latency_ms": {
+          "p50": 863.603,
+          "p95": 1395.2769
+        }
+      },
+      "web": {
+        "sample_count": 436,
+        "correct_count": 136,
+        "accuracy": 0.311926605505,
+        "missing_prediction_count": 0,
+        "latency_count": 436,
+        "latency_ms": {
+          "p50": 1948.9507,
+          "p95": 2924.766
+        }
+      }
+    },
+    "by_type": {
+      "icon": {
+        "sample_count": 575,
+        "correct_count": 11,
+        "accuracy": 0.019130434783,
+        "missing_prediction_count": 0,
+        "latency_count": 575,
+        "latency_ms": {
+          "p50": 1189.6335,
+          "p95": 2840.3308
+        }
+      },
+      "text": {
+        "sample_count": 697,
+        "correct_count": 492,
+        "accuracy": 0.705882352941,
+        "missing_prediction_count": 0,
+        "latency_count": 697,
+        "latency_ms": {
+          "p50": 1146.4585,
+          "p95": 2664.2052
+        }
+      }
+    },
+    "by_platform_and_type": {
+      "desktop": {
+        "icon": {
+          "sample_count": 140,
+          "correct_count": 3,
+          "accuracy": 0.021428571429,
+          "missing_prediction_count": 0,
+          "latency_count": 140,
+          "latency_ms": {
+            "p50": 1046.4272,
+            "p95": 3425.001
+          }
+        },
+        "text": {
+          "sample_count": 194,
+          "correct_count": 150,
+          "accuracy": 0.773195876289,
+          "missing_prediction_count": 0,
+          "latency_count": 194,
+          "latency_ms": {
+            "p50": 1135.7735,
+            "p95": 2569.3658
+          }
+        }
+      },
+      "mobile": {
+        "icon": {
+          "sample_count": 229,
+          "correct_count": 4,
+          "accuracy": 0.017467248908,
+          "missing_prediction_count": 0,
+          "latency_count": 229,
+          "latency_ms": {
+            "p50": 859.8229,
+            "p95": 1563.1667
+          }
+        },
+        "text": {
+          "sample_count": 273,
+          "correct_count": 210,
+          "accuracy": 0.769230769231,
+          "missing_prediction_count": 0,
+          "latency_count": 273,
+          "latency_ms": {
+            "p50": 874.2995,
+            "p95": 1331.1644
+          }
+        }
+      },
+      "web": {
+        "icon": {
+          "sample_count": 206,
+          "correct_count": 4,
+          "accuracy": 0.019417475728,
+          "missing_prediction_count": 0,
+          "latency_count": 206,
+          "latency_ms": {
+            "p50": 1944.4813,
+            "p95": 2930.5071
+          }
+        },
+        "text": {
+          "sample_count": 230,
+          "correct_count": 132,
+          "accuracy": 0.573913043478,
+          "missing_prediction_count": 0,
+          "latency_count": 230,
+          "latency_ms": {
+            "p50": 1948.9507,
+            "p95": 2864.5037
+          }
+        }
+      }
+    }
+  },
+  "evaluation_boundary": "This report evaluates saved ScreenSpot predictions only; it is not a voice, project-RAG, or end-to-end business metric.",
+  "provenance": {
+    "status": "declared",
+    "path": "eval\\results\\screenspot_candidate_rapidocr_20260818\\data_provenance.json",
+    "dataset": "ScreenSpot",
+    "source_run": "eval/results/screenspot_b0_center_20260818/data_provenance.json",
+    "candidate": "CANDIDATE_RAPIDOCR_TEXT_MATCH"
+  },
+  "comparison": {
+    "baseline_results": "eval\\results\\screenspot_b0_center_20260818\\scored_predictions.jsonl",
+    "paired_count": 1272,
+    "accuracy_delta": 0.368710691824,
+    "by_platform": {
+      "desktop": {
+        "sample_count": 334,
+        "baseline_accuracy": 0.026946107784,
+        "candidate_accuracy": 0.458083832335,
+        "accuracy_delta": 0.431137724551
+      },
+      "mobile": {
+        "sample_count": 502,
+        "baseline_accuracy": 0.035856573705,
+        "candidate_accuracy": 0.426294820717,
+        "accuracy_delta": 0.390438247012
+      },
+      "web": {
+        "sample_count": 436,
+        "baseline_accuracy": 0.016055045872,
+        "candidate_accuracy": 0.311926605505,
+        "accuracy_delta": 0.295871559633
+      }
+    },
+    "by_type": {
+      "icon": {
+        "sample_count": 575,
+        "baseline_accuracy": 0.019130434783,
+        "candidate_accuracy": 0.019130434783,
+        "accuracy_delta": 0.0
+      },
+      "text": {
+        "sample_count": 697,
+        "baseline_accuracy": 0.03299856528,
+        "candidate_accuracy": 0.705882352941,
+        "accuracy_delta": 0.672883787661
+      }
+    }
+  }
+}

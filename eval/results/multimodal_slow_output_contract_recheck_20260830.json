@@ -1,0 +1,42 @@
+{
+  "schema_version": "souldrive_multimodal_slow_output_contract_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Docling",
+      "url": "https://github.com/docling-project/docling",
+      "adopted": "将复杂文档的文本、表格、图片和层级/来源元数据视为结构化对象；本轮只借鉴输出契约与来源可追踪原则，不引入依赖"
+    },
+    {
+      "project": "PaddleOCR-VL",
+      "url": "https://github.com/PaddlePaddle/PaddleOCR",
+      "adopted": "文档/图表解析使用任务相关的结构化输出；本轮将同一原则用于视觉描述与目标候选，不复制模型或代码"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "多模态链路分开处理图像检索/理解；本轮保持 OCR fast 和 VLM slow 路径分离"
+    }
+  ],
+  "implemented": {
+    "slow_description_min_tokens": 64,
+    "grounding_min_tokens": 128,
+    "fast_path_unchanged": 24,
+    "budget_cap": 256,
+    "routing_policy": "only after slow route is selected; no permission/authorization change",
+    "deictic_visual_query": "selected region or explicit image reference is required; unrelated project questions remain document RAG"
+  },
+  "verification": {
+    "targeted_backend": "43 passed, 1 warning",
+    "backend_full": "781 passed, 1 warning",
+    "frontend_test": "passed",
+    "frontend_build": "passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "limits": [
+    "This fixes truncation/routing contract only; no claim of VLM accuracy gain or P95<5s",
+    "Real 30 episode multimodal evaluation, cross-app UIA coverage, icon/chart accuracy, full chain P50/P95 still unfinished",
+    "Model output quality still depends on local VLM weights; no production encrypted workspace rebuild performed"
+  ]
+}

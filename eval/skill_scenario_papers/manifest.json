@@ -1,0 +1,42 @@
+{
+  "schema_version": "souldrive_skill_scenario_papers_v1",
+  "purpose": "验证四类本地 PPT 业务 Skill 的结构化生成效果",
+  "items": [
+    {
+      "category": "论文研究汇报",
+      "skill": "论文研究汇报",
+      "title": "深度学习目标检测方法综述",
+      "authors": "中国图象图形学学会公开论文页面",
+      "file": "research-paper/attention-is-all-you-need.pdf",
+      "source_url": "https://www.cjig.cn/rc-pub/front/front-article/download/55696365/lowqualitypdf/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E7%9B%AE%E6%A0%87%E6%A3%80%E6%B5%8B%E6%96%B9%E6%B3%95%E7%BB%BC%E8%BF%B0.pdf",
+      "source_note": "中国图象图形学学会公开 PDF"
+    },
+    {
+      "category": "技术方案汇报",
+      "skill": "技术方案汇报",
+      "title": "基于区块链技术的虚拟电厂一站式建设与实时监控系统研究",
+      "authors": "公开期刊论文页面",
+      "file": "technical-solution/mapreduce-osdi04.pdf",
+      "source_url": "https://ojs.gfpress.org/jste/article/download/45/42",
+      "source_note": "公开期刊 PDF"
+    },
+    {
+      "category": "政策项目汇报",
+      "skill": "政策项目汇报",
+      "title": "绿色信贷政策对于重污染企业绿色双元性创新的影响",
+      "authors": "公开期刊论文页面",
+      "file": "policy-project/minimum-wages-and-employment.pdf",
+      "source_url": "https://journals.viserdata.com/index.php/mem/article/download/11773/11731",
+      "source_note": "现代经济管理公开 PDF"
+    },
+    {
+      "category": "商务汇报",
+      "skill": "商务汇报",
+      "title": "大数据分析驱动企业商业模式的创新研究",
+      "authors": "公开期刊论文页面",
+      "file": "business/deep-neural-networks-for-youtube-recommendations.pdf",
+      "source_url": "https://journals.viserdata.com/index.php/mem/article/download/9988/9877",
+      "source_note": "现代经济管理公开 PDF"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": "souldrive_pc_mmi_media_manifest_v0.2",
+  "dataset_id": "SoulDrive-PC-MMI-media-smoke-3-v0.2",
+  "base_dataset_id": "SoulDrive-PC-MMI-480-v0.1",
+  "description": "Synthetic media-backed business harness with generated PC screenshots and local 16 kHz waveforms.",
+  "episode_count": 3,
+  "split_counts": {
+    "train": 3
+  },
+  "template_id_count": 3,
+  "template_split_overlap": false,
+  "episodes_sha256": "fcca876c77b16a5c35051766d2df9f9a5c31dc854aee0da2bdbc18c0725f8961",
+  "media_index_sha256": "35f42c1c473161c09d66d5be9952547cec84693cd2c568a123d240932168c75d",
+  "media": {
+    "audio": {
+      "count": 3,
+      "format": "PCM s16le, mono, 16000 Hz",
+      "backend": "synthetic_tone_fallback"
+    },
+    "screenshots": {
+      "count": 3,
+      "format": "PNG 1440x900",
+      "backend": "Pillow deterministic renderer",
+      "capture_policy": "explicit synthetic selection; no background capture"
+    }
+  },
+  "generation": {
+    "seed": 20260819,
+    "source": "eval/fixtures/souldrive_pc_mmi_480_v0.1",
+    "generator": "scripts/build_souldrive_mmi_media_480.py"
+  },
+  "limitations": [
+    "All waveforms and screenshots are synthetic development artifacts; no human recordings are included.",
+    "The labels inherit the reviewed structured MMI set, but media realism and ASR/VLM behavior are not represented by this score.",
+    "This dataset is not MIntRec2.0, ScreenSpot, the Huawei hidden set, or a competition score.",
+    "Run the media runtime on user-authorized recordings before submission; do not train on the sealed test split."
+  ]
+}

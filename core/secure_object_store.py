@@ -58,6 +58,9 @@ class SecureObjectStore:
     def read_json(self, object_id: str) -> dict:
         return json.loads(self.read_bytes(object_id).decode("utf-8"))
 
+    def delete(self, object_id: str) -> None:
+        self.object_path(object_id).unlink(missing_ok=True)
+
     def object_path(self, object_id: str) -> Path:
         return self.root_path / object_id[:2] / f"{object_id}.sdoc"
 

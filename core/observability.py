@@ -16,6 +16,12 @@ class RuntimeMetrics:
     failed_requests: int = 0
     chat_requests: int = 0
     chat_failures: int = 0
+    chat_completed: int = 0
+    chat_under_5s: int = 0
+    last_chat_first_token_ms: int = 0
+    last_chat_total_ms: int = 0
+    total_chat_first_token_ms: int = 0
+    total_chat_completion_ms: int = 0
     retrieval_failures: int = 0
     retrieval_runs: int = 0
     retrieval_skips: int = 0
@@ -66,6 +72,18 @@ class RuntimeMetrics:
         with self._lock:
             self.last_model_load_ms = max(0, elapsed_ms)
 
+    def record_chat_latency(self, first_token_ms: int, total_ms: int, *, success: bool):
+        with self._lock:
+            self.last_chat_first_token_ms = max(0, int(first_token_ms))
+            self.last_chat_total_ms = max(0, int(total_ms))
+            if not success:
+                return
+            self.chat_completed += 1
+            self.total_chat_first_token_ms += self.last_chat_first_token_ms
+            self.total_chat_completion_ms += self.last_chat_total_ms
+            if self.last_chat_total_ms < 5000:
+                self.chat_under_5s += 1
+
     def record_retrieval_run(self, elapsed_ms: int, candidate_count: int, evidence_count: int):
         with self._lock:
             self.retrieval_runs += 1
@@ -102,6 +120,12 @@ class RuntimeMetrics:
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             average_latency = self.total_latency_ms / self.total_requests if self.total_requests else 0
+            average_chat_first_token = (
+                self.total_chat_first_token_ms / self.chat_completed if self.chat_completed else 0
+            )
+            average_chat_completion = (
+                self.total_chat_completion_ms / self.chat_completed if self.chat_completed else 0
+            )
             return {
                 "uptime_seconds": int(time.time() - self.started_at),
                 "total_requests": self.total_requests,
@@ -112,6 +136,16 @@ class RuntimeMetrics:
                 "failed_requests": self.failed_requests,
                 "chat_requests": self.chat_requests,
                 "chat_failures": self.chat_failures,
+                "chat_completed": self.chat_completed,
+                "chat_under_5s": self.chat_under_5s,
+                "chat_under_5s_rate": round(
+                    self.chat_under_5s / self.chat_completed if self.chat_completed else 0,
+                    6,
+                ),
+                "last_chat_first_token_ms": self.last_chat_first_token_ms,
+                "last_chat_total_ms": self.last_chat_total_ms,
+                "average_chat_first_token_ms": round(average_chat_first_token, 2),
+                "average_chat_total_ms": round(average_chat_completion, 2),
                 "retrieval_failures": self.retrieval_failures,
                 "retrieval_runs": self.retrieval_runs,
                 "retrieval_skips": self.retrieval_skips,

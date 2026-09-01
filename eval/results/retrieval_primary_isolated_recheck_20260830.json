@@ -1,0 +1,32 @@
+{
+  "schema_version": "souldrive_retrieval_recheck_v0.1",
+  "performed_at": "2026-08-30T18:08:25+08:00",
+  "dataset": "eval/retrieval_quality_blind_v0.3.jsonl",
+  "workspace": "runtime/rag-eval-workspace-v4",
+  "conditions": {
+    "sample_count": 360,
+    "top_k": 3,
+    "usage_ledger": false,
+    "comparison_source_reservation": false,
+    "source_profile_recall": false,
+    "answer_generation": false,
+    "index_write": false
+  },
+  "metrics": {
+    "positive_sample_count": 324,
+    "all_hit_at_3": 0.962963,
+    "any_hit_at_3": 0.984568,
+    "first_hit_at_1": 0.92284,
+    "mrr_at_3": 0.9490740740740741,
+    "average_source_coverage_at_3": 0.9737654320987654,
+    "cross_document_all_hit_at_3": 0.935185,
+    "graph_relevant_any_hit_at_3": 0.9822695035460993,
+    "average_retrieval_ms": 3720
+  },
+  "paired_against": {
+    "file": "eval/results/retrieval_primary_isolated_baseline2_20260830.jsonl",
+    "all_hit_change": {"improved": 0, "regressed": 0, "unchanged": 360},
+    "exact_mcnemar_p": 1.0
+  },
+  "interpretation": "当前代码在冻结盲测上与既有隔离 baseline 的 360 个样本逐条结果完全一致；平均检索耗时增加 155 ms，但本次不是性能候选实验。该结果是检索指标回归证据，不是答案准确率、真实业务效果或官方/隐藏集成绩。"
+}

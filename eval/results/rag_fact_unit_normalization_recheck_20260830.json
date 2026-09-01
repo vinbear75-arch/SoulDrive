@@ -1,0 +1,38 @@
+{
+  "schema_version": "souldrive_rag_fact_unit_normalization_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adopted": "把事实支持作为生成后的独立诊断门，不将检索排序分当作事实真值"
+    },
+    {
+      "project": "CRAG",
+      "url": "https://arxiv.org/abs/2401.15884",
+      "adopted": "证据支持不足时保持纠错/重试/保守回退路径，不直接放宽回答"
+    }
+  ],
+  "implemented": {
+    "equivalences": [
+      "时间：秒、毫秒、分钟、小时、天统一为 time_ms",
+      "存储：字节与明确二进制单位 KiB/MiB/GiB/TiB 统一为 bytes",
+      "百分比：保留既有百分比与小数等价规则"
+    ],
+    "unknown_units": "未知单位不换算，避免猜测",
+    "gate_behavior": "仅影响 claim-to-citation 支持校验；不改变召回、项目过滤、证据充分性门或 sealed-test 口径"
+  },
+  "verification": {
+    "targeted_backend": "36 passed",
+    "equivalent_time_units": "passed",
+    "different_time_value_rejected": "passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "backend_full": "777 passed, 1 warning"
+  },
+  "limits": [
+    "只支持列明的无歧义单位；KB/MB 等可能存在十进制或二进制歧义的单位不自动换算",
+    "仍不是 NLI 或事实真值验证，不能证明来源内容本身正确",
+    "同义改写、跨段推理、复杂单位/币种换算、产物级 E#/V#/A#/M# 映射和 sealed-test 仍未完成"
+  ]
+}

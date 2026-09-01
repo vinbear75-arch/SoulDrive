@@ -1,0 +1,207 @@
+{
+  "schema_version": "souldrive_business_runtime_repeat_benchmark_v0.1",
+  "dataset_id": "SoulDrive-PC-MMI-media-smoke-3-v0.2",
+  "dataset_sha256": "fcca876c77b16a5c35051766d2df9f9a5c31dc854aee0da2bdbc18c0725f8961",
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace",
+  "environment": {
+    "python": "3.10.20",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "llama_cpp": {
+      "version": "0.3.34",
+      "gpu_offload_supported": true
+    },
+    "model_runtime": {
+      "ready": true,
+      "config": {
+        "model_filename": "qwen2.5-3b-instruct-q4_k_m.gguf",
+        "chat_n_ctx": 8192,
+        "graph_n_ctx": 8192,
+        "temperature": 0.01,
+        "top_p": 0.85,
+        "repeat_penalty": 1.12,
+        "max_tokens": 128,
+        "graph_temperature": 0.1,
+        "graph_max_tokens": 2048,
+        "graph_repeat_penalty": 1.1
+      },
+      "gpu_layers": 0,
+      "chat_model": {
+        "ready": true,
+        "name": "qwen3.5:9b",
+        "selected": "qwen3.5:9b",
+        "provider": "ollama",
+        "mode": "ollama"
+      },
+      "embedding_model": {
+        "ready": true,
+        "name": "qwen3-embedding:4b",
+        "provider": "ollama"
+      },
+      "reranker": {
+        "ready": true,
+        "selected": "Qwen3-Reranker-0.6B",
+        "mode": "enabled"
+      },
+      "search_roots": [
+        "models",
+        "models",
+        "models"
+      ]
+    }
+  },
+  "unique_episode_count": 3,
+  "repeat_count": 1,
+  "measurement_count": 3,
+  "cold_start_measurement_count": 1,
+  "warm_measurement_count": 2,
+  "query_source": "frozen_structured_business_query",
+  "pipeline_coverage": {
+    "asr": "measured",
+    "ocr": "measured",
+    "soulalign": "measured",
+    "project_scoped_retrieval": "measured",
+    "model_first_token": "measured",
+    "complete_response": "measured"
+  },
+  "warm_stage_latency_ms": {
+    "asr": {
+      "count": 2,
+      "p50": 88.599,
+      "p95": 98.323,
+      "max": 98.323
+    },
+    "ocr": {
+      "count": 2,
+      "p50": 730.041,
+      "p95": 749.893,
+      "max": 749.893
+    },
+    "soulalign": {
+      "count": 2,
+      "p50": 19.066,
+      "p95": 37.679,
+      "max": 37.679
+    },
+    "perception": {
+      "count": 2,
+      "p50": 839.404,
+      "p95": 887.924,
+      "max": 887.924
+    },
+    "retrieval_and_context_gate": {
+      "count": 2,
+      "p50": 577.636,
+      "p95": 585.96,
+      "max": 585.96
+    },
+    "model_first_token": {
+      "count": 0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+    },
+    "first_response_chunk": {
+      "count": 2,
+      "p50": 1420.694,
+      "p95": 1460.489,
+      "max": 1460.489
+    },
+    "complete_response": {
+      "count": 2,
+      "p50": 1420.694,
+      "p95": 1460.489,
+      "max": 1460.489
+    },
+    "rag_response": {
+      "count": 2,
+      "p50": 581.289,
+      "p95": 590.015,
+      "max": 590.015
+    }
+  },
+  "records": [
+    {
+      "episode_id": "MMI-TR-SELE-0000",
+      "repeat": 1,
+      "status": "pass",
+      "query": "请概括当前选中的实验材料并给出下一步任务。",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "그.",
+      "response_chars": 94,
+      "stage_latency_ms": {
+        "asr": 21228.003,
+        "ocr": 1914.03,
+        "soulalign": 12.992,
+        "perception": 23180.097,
+        "rag_initialization": 1969.914,
+        "retrieval_and_context_gate": 3957.867,
+        "model_first_token": null,
+        "first_response_chunk": 29112.247,
+        "complete_response": 29112.247,
+        "rag_response": 3962.235
+      },
+      "retrieval_evidence_count": 0,
+      "resources": {
+        "process_memory_mib": 2683.367,
+        "torch_peak_gpu_memory_mib": 2052.13
+      }
+    },
+    {
+      "episode_id": "MMI-TR-SELE-0001",
+      "repeat": 1,
+      "status": "pass",
+      "query": "请概括当前选中的实验材料并给出下一步任务。",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "🎼Yeah.",
+      "response_chars": 94,
+      "stage_latency_ms": {
+        "asr": 98.323,
+        "ocr": 749.893,
+        "soulalign": 37.679,
+        "perception": 887.924,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 569.312,
+        "model_first_token": null,
+        "first_response_chunk": 1460.489,
+        "complete_response": 1460.489,
+        "rag_response": 572.563
+      },
+      "retrieval_evidence_count": 0,
+      "resources": {
+        "process_memory_mib": 2704.602,
+        "torch_peak_gpu_memory_mib": 2056.833
+      }
+    },
+    {
+      "episode_id": "MMI-TR-SELE-0002",
+      "repeat": 1,
+      "status": "pass",
+      "query": "请概括当前选中的实验材料并给出下一步任务。",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "Yeah.",
+      "response_chars": 94,
+      "stage_latency_ms": {
+        "asr": 78.875,
+        "ocr": 710.189,
+        "soulalign": 0.453,
+        "perception": 790.883,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 585.96,
+        "model_first_token": null,
+        "first_response_chunk": 1380.899,
+        "complete_response": 1380.899,
+        "rag_response": 590.015
+      },
+      "retrieval_evidence_count": 0,
+      "resources": {
+        "process_memory_mib": 2705.418,
+        "torch_peak_gpu_memory_mib": 2056.833
+      }
+    }
+  ],
+  "limitations": [
+    "固定公开媒体 fixture 仅验证本机链路，不是公开数据集或华为隐藏集成绩。",
+    "业务查询是冻结结构化输入；公开示例音频的 ASR 文本单独保留，未伪称为同一条业务查询。",
+    "model_first_token 是模型生成的首 token；为完成引用校验，RAG 当前在验证后才向 UI 输出首个响应块。"
+  ]
+}

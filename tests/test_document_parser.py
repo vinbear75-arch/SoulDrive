@@ -6,6 +6,7 @@ from unittest.mock import patch
 from docling.datamodel.base_models import ConversionStatus, DoclingComponentType, ErrorItem
 
 from core.document_parser import AdvancedDocumentParser
+from core.plain_document_parser import PlainDocumentParser
 
 
 class FakeProv:
@@ -138,6 +139,7 @@ class DocumentParserTests(unittest.TestCase):
         pipeline_options = pdf_option.pipeline_options
         self.assertIsNone(pipeline_options.artifacts_path)
         self.assertEqual(pipeline_options.accelerator_options.device.value, "cpu")
+        self.assertFalse(pipeline_options.do_ocr)
         self.assertEqual(pipeline_options.layout_batch_size, 2)
         self.assertEqual(pipeline_options.queue_max_size, 8)
 
@@ -155,6 +157,7 @@ class DocumentParserTests(unittest.TestCase):
         self.assertEqual(pipeline_options.table_structure_options.mode.value, "accurate")
         self.assertTrue(pipeline_options.table_structure_options.do_cell_matching)
         self.assertEqual(pipeline_options.accelerator_options.device.value, "cpu")
+        self.assertFalse(pipeline_options.do_ocr)
         self.assertEqual(pipeline_options.layout_batch_size, 2)
         self.assertEqual(pipeline_options.ocr_batch_size, 2)
         self.assertEqual(pipeline_options.table_batch_size, 2)
@@ -166,7 +169,8 @@ class DocumentParserTests(unittest.TestCase):
             pdf_path.write_bytes(b"%PDF fake")
 
             with patch("core.document_parser.DocumentConverter", return_value=FakeConverter()):
-                chunks = AdvancedDocumentParser().parse_and_chunk(str(pdf_path))
+                parser = AdvancedDocumentParser()
+                chunks = parser.parse_and_chunk(str(pdf_path))
 
         self.assertTrue(chunks)
         self.assertTrue(
@@ -181,13 +185,14 @@ class DocumentParserTests(unittest.TestCase):
         for chunk in chunks:
             self.assertIn(chunk.metadata.get("page_label"), {"1", "2"})
 
-    def test_parse_and_chunk_records_table_and_image_metadata(self):
+    def test_parse_and_chunk_keeps_images_out_of_text_retrieval(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             pdf_path = Path(temp_dir) / "paper.pdf"
             pdf_path.write_bytes(b"%PDF fake")
 
             with patch("core.document_parser.DocumentConverter", return_value=FakeConverter()):
-                chunks = AdvancedDocumentParser().parse_and_chunk(str(pdf_path))
+                parser = AdvancedDocumentParser()
+                chunks = parser.parse_and_chunk(str(pdf_path))
 
         table_chunks = [chunk for chunk in chunks if chunk.metadata.get("table_count")]
         image_chunks = [chunk for chunk in chunks if chunk.metadata.get("image_count")]
@@ -195,8 +200,11 @@ class DocumentParserTests(unittest.TestCase):
         self.assertTrue(table_chunks)
         self.assertIn("Layer", table_chunks[0].metadata.get("tables_json", ""))
         self.assertTrue(image_chunks)
-        self.assertIn("Decoder architecture diagram", image_chunks[0].metadata.get("image_metadata_json", ""))
-        self.assertIn("[图像:", image_chunks[0].page_content)
+        self.assertNotEqual(image_chunks[0].metadata["content_kind"], "image")
+        self.assertIn("Decoder architecture diagram", image_chunks[0].metadata["image_metadata_json"])
+        self.assertIn("figure-p2-1", image_chunks[0].metadata["image_metadata_json"])
+        self.assertEqual(parser._page_assets[2]["images"][0]["caption"], "Decoder architecture diagram")
+        self.assertTrue(all("[图像" not in chunk.page_content for chunk in chunks))
 
     def test_parse_failure_exposes_structured_error(self):
         class FailingConverter:
@@ -216,7 +224,7 @@ class DocumentParserTests(unittest.TestCase):
         self.assertEqual(parser.last_error["source_filename"], "locked.pdf")
         self.assertEqual(parser.last_error["error_code"], "ENCRYPTED_DOCUMENT")
 
-    def test_partial_conversion_is_rejected_and_failed_pages_are_observable(self):
+    def test_partial_conversion_keeps_available_pages_and_failed_pages_are_observable(self):
         class PartialConverter:
             def convert(self, pdf_path):
                 _ = pdf_path
@@ -244,11 +252,42 @@ class DocumentParserTests(unittest.TestCase):
                 parser = AdvancedDocumentParser()
                 chunks = parser.parse_and_chunk(str(pdf_path))
 
-        self.assertEqual(chunks, [])
-        self.assertEqual(parser.last_error["error_code"], "PARTIAL_DOCUMENT_PARSE")
+        self.assertTrue(chunks)
+        self.assertIsNone(parser.last_error)
         self.assertEqual(parser.last_parse_stats["conversion_status"], "partial_success")
         self.assertEqual(parser.last_parse_stats["conversion_error_count"], 2)
         self.assertEqual(parser.last_parse_stats["failed_pages"], [40, 41])
+
+    def test_partial_conversion_without_document_is_rejected(self):
+        class PartialWithoutDocumentConverter:
+            def convert(self, pdf_path):
+                _ = pdf_path
+                result = type("PartialResult", (), {})()
+                result.status = ConversionStatus.PARTIAL_SUCCESS
+                result.document = None
+                result.pages = []
+                result.errors = [
+                    ErrorItem(
+                        component_type=DoclingComponentType.PIPELINE,
+                        module_name="StandardPdfPipeline",
+                        error_message="Page 40: pipeline terminated early",
+                    )
+                ]
+                return result
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pdf_path = Path(temp_dir) / "partial-without-document.pdf"
+            pdf_path.write_bytes(b"%PDF fake")
+
+            with patch(
+                "core.document_parser.DocumentConverter",
+                return_value=PartialWithoutDocumentConverter(),
+            ):
+                parser = AdvancedDocumentParser()
+                chunks = parser.parse_and_chunk(str(pdf_path))
+
+        self.assertEqual(chunks, [])
+        self.assertEqual(parser.last_error["error_code"], "PARTIAL_DOCUMENT_PARSE")
 
     def test_parse_and_chunk_promotes_formal_document_headings_to_section_metadata(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -294,6 +333,11 @@ class DocumentParserTests(unittest.TestCase):
 
         self.assertEqual(markdown, "1. 第一项要求")
 
+    def test_clean_text_normalizes_pdf_compatibility_characters(self):
+        parser = AdvancedDocumentParser.__new__(AdvancedDocumentParser)
+
+        self.assertEqual(parser._clean_text("⽤⼾\u200b资料"), "用户资料")
+
     def test_technical_heading_depth_is_preserved(self):
         parser = AdvancedDocumentParser.__new__(AdvancedDocumentParser)
 
@@ -304,6 +348,95 @@ class DocumentParserTests(unittest.TestCase):
             parser._document_profile("信息安全技术要求", "GB/T 35273-2020"),
             "standard_document",
         )
+
+    def test_markdown_splitter_preserves_deep_section_paths(self):
+        with patch("core.document_parser.DocumentConverter"):
+            parser = AdvancedDocumentParser()
+
+        chunks = parser._split_page_markdown({
+            1: "# 根章节\n\n## 方法\n\n### 检索\n\n#### 重排\n\n重排用于提高证据相关性。",
+        })
+
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(
+            chunks[0].metadata["section_path"],
+            ["根章节", "方法", "检索", "重排"],
+        )
+        self.assertEqual(chunks[0].metadata["section"], "重排")
+
+    def test_markdown_splitter_merges_heading_only_fragment_into_following_body(self):
+        with patch("core.document_parser.DocumentConverter"):
+            parser = AdvancedDocumentParser()
+
+        chunks = parser._split_page_markdown({
+            1: "## 二、RAG 的三大核心模块\n\n# 1. 检索器\n\n检索器负责找到相关文档片段。",
+        })
+
+        self.assertEqual(len(chunks), 1)
+        self.assertIn("二、RAG 的三大核心模块", chunks[0].page_content)
+        self.assertIn("检索器负责找到相关文档片段", chunks[0].page_content)
+
+    def test_markdown_splitter_merges_short_same_section_across_pages(self):
+        with patch("core.document_parser.DocumentConverter"):
+            parser = AdvancedDocumentParser()
+
+        chunks = parser._split_page_markdown({
+            1: "# 关键技术\n\n编码模型适合语义匹配。",
+            2: "索引优化用于加速大规模检索。",
+        })
+
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0].metadata["page_start"], 1)
+        self.assertEqual(chunks[0].metadata["page_end"], 2)
+        self.assertEqual(chunks[0].metadata["page_label"], "1-2")
+
+    def test_noisy_section_header_is_kept_as_text_not_structure(self):
+        parser = AdvancedDocumentParser.__new__(AdvancedDocumentParser)
+
+        noisy = parser._item_markdown(None, FakeDoclingItem("，", 1, label="section_header"))
+        author_like = parser._item_markdown(None, FakeDoclingItem("王 亮", 1, label="section_header"))
+        valid = parser._item_markdown(None, FakeDoclingItem("一、总体要求", 1, label="section_header"))
+
+        self.assertEqual(noisy, "，")
+        self.assertEqual(author_like, "王 亮")
+        self.assertEqual(valid, "## 一、总体要求")
+
+    def test_numbered_list_item_is_not_promoted_to_section_heading(self):
+        parser = AdvancedDocumentParser.__new__(AdvancedDocumentParser)
+        item = FakeDoclingItem("1.通信速率和带宽", 1, label="list_item")
+        item.marker = "1."
+
+        markdown = parser._item_markdown(None, item)
+
+        self.assertFalse(markdown.startswith("#"))
+        self.assertIn("1.通信速率和带宽", markdown)
+
+    def test_plain_parser_keeps_date_prefixed_training_logs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "training.log"
+            path.write_text(
+                "2026-07-12 INFO epoch=3 validation_macro_f1=0.741\n"
+                "2026-07-12 INFO no screen context used\n",
+                encoding="utf-8",
+            )
+
+            chunks = PlainDocumentParser().parse_and_chunk(str(path))
+
+        self.assertEqual(len(chunks), 1)
+        self.assertIn("validation_macro_f1=0.741", chunks[0].page_content)
+
+    def test_plain_parser_keeps_heading_only_templates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "template.md"
+            path.write_text(
+                "# 实验报告\n## 目标\n## 配置\n## 指标\n",
+                encoding="utf-8",
+            )
+
+            chunks = PlainDocumentParser().parse_and_chunk(str(path))
+
+        self.assertEqual(len(chunks), 1)
+        self.assertIn("实验报告", chunks[0].page_content)
 
 
 if __name__ == "__main__":

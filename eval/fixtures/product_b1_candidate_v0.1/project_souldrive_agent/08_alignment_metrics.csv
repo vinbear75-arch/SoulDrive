@@ -1,0 +1,4 @@
+metric,value
+target_binding_accuracy,0.850
+conflict_clarification_accuracy,0.880
+p95_latency_ms,2860

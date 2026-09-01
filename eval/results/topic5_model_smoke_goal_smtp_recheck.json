@@ -1,0 +1,49 @@
+{
+  "schema_version": "souldrive_topic5_model_smoke_v0.1",
+  "image": "data/public/screenspot_v0.1/images/mobile_043c3a5e-c12c-4991-bb7f-676c617b2f9b.png",
+  "gpu_before": {
+    "available": true,
+    "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "total_gib": 7.96,
+    "allocated_gib": 0.0,
+    "reserved_gib": 0.0
+  },
+  "models": {
+    "sensevoice_small": {
+      "status": "pass",
+      "loaded_ms": 4482.006900012493,
+      "inference_ms": 1066.858299949672,
+      "text_preview": "开饭时间早上9点至下午五点。"
+    },
+    "rapidocr": {
+      "status": "pass",
+      "loaded_ms": 957.1478999569081,
+      "inference_ms": 2001.1405000113882,
+      "text_count": 20
+    },
+    "qwen2.5_vl_3b_4bit": {
+      "status": "pass",
+      "loaded_ms": 19402.4505999987,
+      "inference_ms": 3218.003000016324,
+      "text_preview": "图中显示的是一个平板电脑的桌面，桌面上有多个应用程序图标和标签。",
+      "gpu_after": {
+        "available": true,
+        "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+        "total_gib": 7.96,
+        "allocated_gib": 2.278,
+        "reserved_gib": 2.617
+      }
+    }
+  },
+  "limitations": [
+    "Smoke tests are not public benchmark scores and use one sample per modality."
+  ],
+  "gpu_after": {
+    "available": true,
+    "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "total_gib": 7.96,
+    "allocated_gib": 1.682,
+    "reserved_gib": 2.617
+  },
+  "all_pass": true
+}

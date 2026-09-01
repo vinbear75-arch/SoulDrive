@@ -1,0 +1,71 @@
+{
+  "schema_version": "souldrive_product_b1_runtime_metrics_v0.1",
+  "status": "completed",
+  "discovered_files": 30,
+  "processed_files": 30,
+  "succeeded_files": 28,
+  "failed_files": 2,
+  "parse_success_rate": 0.9333333333333333,
+  "chunk_count": 28,
+  "failure_summary": {
+    "NO_PARSEABLE_CHUNKS": 2
+  },
+  "totals": {
+    "parse_ms": 20023,
+    "ingest_ms": 1339,
+    "graph_ms": 15,
+    "elapsed_ms": 21550,
+    "chunk_chars": 2066,
+    "child_count": 32,
+    "embedding_ms": 643,
+    "vector_store_ms": 503,
+    "keyword_index_ms": 74,
+    "parent_store_ms": 69,
+    "child_split_ms": 6,
+    "raw_items": 37,
+    "kept_items": 37,
+    "removed_page_artifacts": 0,
+    "removed_non_content": 0,
+    "removed_duplicates": 0,
+    "table_items": 0,
+    "image_items": 3,
+    "ocr_ms": 2380,
+    "ocr_region_count": 12,
+    "ocr_mean_confidence": 0.99235,
+    "pages": 28,
+    "parent_chunks": 28,
+    "conversion_error_count": 0,
+    "converted_pages": 30,
+    "failed_page_count": 0,
+    "formal_window_count": 24,
+    "boundary_overlap_opportunity_count": 0,
+    "boundary_overlap_count": 0,
+    "boundary_overlap_truncated_count": 0,
+    "boundary_overlap_token_skip_count": 0,
+    "boundary_overlap_coverage_rate": null,
+    "max_child_tokens": 66,
+    "max_embedding_input_tokens": 136,
+    "embedding_token_limit": 512,
+    "child_strategy_counts": {
+      "dynamic_structure_overlap_v1": 8,
+      "formal_structure_paragraph_window_v2": 24
+    },
+    "conversion_status_counts": {
+      "success": 30
+    },
+    "modality_counts": {
+      "document": 27,
+      "image": 3
+    }
+  },
+  "failures": [
+    {
+      "source_filename": "03_dataset_audit.pdf",
+      "reason": "no parseable chunks"
+    },
+    {
+      "source_filename": "07_baseline_report.pdf",
+      "reason": "no parseable chunks"
+    }
+  ]
+}

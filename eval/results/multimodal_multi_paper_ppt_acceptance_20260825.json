@@ -1,0 +1,753 @@
+{
+  "case": "multi_paper",
+  "project_id": "rag-cn-demo-20260824",
+  "selected_sources": [
+    "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+    "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+    "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+  ],
+  "task": {
+    "task_id": "task_9158b73cc375c6abbb2b",
+    "kind": "presentation.generate",
+    "status": "completed",
+    "current_step": null,
+    "owner_id": null,
+    "created_at": 1787657120.7326186,
+    "updated_at": 1787657147.476845,
+    "started_at": 1787657120.739648,
+    "completed_at": 1787657147.476845,
+    "attempt_count": 1,
+    "error": null,
+    "inputs": {
+      "audience": "technical",
+      "max_slides": 10,
+      "open_in_wps": false,
+      "source_filenames": [
+        "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+        "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+        "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+      ],
+      "style_skill_id": "",
+      "task_id": "task_9158b73cc375c6abbb2b",
+      "title": "三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825"
+    },
+    "result": {
+      "elapsed_ms": 26734.0,
+      "evidence_metrics": {
+        "attributed_slide_count": 5,
+        "cited_source_count": 3,
+        "evidence_bound_point_count": 23,
+        "evidence_slide_count": 5,
+        "evidence_slide_coverage": 1.0,
+        "selected_source_count": 3,
+        "selected_source_coverage": 1.0
+      },
+      "opened_in_wps": false,
+      "outline_source": "extractive",
+      "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825-c6abbb2b.pptx",
+      "renderer": "SoulDrive OpenXML",
+      "slide_count": 7,
+      "source_count": 3
+    },
+    "steps": [
+      {
+        "task_id": "task_9158b73cc375c6abbb2b",
+        "step_name": "collect_evidence",
+        "ordinal": 0,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "5025a0cecffa1d9efbc2fa93fd663fded975556439cc1dddeb75c704a6c075cb",
+        "started_at": 1787657120.7406538,
+        "completed_at": 1787657120.9936097,
+        "error": null,
+        "output": {
+          "record_count": 54,
+          "records": [
+            {
+              "content": "# 基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 1,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_0",
+              "parent_index": 0,
+              "section": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "## 二、RAG核心技术问题研究",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 2,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_1",
+              "parent_index": 1,
+              "section": "基于科学数据的检索增强生成 （RAG）技术研究与应用 > 二、RAG核心技术问题研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "## 三、基于RAG的科学数据智能服务 基于 RAG 的智能服务",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 2,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_2",
+              "parent_index": 2,
+              "section": "基于科学数据的检索增强生成 （RAG）技术研究与应用 > 三、基于RAG的科学数据智能服务",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG with LLMs RAG（Retrieval-Augmented Generation，检索增强生成）是一种结合了信息检索和自然语言生成 的技术，主要应用于增强大型语言模型（如GPT等）的生成能力。",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 3,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_3",
+              "parent_index": 3,
+              "section": "RAG with LLMs",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 2020 年由 Meta AI 提出",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 3,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_4",
+              "parent_index": 4,
+              "section": "2020 年由 Meta AI 提出",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG-大模型应用技术 预训练阶段：模型在大规模通用数据集上学习基础知识和结构。 微调阶段：将预训练模型应用到特定任务的数据集上，通过再训练提升表现。 模型应用阶段：通过优化模型交互，使用 RAG 技术和 Agent 实现动态任务处理，并在各行业中应用。",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_5",
+              "parent_index": 5,
+              "section": "RAG-大模型应用技术",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 自监督指令泛化学习 对齐学习研究 （利用云端基座模型，利 用自动标注技术，减少人 力投入）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_6",
+              "parent_index": 6,
+              "section": "自监督指令泛化学习 对齐学习研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# ICL、提示工程、RAG、 Agent研究 （大模型应用技术，适配学科、 行业场景及数据 管理信息化、数据库、安全…）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_7",
+              "parent_index": 7,
+              "section": "ICL、提示工程、RAG、 Agent研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 研究点",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_8",
+              "parent_index": 8,
+              "section": "研究点",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 语料预处理研究 （金融、医疗、法律等文 本性强的学科）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_9",
+              "parent_index": 9,
+              "section": "语料预处理研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 继续预训练研究 （适合做学术论文、学科 数据的增量学习，例如代 码、生物信息、物理、化 学…）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 4,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_10",
+              "parent_index": 10,
+              "section": "继续预训练研究",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG-大模型应用技术",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 5,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_11",
+              "parent_index": 11,
+              "section": "RAG-大模型应用技术",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 检索增强生成 · 输入解析器 · Prompt 工程 · 输出解析器 · 向量数据库 · 知识图谱模块 · 私域文件加载器",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 5,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_12",
+              "parent_index": 12,
+              "section": "检索增强生成",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# GraphRAG",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 6,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_13",
+              "parent_index": 13,
+              "section": "GraphRAG",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 利用知识图谱提升RAG应用的准确性 图检索增强生成（GraphRAG）利用图数据库的结构化特性，以节点和关系的方式进行组织数据，增加 - 了检索到信息的深度和关联上下文，是传统向量检索方法的有效补充。",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 6,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_14",
+              "parent_index": 14,
+              "section": "利用知识图谱提升RAG应用的准确性",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# Self-RAG Self-RAG（Self-Reflective RAG） 是一种增强的RAG范式，由华盛顿大学和IBM人工智能研究院的技术专家提 出，核心思想是通过自省机制来优化生成任务的准确性和质量。 · 按需检索： Self-RAG在生成内容时，首先判 断是否需要检索外部知识。如果不需要，模 型直接生成答案；如果需要，则进行检索。 · 自省标记： 模型在生成过程中会插入自省标 记（如[Retrieval]、[Relevant]等），这些 标记帮助模型评估生成内容的相关性和支持 度。 · 增强生成 ：在需要检索的情况下，Self-RAG 会使用检索到的相关知识与输入问题一起生 成多个响应，并通过评分算法选择最优答案。 · 评估指标： Self-RAG设计了四种评估指标： 检索判断（Retrieve）、知识相关性 （IsRel）、响应支持度（IsSup）和响应有 效性（IsUse）",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 7,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_15",
+              "parent_index": 15,
+              "section": "Self-RAG",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# RAG大模型应用落地案例-智能问答",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 8,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_16",
+              "parent_index": 16,
+              "section": "RAG大模型应用落地案例-智能问答",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "# 1. 客户支持",
+              "document_title": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "page_number": 8,
+              "parent_id": "ae9ffd99e6d3dfe57146258f744c7061_63d5233ae1d5_schema_10_parent_17",
+              "parent_index": 17,
+              "section": "1. 客户支持",
+              "source_filename": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+            },
+            {
+              "content": "第 42 卷 第 10 期 2025 年 10 月 Vol. 42 No. 10 October 2025",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 1,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_0",
+              "parent_index": 0,
+              "section": "第 1 页正文（未识别标题）",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# 微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 1,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_1",
+              "parent_index": 1,
+              "section": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# MICROELECTRONICS & COMPUTER 引用格式 ： 李子骏 ， 肖辉 ， 李雪峰 ． 面向知识密集型任务的检索增强生成技术综述 [ J ] . 微电子学与计算机 ， 2025 ， 42 （ 10 ）： 48-65 ． LI Z J ， XIAO H ， LI X F. Survey on retrieval-augmented generation techniques for knowledge-intensive tasks [ J ] . Microelectronics & Computer ， 2025 ， 42 （ 10 ）： 48-65. DOI ： 10.19304/J.ISSN1000-7180.2025.0652",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 1,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_2",
+              "parent_index": 2,
+              "section": "MICROELECTRONICS & COMPUTER",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# 面向知识密集型任务的检索增强生成技术综述 李子骏，肖 辉，李雪峰 （ 同济大学 电子与信息工程学院 , 上海 201804 ） 摘 要 ： 检索增强生成 （ Retrieval-Augmented Generation, RAG ） 作为一种融合信息检索与文本生成的范式，通过引 入外部知识源，显著提升了模型的知识覆盖率、事实准确性与时效性。系统梳理了 RAG 技术的演进与研究现状， 从基本原理、系统架构出发，深入分析检索器与生成器的协同建模机制及典型变体，包括 FiD 、 REALM 、 REPLUG 、 GraphRAG 等。总结了 RAG 在开放域问答、领域知识问答、智能客服、企业知识管理等应用场景的实践效果，并分 析了多模态融合、外部工具调用和小样本学习等前沿方向。在此基础上，指出了当前 RAG 研究所面临的评估体系 不统一、训练开销高、可控性不足等挑战，并对未来发展趋势进行了展望。 关键词 ： 检索增强生成 ； 预训练语言模型 ； 信息检索 ； 文本生成 ； 知识密集型任务 中图分类号 ： T18 文献标识码 ： A 文章编号 ： 1000-7180 （ 2025 ） 10-0048-18",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 1,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_3",
+              "parent_index": 3,
+              "section": "面向知识密集型任务的检索增强生成技术综述",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# Survey on retrieval-augmented generation techniques for knowledge-intensive tasks LI Zijun ， XIAO Hui ， LI Xuefeng （ College of Electronic and Information Engineering, Tongji University, Shanghai 201804, China ） Abstract ： Retrieval-Augmented Generation (RAG), as a paradigm that integrates information retrieval and text generation, significantly enhances the knowledge coverage, factual accuracy, and timeliness of models by incorporating external knowledge sources. This paper systematically reviews the technical evolution and research status of RAG, starting from its basic principles and system architecture. It delves into the co-modeling mechanisms of the retriever and generator and their typical variants, including FiD, REALM, REPLUG, and GraphRAG. Furthermore, it summarizes the practical effects of RAG in application scenarios such as open-domain question answering, domain knowledge question answering, intelligent customer service, and enterprise knowledge management, and explores cutting-edge directions such as multimodal fusion, external tool invocation, and few-shot learning. Based on this, the paper points out the challenges currently faced by RAG research, such as the lack of a unified evaluation system, high training costs, and insufficient controllability, and looks forward to future development trends. This paper aims to provide a systematic theoretical framework and practical reference for subsequent research. Key words ： retrieval-augmented generation ； pre-trained language models ； information retrieval ； text generation ； knowledge-intensive tasks",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 1,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_4",
+              "parent_index": 4,
+              "section": "Survey on retrieval-augmented generation techniques for knowledge-intensive tasks",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# 1 引言 近年来，预训练语言模型 （ Pretrained Language Models, PLMs ） 已成为自然语言处理 （ Natural Language Processing, NLP ） 研究的基础范式。自 BERT 模 型提出以来， PLMs 在命名实体识别、问答系统和",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 1,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_5",
+              "parent_index": 5,
+              "section": "1 引言",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "文本分类等多个任务中取得了显著进展 [1] 。以 GPT 系列、 PaLM 、 ChatGLM 、通义千问和 DeepSeek 为 代表的生成式模型，进一步推动了自然语言生成、 对话建模等方向的发展，标志着通用语言建模能力 的跃升 [2-7] 。 尽管大规模语言模型具备较强的泛化能力，但 知识获取依赖于预训练阶段所学习的静态语料，在 处理需要事实核查、时效性强或领域特定的任务时， 易出现知识缺失、信息幻觉等问题 [8] 。该类问题在 开放领域问答 （ Open-domain Question Answering, ODQA ） 、多文档推理和事实生成等任务中的短板尤 为突出，限制了模型在真实应用场景中的可信度与 可控性。为提升生成模型对外部知识的调用能力， Lewis 等 [9] 提出了 RAG （ Retrieval-Augmented Generation ） 框架。通过在生成前引入信息检索机制，使模 型能够从外部文档库中动态获取与输入相关的文本， 作为辅助条件进而驱动模型生成更加准确和可验证 的自然语言输出。与封闭式语言模型相比， RAG 具 备更强的知识覆盖范围与时效适应性，在多个知识 密集型任务中表现出较强优势 [10-11] 。近几年， RAG 研究方向持续拓展，其技术体系覆盖了检索器与生 成器的协同建模、结构优化、融合策略和多轮交互 机制等多个维度。同时，结合图结构建模、工具调 用与多模态输入的研究工作也日益增多，推动了 RAG 系统从单一文档增强向知识融合与智能推理方 向发展。目前， RAG 已被广泛应用于开放问答、领 域检索、智能客服和企业知识管理等场景，展现出 重要的市场价值。尽管 RAG 方法在特定任务中的 应用取得了实效性进展，目前尚缺乏系统性综述以 梳理其理论基础、模型演化路径与研究趋势，难以 为后续研究提供清晰框架与统一视角。 因此，本文通过系统回顾 RAG 的技术演进、 关键组成与代表性拓展，从结构机制、应用场景与 挑战展望等方面展开分析，主要内容包括以下六 点。 - （ 1 ） 概述 RAG 的提出背景与方法范式，明确其 与传统问答模型的区别。 - （ 2 ） 系统阐述 RAG 核心组成，包括检索器、生 成器及其协同机制。 - （ 3 ） 归纳近年来提出的典型架构变体与优化策 略，如 FiD 、 REALM 、 REPLUG 、 GraphRAG 等。 - （ 4 ） 总结 RAG 在多领域的实际应用，包括问答 系统、知识问答、企业助手等。 （ 5 ） 分析当前 RAG 系统在性能评估、训练代价 与可控性方面的关键挑战。 （ 6 ） 展望未来 RAG 研究在多模态融合、小样本 学习与外部工具交互方面的发展方向。 本文旨在为相关研究提供统一视角与方法脉络， 进而推动 RAG 在理论探索与工程实践中的深入 发展。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 2,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_6",
+              "parent_index": 6,
+              "section": "1 引言",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# 2 基本原理与系统架构 在 NLP 领域，近年来大语言模型取得了显著 进展，尤其在文本生成、问答系统与语言理解等任 务中展现出强大的泛化能力。然而，现有模型面临 ' 知识封闭性 ' （ Knowledge Closedness ） 、 ' 事实幻 觉 ' （ Hallucination ） 以及 ' 可解释性不足 ' 等核心挑 战，亟需一种机制以弥合语言模型参数内建知识与 外部动态知识之间的鸿沟。 RAG 范式正是在此背景 下产生，通过将神经语言模型与语义检索模块结合， 实现了 ' 检索 -生成 ' 联动建模，为构建具备知识 调用能力的生成系统提供了新的思路。 RAG 架构在设计上秉持 ' 外部知识调用 + 条 件生成 ' 策略，使模型在生成答案前能够显式地从 外部文档库中检索语义相关内容，并以此作为生成 条件进行语言建构，从而有效提升生成结果的事实一 致性、语义相关性与可溯源性。相比于传统闭卷模 型 （ Closed-book Models ） 和检索式问答系统 （ Retrievalbased QA Systems ） ， RAG 在保持语言自然度的同时 实现了知识利用的动态性与模块化，成为近年来知 识密集型 NLP 研究的主流架构之一。本文将围绕 RAG 的核心建模理念、系统流程与关键组成模块展 开，进一步对其与其他问答范式之间的关系进行系 统比较，为后续基于 RAG 的模型改进与路径优化 提供理论基础与架构认知。 为清晰地呈现 RAG 技术的发展脉络，首先给 出自 2020 年以来的关键进展时间轴，如图 1 所示。 2.1 RAG 范式 RAG 是一种融合信息检索 （ Information Retrieval, IR ） 与文本生成 （ Text Generation ） 机制的神经语 言建模框架，其核心目标是赋予预训练语言模型以 动态调用外部知识的能力。该方法在 2020 年被提 出，旨在解决传统语言模型对事实性、时效性知识 建模能力不足的问题 [9] 。与封闭式生成模型不同， RAG 系统采用 ' 开放式 ' （ Open-book ） 的生成范式。 在该框架中，模型在生成响应之前，首先从一个外 部知识源 （ 通常为向量化语料库 ） 中检索与输入查询 语义相关的文档段落，再将这些文档与原始查询联",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 2,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_7",
+              "parent_index": 7,
+              "section": "2 基本原理与系统架构",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "图 1 RAG 技术的关键进展时间轴 Fig. 1 Timeline of key advances in RAG technology 合编码，作为上下文条件馈入生成器，进而完成输 出生成。这一过程使得模型可以在响应生成时访问 与任务相关的即时信息，而不依赖模型参数中静态 存储的知识。该范式具有显著优势，具体如下。 - （ 1 ） RAG 框架通过显式调用文档，显著增强了 生成结果的知识依据性与事实一致性，缓解了大语 言模型中常见的幻觉问题 [8] 。 - （ 2 ） 系统的输出可追溯至原始文档，提高了可 解释性，为用户提供了答案背后的来源支持。 - （ 3 ） 模型对知识的存储与调用解耦，提高了整 体系统的可扩展性与可更新性，支持快速集成不同 领域知识库或增量更新文档集合。 上述特性使 RAG 在开放领域问答、知识注入 对话、事实验证、文档搜索生成等任务中表现出良 好的适用性 [11-12] 。 从建模角度， RAG 并非将信息检索作为独立前 处理步骤，而是将其作为可训练的子模块与生成器 共同建模，形成一个联合概率优化目标。其训练与 推理过程支持两种主流模式：一种是管线式结构， 先训练检索器再调用生成器；另一种为端到端联合 优化，将检索与生成解耦建模转化为可微优化过程， 使得检索器可在生成器的损失引导下迭代更新 [9-10] 。 随着大语言模型能力的增强， RAG 也支持将生成器 替换为黑盒模型 （ 如 GPT-4 ） ，进一步形成 ' 可训练 检索器 + 不可训练生成器 ' 的解耦范式，如 REPLUG 所提出的方式 [13] 。目前， RAG 已发展为知 识增强语言建模 （ Knowledge-intensive NLP ） 的主流 https://mc.spacejournal.cn 技术之一，并成为多模态问答、智能体系统 （ Agent ） 、 领域对话系统等多类任务的基础框架之一。它不仅 为解决知识 ' 封闭性 ' 提供了系统路径，也推动了 生成模型向高可信、可验证、低幻觉方向 演化。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 3,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_8",
+              "parent_index": 8,
+              "section": "2 基本原理与系统架构",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "## 2.2 系统流程 RAG 系统通常由两个核心模块组成：文档检索 器 （ Retriever ） 与文本生成器 （ Generator ） ，两者协同 运行构成完整的检索增强生成流程。前者负责从大 规模语料库中筛选与输入查询最相关的文档段落， 后者则基于原始查询与所检索内容生成自然语言输 出。这种结构明确分工的架构设计，兼顾信息覆盖 性与语言生成能力，为解决大语言模型的知识时效 性与幻觉问题提供了可行路径 [9] 。 RAG 的基本流程 可划分为 4 个阶段，分别为编码、检索、融合与生 成，系统处理过程主要流程包括以下 4 个阶段 [9, 11] 。 - （ 1 ） 编码阶段 （ Query Encoding ） ：用户输入的自 然语言查询 首先通过预训练语言模型 （ 如 BERT 、 RoBERTa ） 编码为低维稠密向量表示，作为语义检 索的查询项输入。该编码阶段的关键在于捕捉查询 的语义特征，以便在后续检索中实现高质量匹配。 （ 2 ） 检索阶段 （ Retrieval ） ：基于编码后的查询向 量，系统在预构建的向量化文档索引中执行近似最 近邻 （ Approximate Nearest Neighbor, ANN ） 搜索，返 回 topk 个与查询语义最相近的段落或片段。该检 索过程可基于向量点积、余弦相似度等指标进行匹 配，具体实现通常采用 FAISS 、 ScaNN 等高效索引",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 3,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_9",
+              "parent_index": 9,
+              "section": "2 基本原理与系统架构 > 2.2 系统流程",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "机制，以确保在大规模语料库下的低延迟响应 [14] 。 （ 3 ） 融合阶段 （ Context Fusion ） ：将检索得到的 文档内容与原始查询进行融合编码，形成上下文条 件输入供生成器使用。常见策略包括：早期拼接、 独立编码后融合、以及基于注意力机制的权重聚合。 如 Fusion-in-Decoder （ FiD ） 采用了对每个文档独立编 码，仅在 Decoder 阶段聚合的设计，证明在多文档 融合场景下能显著提升生成质量 [11] 。 （ 4 ） 生成阶段 （ Conditional Generation ） ：基于融 合后的上下文表示，文本生成器输出最终的自然语 言回答 。生成模块通常采用 Encoder-Decoder 架构 （ 如 BART 、 T5 ） 或 Decoder-only 结构 （ 如 GPT ） 实现， 具体选择取决于系统对可训练性、结构透明性和上 下文长度的需求。 此流程体现了 RAG ' 文档增强 ' 建模范式的核 心思想：通过将语义检索纳入生成决策路径，使语 言模型具备了动态访问外部知识的能力，进而提升 了生成内容的事实一致性与知识可靠性 [10] 。与传统 闭合式生成模型相比， RAG 在处理需要事实支撑或 领域知识支撑的任务时，具备更强的适应能力与可 解释性。此外，该流程天然支持文档库的扩展与更 新，适用于快速变化的知识环境 （ 如新闻、金融、法 律等场景 ） ，在系统部署层面具有良好的工程可扩 展性。值得注意的是，随着 RAG 在工业与研究中 的广泛应用，不同系统在具体流程实现上有所差异。 例如， WebGPT 在检索阶段加入了 BM25 作为初筛 机制以提高召回效率， REPLUG 则在生成器不可训 练的场景下进一步优化检索器，以更好适配输出语 言模型的响应偏好 [13, 15] 。这些演化体现了 RAG 范式 在不同场景下的可定制性与灵活性。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 4,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_10",
+              "parent_index": 10,
+              "section": "2 基本原理与系统架构 > 2.2 系统流程",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "## 2.3 问答系统 在自然语言处理的问答系统研究中， RAG 被广 泛认为是连接闭卷问答 （ Closed-book QA ） 与检索式 问答 （ Retrieval-based QA ） 两种范式的桥梁型架构。 其基本理念是在回答生成前主动从外部文档库中检 索相关信息，以此补充语言模型本身的知识表示能 力，从而生成更为准确且语义连贯的自然语言答 案 [9, 13] 。该范式通过融合外部知识调用能力与上下 文感知语言建模能力，试图克服传统问答模型在事 实性、生成性与可扩展性方面的固有限制。 闭卷问答系统依赖于大规模语言模型 （ 如 GPT3 、 T5 ） ，其全部知识均内嵌于参数之中，回答生成 过程完全不依赖外部资源 [16-17] 。尽管此类模型在少 样本泛化与语言生成方面展现出较强能力，但由于 其知识是静态冻结的，难以适应知识快速演化的应 用场景，且在事实密集型任务中易出现 ' 幻觉 ' （ Hallucination ） 现象，即输出与现实事实相悖的信 息 [8, 18] 。检索式问答系统则主要借助传统信息检索 技术，如 BM25 、 DPR 等，基于关键词或向量匹配 机制在文档库中检索相关片段，并直接返回文本作 为答案 [12, 19] 。该方法因其高度可解释性与事实准确 性在工业系统中长期占据主导地位。然而，其回答 往往为原文摘录，缺乏语言生成的灵活性与上下文 整合能力，尤其在多文档融合、跨句推理等任务中 表现受限 [12, 20] 。 RAG 架构在上述两种极端之间建立起融合机制： 在保持事实性与可解释性的同时，引入生成能力提 升语言自然度。其生成器以检索结果为条件输入， 从多个候选段落中整合信息并生成语义合理、语言 自然的回答 [11, 21] 。该机制不仅提升了模型的回答质 量，也显著增强了系统对外部知识库的依赖能力， 使模型具备了 ' 按需访知 ' 的动态推理能力 [22] 。 在多项开放领域问答任务 （ 如 Natural Questions 、 TriviaQA ） 中， RAG 模型在准确率、 BLEU 等指标 上显著优于封闭式模型和纯检索系统，验证了其在 事实一致性与生成质量之间的优越平衡能力 [9, 23] 。 表 1 对 3 种问答范式的核心特性进行了系统对比。 表 1 闭卷、检索式和 RAG 问答范式的对比 Tab. 1 Comparison of closed-book, retrieval-based and RAG question-answering paradigms | 模型类型 | 是否调用外部知识 | 回答方式 | 优势 | 局限性 | |--------|------------|------------|---------------|--------------------| | 闭卷问答 | 否 | 直接从参数生成 | 生成自然、部署简便 | 幻觉率高、知识不可更新 | | 检索式问答 | 是 | 文本片段直接返回 | 高可解释性、事实准确性强 | 回答缺乏语言柔性、难以跨句 整合信息 | | RAG | 是 | 基于检索内容进行生成 | 兼顾语言自然性与事实一致性 | 系统复杂性增加，性能依赖 检索质量 | Tab. 1 Comparison of closed-book, retrieval-based and RAG question-answering paradigms",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 4,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_11",
+              "parent_index": 11,
+              "section": "2 基本原理与系统架构 > 2.3 问答系统",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "企业问答系统 （ 金融、法律、医疗领等 ） 、人机对话 系统、复杂推理型任务中 [13, 24] 。随着检索模块与生 成模块逐步解耦并优化， RAG 范式展现出良好的工 程可扩展性，适应了多源异构知识调用、知识图谱 整合、多轮交互等复杂场景的需求，成为知识增强 型自然语言处理的重要方向。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 5,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_12",
+              "parent_index": 12,
+              "section": "2 基本原理与系统架构 > 2.3 问答系统",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# 3 RAG 关键组件与技术 RAG 系统通常由两个核心模块构成：文档检索 器与文本生成器。两者协同工作，以实现从大规模 知识库中动态调用信息并生成自然语言回答的目 标 [9, 11] 。其基本处理流程包括以下步骤。 步骤 1 输入查询 首先经过编码器映射为稠密 向量表示，如式 （ 1 ） 所示。 q = Encoder( x ) （1） 步骤 2 检索器基于该向量 在预构建的文档索 引中选出 topk 个语义相关的文档，如式 （ 2 ） 所示。 f d 1 ; d 2 ; ; dk g = top k (Sim( q ; di )) （2） 步骤 3 检索到的文档与原始查询联合构成条 件输入，输入至文本生成器。 步骤 4 生成器通常采用序列到序列架构 （ 如 BART 、 T5 ） 进行条件生成，输出最终回答文本 。 因此，该机制可形式化地表示为一个条件概率 建模问题，如式 （ 3 ） 所示。 P ( y j x ) P ( d j x ) P ( y j x ; d ) 式中： 表示在给定查询 的条件下，生成输出 的总体概率； 表示查询 检索到文档 的概率 分布，通常由向量检索模型估计； 表示在查 询与特定文档 d 的条件下生成回答的概率，依赖于 解码器建模能力。 P ( y j x ) = ∑ d 2 D P ( y j x ; d ) P ( d j x ) （3） 由于对整个文档集合 求和在计算上不可行， 实际训练与推理中一般采用 topk 截断近似，即 P ( y j x ) k ∑ i = 1 P ( y j x ; di ) P ( di j x ) （4） 该联合建模方式体现了 RAG 在知识选择与语 言生成之间建立的概率耦合机制，显著区别于传统 封闭语言模型在生成时的 ' 参数记忆 ' 范式，也区 别于检索式系统的 ' 文档摘录 ' 逻辑 [10, 13] 。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 5,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_13",
+              "parent_index": 13,
+              "section": "3 RAG 关键组件与技术",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "## 3.1 检索器 P ( d j x ) 在 RAG 架构中，文档检索器的核心任务是建 模条件概率分布 ，即在给定用户查询 的条件 下，选出最相关的文档 。该模块通过在大规模知 识库中筛选出语义相关的段落，为后续生成器提供 事实依据，是整个 RAG 流程的关键入口。目前主 流的检索方法可划分为稠密检索、稀疏检索和混合 检索。 稠密检索 （ Dense Retrieval, DR ） 采用神经网络将 查询与文档编码为低维稠密向量，并通过向量间相 似度 （ 如内积或余弦 ） 进行匹配。代表性方法如 DPR （ Dense Passage Retriever, DPR ） 使用两个 BERT 编码器分别处理查询与文档，通过对比学习优化匹 配效果 [12] 。该方法在多个开放领域问答任务 （ 如 Natural Questions 、 TriviaQA ） 中显著优于传统方法， 成为 RAG 框架中广泛采用的检索器。后续如 ColBERT 提出 token 级交互的 late interaction 机制， 在保留语义信息的同时提高了检索粒度； ANCE 则 通过异步更新负样本缓解了训练过程中的不稳定 性 [22, 25] 。稀疏检索 （ Sparse Retrieval ） 则基于词项频率 构建倒排索引，例如 TF-IDF 与 BM25 。其通过对词 语出现频率与文档长度进行加权打分，匹配时高度 依赖关键词重合，虽然不具备深层语义理解能力， 但实现简单、可解释性强，适用于大规模快速检索 或资源受限场景。在实际应用中，如 WebGLM 就 采用此方法进行候选段落初筛，从而降低生成器处 理负担 [26] 。混合检索 （ Hybrid Retrieval ） 尝试结合稠 密与稀疏方法的优势，通常采用线性加权或级联的 方式对两个检索结果进行融合。例如 ColBERTv2 引入 BM25 筛选 top 文档，再用稠密模型进行精 rerank ，有效提高了召回质量与系统效率的平衡 [27] 。 该策略在工业部署中极具实用价值，特别适用于长 尾查询或召回瓶颈场景。 在检索器设计之外，文档库的构建与维护策略 同样关键。文档通常以段落级或句子级粒度进行切 分，以控制生成模块的输入长度与上下文承载能 力 [9] 。检索向量可由 BERT 、 RoBERTa 、 E5 等预训 练模型生成，并通过近似最近邻 （ Approximate Nearest Neighbors, ANN ） 算法 （ 如 FAISS, ScaNN ） 建 立高效索引结构 [14] 。对于新闻、法律问答等知识快 速更新的领域， KILT toolkit 可提供统一的任务接口 与评测数据支持，可与具备增量索引功能的检索框 架结合使用 [23] 。综上，检索器在 RAG 中承担了 ' 知 识选择器 ' 的角色，其设计直接影响到生成器的响 应质量与事实一致性，是当前 RAG 研究中持续优 化的重点方向。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 5,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_14",
+              "parent_index": 14,
+              "section": "3 RAG 关键组件与技术 > 3.1 检索器",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "## 3.2 生成器 在 RAG 系统中，生成模块承担最终文本输出 的任务，其质量直接决定了系统的实用性与鲁棒性。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 5,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_15",
+              "parent_index": 15,
+              "section": "3 RAG 关键组件与技术 > 3.2 生成器",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "近年来，生成器的选择经历了从中等规模、结构明 确、可调优的开源模型 （ 如 Flan-T5 、 UL2 ） 向大型 闭源语言模型 （ 如 GPT-4 、 Claude 、 Gemini ） 的快速 演进。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 6,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_16",
+              "parent_index": 16,
+              "section": "3 RAG 关键组件与技术 > 3.2 生成器",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# （ 1 ） 模型架构演进 在 RAG 系统的发展初期，生成器主要依赖于 可训练的 Encoder-Decoder 结构模型，典型代表如 T5 及其强化版本 Flan-T5 [28] 。 Flan-T5 通过大规模多 语言、多任务指令微调 （ Instruction Tuning ） ，在保 持 T5 架构通用性的同时，显著提升了模型在零样 本与少样本任务中的泛化性能 [29] 。与此同时， UL2 则以统一语言学习 （ Unifying Language Learning ） 为 目标，将 causal LM 、 masked LM 与 span corruption 等训练目标融合为 ' Mixture-of-Denoisers ' 训练范 式，从而兼具生成、填空与问答能力 [30] 。由于这类 模型开源、结构透明且易于微调，它们在学术界被 广泛采用，成为 RAG 任务中可控性强、解释性良 好的生成器选项。 然而，随着大语言模型推理能力的迅猛发展， 实际应用系统逐步转向使用大型闭源 Decoder-only 模型作为生成组件，例如 GPT-4 [31] 、 Claude-3 [32] 、 Gemini 1.5 Pro2 [33] 等。这类模型不仅具备强大的语 言理解与推理能力，还能处理极长的上下文输入 （ 支 持数十万至百万 tokens ） ，为 RAG 系统在多文档融 合、长链推理、复杂决策生成等任务中提供了前所 未有的技术支撑。尽管这些闭源模型通常不可训练、 参数不可微调，但其性能优势推动了 ' Retriever + Promptable LLM ' 范式的兴起，即通过灵活构造 prompt 接口调用 LLM 输出答案，从而解耦生成器 的训练与使用过程。 在此背景下， REPLUG 框架提出冻结大模型参 数，仅对 retriever 进行训练以适配任意黑盒 LLM 的策略，显著降低了系统调优成本与部署复杂度 [13] 。 该框架现已集成至 LangChain 、 LlamaIndex 等 RAG 开发生态中，成为工业级检索增强生成系统的常见 范式。同时，一些最新研究进一步探索如何通过检 索控制生成行为，例如， Li 等 [34] 的 Refiner 模块提 出在检索后将返回内容重新结构化，将与查询相关 的信息按段落连接并提取，以高效支持下游生成器 推理，实验证明可提升多跳 QA 的准确性和生成一 致性。此外， Chan 等 [35] 提出的 RQ-RAG 模型通过 明确 query 重写、拆解与澄清步骤，实现对查询的 多阶段 refinement ，进而改善复杂查询的检索准确 度与答题质量。 综上所述，当前 RAG 生成器的演化趋势呈现 出明确的双轨格局：学术研究更偏好使用开源、可 控的 Encoder-Decoder 模型以支持微调与分析；工 业界则倾向采用高性能、零微调的闭源大模型 API 以满足部署效率和推理质量的要求。二者在架构、 控制机制与使用策略上的分化也推动了 RAG 在多 领域的多样化发展。",
+              "document_title": "微 电 子 学 与 计 算 机 https://mc.spacejournal.cn",
+              "page_number": 6,
+              "parent_id": "95c8fafc68a48edf10f9c4816b2be631_41184f8795d7_schema_10_parent_17",
+              "parent_index": 17,
+              "section": "（ 1 ） 模型架构演进",
+              "source_filename": "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+            },
+            {
+              "content": "# graphrag 的原理、源码及应用介绍 作者 : acedar(C 大 )",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 1,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_0",
+              "parent_index": 0,
+              "section": "graphrag 的原理、源码及应用介绍",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "1. graphrag 的原理介绍 - -索引创建过程讲解 - -查询过程讲解 2. graphrag 的效果体验 ( 以斗破苍穹小说为例 ) - -效果体验，环境安装，常见问题讲解 3. graphrag 的源码剖析 - -代码的流程解读， prompt 的设计逻辑解读 4. graphrag - 适配国内大模型 - -思路讲解，代码修改， graphrag 全流程体验",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 2,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_1",
+              "parent_index": 1,
+              "section": "graphrag 的原理、源码及应用介绍",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 为什么会有graphrag？ rag 解决的问题 ：使用检索增强生成（ RAG ）技术从外部知识源检索相关信息，使大型语言模型（ LLMs 能够回答涉及私有或之前未见过的文档集合的问题",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 3,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_2",
+              "parent_index": 2,
+              "section": "为什么会有graphrag？",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 传统 rag ： 解决外部知识的详情介绍，某些细节的检索。 比如刘德华的成名作电影是？ ( 彩云曲 ) 无发解决 QFS （ query focused summarization ）： 文章中的主要主题是什么？ -> 跨多个段落，甚至多个文章 ）",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 3,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_3",
+              "parent_index": 3,
+              "section": "传统 rag ：",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# graphrag的基本概念 Document( 文档 )-系统中的输入文档。这些文档要么代表 CSV 中的单独行，要么代表单独的 .txt 文件。 TextUnit( 文本块 )-要分析的文本块。这些块的大小、重叠以及它们是否遵守任何数据边界可以 在下面配置。一个常见的用例是设置 CHUNK_BY_COLUMNS 为 id ，以便文档和 TextUnits 之间存在一 对多关系，而不是多对多关系。 Entity( 实体 )-从 TextUnit 中提取的实体。这些实体代表人物、地点、事件或您提供的其他实体模 型。 Relationship( 关系 )-两个实体之间的关系。这些关系由协变量生成。 Covariate( 协变量 )-提取的声明信息，其中包含可能受时间限制的实体的陈述。 Claim( 声明 )-代表具有评估状态和时间限制的积极事实陈述，以协变量 (Covariates) 的称呼在各处 使用 Community Report( 社区报告 )-一旦生成实体，我们就对它们执行分层社区检测，并为该层次 结构中的每个社区生成报告。 Node （节点） -包含已嵌入和聚集的实体和文档的呈现图形视图的布局信息。",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 4,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_4",
+              "parent_index": 4,
+              "section": "graphrag的基本概念",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 文档转换为 TextUnits",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 5,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_5",
+              "parent_index": 5,
+              "section": "文档转换为 TextUnits",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 说明： 概念 -> 追溯原文 文档和文本单元之间存在严格的一对 多关系",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 5,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_6",
+              "parent_index": 6,
+              "section": "说明：",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 切换技巧： - -切换大小 chunk size: 1200 token - -较大的块会导致输出保真度较低，参考文 - 本意义较小；使用较大的块可以大大缩短处 理时间。",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 5,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_7",
+              "parent_index": 7,
+              "section": "切换技巧：",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 图提取 功能：分析每个文本单元并提取图形基元： 实体、关系和声明",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 6,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_8",
+              "parent_index": 8,
+              "section": "图提取",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 实体和关系提取 : 使用 LLM 从原始文本中提取实体和关 系 , 包含具有名称、类型和描述的实体列表， 以及具有源、目标和描述的关系列表。",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 6,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_9",
+              "parent_index": 9,
+              "section": "实体和关系提取 :",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 实体和关系摘要 : 通过 LLM 为每个实体和关系提供简短 的摘要描述",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 6,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_10",
+              "parent_index": 10,
+              "section": "实体和关系摘要 :",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# Claim Extraction & Emission ： 声明代表具有评估状态和时间限制的 积极事实陈述，以协变量 (Covariates) 的称呼 在各处使用",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 6,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_11",
+              "parent_index": 11,
+              "section": "Claim Extraction & Emission ：",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 图增强 ( 构建社区 )",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 7,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_12",
+              "parent_index": 12,
+              "section": "图增强 ( 构建社区 )",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 社区检测： 使用分层莱顿算法生成实体社区的层 次结构，此方法将对我们的图应用递归社区 聚类，直到达到社区规模阈值。这将使我们 能够了解图的社区结构，并提供一种在不同 粒度级别上导航和总结图的方法。",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 7,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_13",
+              "parent_index": 13,
+              "section": "社区检测：",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 图嵌入： 使用 Node2Vec 算法生成图的向量表示。 这将使我们能够理解图的隐式结构，并提供 额外的向量空间，以便在查询阶段搜索相关 概念。 Graph Tables Emission ： the final Entities and Relationships tables are emitted after their text fields are text-embedded. -> 理解构建的社区和实体及关系存在关联关系",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 7,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_14",
+              "parent_index": 14,
+              "section": "图嵌入：",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 社区总结 功能：基于社区数据并为每个社区生成报告，这让我们 可以从多个粒度点对图表有一个高层次的了解。例如， 如果社区 A 是顶级社区，我们将获得有关整个图表的报 告。如果社区是较低级别的，我们将获得有关本地集群 的报告。 生成社区报告 : 使用 LLM 生成每个社区的 摘要 , 引用社区子结构中的关键实体、关系 和声明 总结社区报告：每个社区报告都会通过 LLM 进行总结，以供速记使用。 社区嵌入：通过生成社区报告、社区报告 摘要和社区报告标题的文本嵌入来生成我们 社区的向量表示。",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 8,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_15",
+              "parent_index": 15,
+              "section": "社区总结",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# 文档处理 链接到 TextUnits ：将每个文档链接到第一 阶段创建的文本单元，了解哪些文档与哪些 文本单元相关 文档嵌入：文档切片的平均嵌入来生成文 档的向量表示，能够理解文档之间的隐式关 系",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 9,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_16",
+              "parent_index": 16,
+              "section": "文档处理",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            },
+            {
+              "content": "# local查询",
+              "document_title": "graphrag 的原理、源码及应用介绍",
+              "page_number": 10,
+              "parent_id": "1dec067dc559f025fa52216ae7705d86_59a7a4f6fab3_schema_10_parent_17",
+              "parent_index": 17,
+              "section": "local查询",
+              "source_filename": "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+            }
+          ],
+          "source_count": 3
+        }
+      },
+      {
+        "task_id": "task_9158b73cc375c6abbb2b",
+        "step_name": "build_outline",
+        "ordinal": 1,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "301cad825f0e268002d549eda025cc8356091f66b645be771992e12e105ba9bd",
+        "started_at": 1787657120.9946096,
+        "completed_at": 1787657147.4489233,
+        "error": null,
+        "output": {
+          "generated_at_label": "2026-08-25 19:25",
+          "outline_source": "extractive",
+          "schema_version": "souldrive_presentation_plan_v1",
+          "slides": [
+            {
+              "eyebrow": "技术方案汇报",
+              "footer": "SoulDrive 本地证据链",
+              "kind": "cover",
+              "points": [],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+                "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+                "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+              ],
+              "subtitle": "基于 3 份已入库文档生成",
+              "title": "三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "摘要内容直接提炼自所选文档",
+              "kind": "content",
+              "points": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用：# 利用知识图谱提升RAG应用的准确性 图检索增强生成（GraphRAG）利用图数据库的结构化特性，以节点和关系的方式进行组织数据，增加 - 了检索到…",
+                "02_面向知识密集型任务的检索增强生成技术综述：同时，一些最新研究进一步探索如何通过检 索控制生成行为，例如， Li 等 [34] 的 Refiner 模块提 出在检索后将返回内容重新结构化，将与查询相关 的…",
+                "07_GraphRAG原理源码及应用介绍_Gitee：Claim( 声明 )-代表具有评估状态和时间限制的积极事实陈述，以协变量 (Covariates) 的称呼在各处 使用 Community Report…"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+                "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+                "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+              ],
+              "subtitle": "",
+              "title": "执行摘要"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "基于科学数据的检索增强生成 （RAG）技术研究与应用",
+              "kind": "content",
+              "points": [
+                "# 利用知识图谱提升RAG应用的准确性 图检索增强生成（GraphRAG）利用图数据库的结构化特性，以节点和关系的方式进行组织数据，增加 - 了检索到信息的深度和关联上下文，是传统向量检索方法的有效补充。",
+                "# RAG with LLMs RAG（Retrieval-Augmented Generation，检索增强生成）是一种结合了信息检索和自然语言生成 的技术，主要应用于增强大型语言模型（如GPT等）的生成能…",
+                "· 评估指标： Self-RAG设计了四种评估指标： 检索判断（Retrieve）、知识相关性 （IsRel）、响应支持度（IsSup）和响应有 效性（IsUse）",
+                "# Self-RAG Self-RAG（Self-Reflective RAG） 是一种增强的RAG范式，由华盛顿大学和IBM人工智能研究院的技术专家提 出，核心思想是通过自省机制来优化生成任务的准确性和质量。",
+                "模型应用阶段：通过优化模型交互，使用 RAG 技术和 Agent 实现动态任务处理，并在各行业中应用。"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+              ],
+              "subtitle": "",
+              "title": "01_基于科学数据的检索增强生成_RAG_技术研究与应用"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "第 1 页正文（未识别标题）",
+              "kind": "content",
+              "points": [
+                "同时，一些最新研究进一步探索如何通过检 索控制生成行为，例如， Li 等 [34] 的 Refiner 模块提 出在检索后将返回内容重新结构化，将与查询相关 的信息按段落连接并提取，以高效支持下游生成器 推理…",
+                "RAG 架构在设计上秉持 ' 外部知识调用 + 条 件生成 ' 策略，使模型在生成答案前能够显式地从 外部文档库中检索语义相关内容，并以此作为生成 条件进行语言建构，从而有效提升生成结果的事实一 致性、语义相…",
+                "尽管此类模型在少 样本泛化与语言生成方面展现出较强能力，但由于 其知识是静态冻结的，难以适应知识快速演化的应 用场景，且在事实密集型任务中易出现 ' 幻觉 ' （ Hallucination ） 现象，即输出…",
+                "（ 2 ） 检索阶段 （ Retrieval ） ：基于编码后的查询向 量，系统在预构建的向量化文档索引中执行近似最 近邻 （ Approximate Nearest Neighbor, ANN ） 搜索，返…",
+                "与此同时， UL2 则以统一语言学习 （ Unifying Language Learning ） 为 目标，将 causal LM 、 masked LM 与 span corruption 等训练目标融合…"
+              ],
+              "sources": [
+                "02_面向知识密集型任务的检索增强生成技术综述.pdf"
+              ],
+              "subtitle": "",
+              "title": "02_面向知识密集型任务的检索增强生成技术综述"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "graphrag 的原理、源码及应用介绍",
+              "kind": "content",
+              "points": [
+                "Claim( 声明 )-代表具有评估状态和时间限制的积极事实陈述，以协变量 (Covariates) 的称呼在各处 使用 Community Report( 社区报告 )-一旦生成实体，我们就对它们执行分层社…",
+                "Graph Tables Emission ： the final Entities and Relationships tables are emitted after their text fields…",
+                "# 文档处理 链接到 TextUnits ：将每个文档链接到第一 阶段创建的文本单元，了解哪些文档与哪些 文本单元相关 文档嵌入：文档切片的平均嵌入来生成文 档的向量表示，能够理解文档之间的隐式关 系",
+                "生成社区报告 : 使用 LLM 生成每个社区的 摘要 , 引用社区子结构中的关键实体、关系 和声明 总结社区报告：每个社区报告都会通过 LLM 进行总结，以供速记使用。",
+                "rag 解决的问题 ：使用检索增强生成（ RAG ）技术从外部知识源检索相关信息，使大型语言模型（ LLMs 能够回答涉及私有或之前未见过的文档集合的问题"
+              ],
+              "sources": [
+                "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+              ],
+              "subtitle": "",
+              "title": "07_GraphRAG原理源码及应用介绍_Gitee"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "仅呈现多文档中重复出现的主题词",
+              "kind": "content",
+              "points": [
+                "共同关注主题：rag",
+                "共同关注主题：graphrag",
+                "共同关注主题：generation",
+                "共同关注主题：retrieval-augmented",
+                "共同关注主题：使用"
+              ],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+                "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+                "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+              ],
+              "subtitle": "",
+              "title": "跨文档综合观察"
+            },
+            {
+              "eyebrow": "专题汇报",
+              "footer": "所有内容均来自本地已入库文档",
+              "kind": "sources",
+              "points": [],
+              "sources": [
+                "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+                "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+                "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+              ],
+              "subtitle": "",
+              "title": "资料来源"
+            }
+          ],
+          "style": {
+            "accent": "DAAB4A",
+            "background": "F8F7F2",
+            "primary": "173F3B",
+            "text": "1C2624"
+          },
+          "style_skill": {},
+          "title": "三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825"
+        }
+      },
+      {
+        "task_id": "task_9158b73cc375c6abbb2b",
+        "step_name": "render_pptx",
+        "ordinal": 2,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "5432bae3c4bdce90aeb2494fb841332d40b1e32c06ab1c5c68009e2d867eaf20",
+        "started_at": 1787657147.4659045,
+        "completed_at": 1787657147.471332,
+        "error": null,
+        "output": {
+          "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825-c6abbb2b.pptx",
+          "planned_slide_count": 7,
+          "renderer": "SoulDrive OpenXML"
+        }
+      },
+      {
+        "task_id": "task_9158b73cc375c6abbb2b",
+        "step_name": "verify_pptx",
+        "ordinal": 3,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "90290707edc3362e7d18ad7a2494d16bb5bcc4e9b78099372eb2ebb97a95026d",
+        "started_at": 1787657147.472332,
+        "completed_at": 1787657147.4748385,
+        "error": null,
+        "output": {
+          "errors": [],
+          "expected_slide_count": 7,
+          "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\三篇中文 RAG 与 GraphRAG 论文综合汇报验收 20260825-c6abbb2b.pptx",
+          "size_bytes": 19672,
+          "slide_count": 7,
+          "valid": true
+        }
+      },
+      {
+        "task_id": "task_9158b73cc375c6abbb2b",
+        "step_name": "open_in_wps",
+        "ordinal": 4,
+        "status": "completed",
+        "attempt_count": 1,
+        "idempotency_key": "a3b0731146a5897d260394d17559bd51713f7c5a1e7f73b0162fec27aa23554c",
+        "started_at": 1787657147.4748385,
+        "completed_at": 1787657147.4758444,
+        "error": null,
+        "output": {
+          "opened": false,
+          "reason": "not_requested"
+        }
+      }
+    ],
+    "progress": {
+      "completed": 5,
+      "total": 5
+    },
+    "recoverable": false
+  },
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace"
+}

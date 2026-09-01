@@ -1,0 +1,64 @@
+{
+  "schema_version": "rag_artifact_provenance_recheck_v0.1",
+  "performed_at": "2026-08-30T03:15:29+08:00",
+  "status": "implemented_increment",
+  "change": "project_artifact_provenance_for_presentation_and_local_drafts",
+  "design_basis": [
+    {
+      "name": "Claude Code permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "adapted_mechanism": "审核和撤销作为模型之外的强制状态记录，不能只依赖提示词"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "adapted_mechanism": "结构化处理与可追溯来源元数据一起保留"
+    },
+    {
+      "name": "SoulDrive roadmap",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "S5 产物记录来源版本、生成计划、确认记录和变更摘要"
+    }
+  ],
+  "contract": {
+    "artifact_types": [
+      "presentation_draft",
+      "email_draft",
+      "schedule_draft"
+    ],
+    "stored_fields": [
+      "source_version_ids",
+      "plan",
+      "confirmation_status",
+      "confirmation_record",
+      "change_summary",
+      "created_at"
+    ],
+    "confirmation_record": "创建时记录状态/模式/时间；状态变化追加 previous_status 和 status_changed_at；PPT 追加 generation_status",
+    "source_resolution": "项目目录中的 asset_version_id 才进入 V#；无法映射的全局文件保留 source_refs.status=unresolved",
+    "presentation_binding": "当前项目生成 PPT 时建立项目 artifact，完成后回写 task_id、output_path、renderer、证据覆盖和来源解析结果",
+    "side_effect_boundary": "邮件/日程仍为本地草稿；邮件发送和日历导出继续要求 confirmed；PPT 的 WPS 打开请求单独记录"
+  },
+  "verification": {
+    "backend_targeted": "30 passed, 1 warning",
+    "backend_full": "726 passed, 1 warning",
+    "frontend_tests": "npm test passed",
+    "frontend_build": "npm run build passed; existing bundle-size warning retained",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "coverage": [
+      "legacy artifacts table migration backfills confirmation_record",
+      "artifact status change keeps previous status and timestamp",
+      "email attachment source refs resolve only inside the selected project",
+      "schedule and email draft plans store confirmation and change summary",
+      "completed project PPT binds asset_version_id, task result, plan and output provenance"
+    ]
+  },
+  "interpretation": "This increment proves the three existing local artifact paths persist the requested provenance fields and that project-bound PPT completion can be traced to catalog asset versions. It does not prove semantic fact-level citation validity, because unresolved global documents and cross-Playbook answer facts still require separate E#/V#/A#/M# validation.",
+  "limitations": [
+    "PPT generation through a legacy unscoped tool call without project_id cannot create a project artifact; the UI now requires a selected project.",
+    "Global documents without a project_catalog asset version remain explicitly unresolved rather than receiving a fabricated version ID.",
+    "No user-authored Playbook editor or version migration is implemented.",
+    "No sealed-test data, RAG ranking weight, model, or external send/calendar behavior was changed."
+  ]
+}

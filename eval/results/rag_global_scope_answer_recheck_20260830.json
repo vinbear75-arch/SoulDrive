@@ -1,0 +1,50 @@
+{
+  "schema_version": "souldrive_rag_global_scope_answer_recheck_v0.1",
+  "performed_at": "2026-08-30T21:25:44.0059133+08:00",
+  "design_basis": [
+    {
+      "name": "Microsoft GraphRAG",
+      "url": "https://microsoft.github.io/graphrag/query/overview/",
+      "applied_principle": "查询路由可以区分项目局部证据与共享全局证据，但权限边界必须保持显式"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "最终回答的引用必须回到检索证据，而不是只证明候选命中"
+    }
+  ],
+  "scope": "双项目 LocalKnowledgeBase 到 RAGEngine 的共享全局文档问答链路；固定生成器只用于隔离来源传递，不用于测量模型答案准确率",
+  "fixture": {
+    "projects": ["p1", "p2"],
+    "private_noise_sources": ["noise.pdf", "other-noise.pdf"],
+    "shared_source": "global.pdf",
+    "query": "zero trust policy requires what?"
+  },
+  "verification": {
+    "targeted_tests": "15 passed",
+    "route_by_project": {
+      "p1": {
+        "route": "global_fallback",
+        "answer_contains_shared_source": true,
+        "citation": "[E1]",
+        "private_noise_leaked": false
+      },
+      "p2": {
+        "route": "global_fallback",
+        "answer_contains_shared_source": true,
+        "citation": "[E1]",
+        "private_noise_leaked": false
+      }
+    },
+    "full_backend_tests": "844 passed, 1 warning",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "decision": "保留当前项目优先、无相关本地证据时全局回退的问答路径；双项目均能将共享证据传递到最终引用输出，同时继续隔离私有文档",
+  "limitations": [
+    "固定生成器只验证检索结果、项目权限和引用证据能到达 RAGEngine，不代表本地语言模型的事实/NLI 答案准确率",
+    "本回放未使用正式加密工作区，也未证明真实项目绑定、生产索引或 GraphRAG 生产业务验收",
+    "全局文档若尚未完成索引或资产目录绑定，仍可能触发索引未就绪/来源未编目错误；需要真实工作区解锁后重跑",
+    "真实多模态 30 episode、完整 VLM+RAG P95、答案级人工/NLI 和 sealed-test 仍未完成"
+  ]
+}

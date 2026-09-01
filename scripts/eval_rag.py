@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import json
 import math
 import os
@@ -15,13 +16,14 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.runtime_state import get_runtime_state
+from core.answer_quality import validate_answer_citations
 from core.evaluation import wilson_interval
 from core.rag_defaults import DEFAULT_RAG_TOP_K
 from core.security_context import WORKSPACE_DATA_KEY_ENV, get_workspace_keys, restore_workspace_keys, set_workspace_keys
 from core.workspace import WORKSPACE_MANIFEST, SoulDriveWorkspace
 from core.workspace_crypto import unlock_keystore
 
-CITATION_PATTERN = re.compile(r"\[E(\d+)\]")
+CITATION_PATTERN = re.compile(r"\[((?:E|V|A|M)\d+)\]")
 REFUSAL_MARKERS = (
     "未找到足够可靠",
     "没有足够",
@@ -29,6 +31,10 @@ REFUSAL_MARKERS = (
     "不能回答",
     "不会生成可能误导",
     "无相关证据",
+    "无法依据现有文档",
+    "资料中未包含",
+    "证据缺口",
+    "无法提供或推断",
 )
 SOURCE_ALIASES = {
     "大模型知识管理系统": ["大模型知识管理系统"],
@@ -71,6 +77,7 @@ class EvalRecord:
     should_refuse: bool
     requires_multi_doc: bool
     graph_relevant: bool
+    project_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +91,7 @@ class EvalResult:
     retrieval_ms: int | None = None
     generation_ms: int | None = None
     model_name: str | None = None
+    project_id: str | None = None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -98,6 +106,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--compare-results", nargs=2, metavar=("BASELINE_JSONL", "CANDIDATE_JSONL"), help="Compare two saved result files.")
     parser.add_argument("--baseline-label", default="baseline", help="Label for the first --compare-results file.")
     parser.add_argument("--candidate-label", default="candidate", help="Label for the second --compare-results file.")
+    source_reservation_group = parser.add_mutually_exclusive_group()
+    source_reservation_group.add_argument(
+        "--enable-comparison-source-reservation",
+        action="store_true",
+        help="Enable the experimental comparison sub-query source reservation candidate.",
+    )
+    source_reservation_group.add_argument(
+        "--disable-comparison-source-reservation",
+        action="store_true",
+        help="Explicitly disable comparison sub-query source reservation for a matched baseline run.",
+    )
+    parser.add_argument(
+        "--rerank-candidate-limit",
+        type=int,
+        default=None,
+        help="Optional bounded cross-encoder rerank pool for an explicit latency/recall experiment.",
+    )
+    parser.add_argument(
+        "--enable-source-profile-recall",
+        action="store_true",
+        help="Enable the experimental document-profile recall stage.",
+    )
     parser.add_argument("--passphrase", default=None, help="Workspace passphrase for encrypted local indexes.")
     args = parser.parse_args(argv)
 
@@ -141,11 +171,31 @@ def main(argv: list[str] | None = None) -> int:
                     "Pass --passphrase <workspace password> or set SOULDRIVE_WORKSPACE_PASSPHRASE."
                 )
             print(f"评测工作区: {workspace}")
+            retrieval_options = {}
+            if args.enable_comparison_source_reservation:
+                retrieval_options["enable_comparison_source_reservation"] = True
+            elif args.disable_comparison_source_reservation:
+                retrieval_options["enable_comparison_source_reservation"] = False
+            if args.rerank_candidate_limit is not None:
+                retrieval_options["rerank_candidate_limit"] = args.rerank_candidate_limit
+            if args.enable_source_profile_recall:
+                retrieval_options["enable_source_profile_recall"] = True
             if args.include_answers:
-                results = run_answer_generation(records, workspace=workspace, top_k=args.top_k)
+                configure_answer_generation_backend()
+                results = run_answer_generation(
+                    records,
+                    workspace=workspace,
+                    top_k=args.top_k,
+                    **retrieval_options,
+                )
                 mode = "答案生成评测"
             else:
-                results = run_retrieval(records, workspace=workspace, top_k=args.top_k)
+                results = run_retrieval(
+                    records,
+                    workspace=workspace,
+                    top_k=args.top_k,
+                    **retrieval_options,
+                )
                 mode = "检索评测"
 
         if args.save_results:
@@ -179,6 +229,7 @@ def load_dataset(path: Path) -> list[EvalRecord]:
                 should_refuse=bool(payload.get("should_refuse", False)),
                 requires_multi_doc=bool(payload.get("requires_multi_doc", False)),
                 graph_relevant=bool(payload.get("graph_relevant", False)),
+                project_id=_optional_str(payload.get("project_id")),
             )
         )
     return records
@@ -186,14 +237,54 @@ def load_dataset(path: Path) -> list[EvalRecord]:
 
 def load_results(path: Path, records: list[EvalRecord]) -> list[EvalResult]:
     by_id: dict[str, dict[str, Any]] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if line.strip():
             payload = json.loads(line)
-            by_id[str(payload["id"])] = payload
+            result_id = str(payload.get("id") or "").strip()
+            if not result_id:
+                raise ValueError(f"评测结果第 {line_number} 行缺少 id，无法与数据集对齐")
+            if result_id in by_id:
+                raise ValueError(f"评测结果包含重复 id: {result_id}")
+            by_id[result_id] = payload
+
+    expected_ids = {record.id for record in records}
+    result_ids = set(by_id)
+    missing_ids = sorted(expected_ids - result_ids)
+    unexpected_ids = sorted(result_ids - expected_ids)
+    if missing_ids or unexpected_ids:
+        details = []
+        if missing_ids:
+            details.append(f"缺少 {missing_ids[:5]}")
+        if unexpected_ids:
+            details.append(f"多出 {unexpected_ids[:5]}")
+        raise ValueError(
+            f"评测结果与数据集 ID 不匹配（{'；'.join(details)}）。"
+            "请使用同一数据集生成和读取结果，禁止跨数据集比较。"
+        )
 
     results = []
     for record in records:
         payload = by_id.get(record.id, {})
+        result_question = str(payload.get("question") or "").strip()
+        if result_question and result_question != record.question:
+            raise ValueError(f"评测结果 {record.id} 的 question 与数据集不一致")
+        if "expected_sources" in payload:
+            result_sources = [str(item) for item in payload.get("expected_sources") or []]
+            if result_sources != record.expected_sources:
+                raise ValueError(f"评测结果 {record.id} 的 expected_sources 与数据集不一致")
+        if record.project_id is not None:
+            result_project_id = _optional_str(payload.get("project_id"))
+            if result_project_id != record.project_id:
+                raise ValueError(
+                    f"评测结果 {record.id} 的 project_id 与数据集不一致或缺失；"
+                    "项目隔离评测禁止使用未带作用域的旧结果"
+                )
+        elif "project_id" in payload and _optional_str(payload.get("project_id")):
+            raise ValueError(
+                f"评测结果 {record.id} 带有 project_id，但数据集未指定作用域"
+            )
+        if "evidence" in payload and not isinstance(payload.get("evidence"), list):
+            raise ValueError(f"评测结果 {record.id} 的 evidence 不是列表")
         results.append(
             EvalResult(
                 id=record.id,
@@ -205,24 +296,41 @@ def load_results(path: Path, records: list[EvalRecord]) -> list[EvalResult]:
                 retrieval_ms=_optional_int(payload.get("retrieval_ms")),
                 generation_ms=_optional_int(payload.get("generation_ms")),
                 model_name=_optional_str(payload.get("model_name")),
+                project_id=_optional_str(payload.get("project_id")),
             )
         )
     return results
 
 
-def run_retrieval(records: list[EvalRecord], workspace: str | None, top_k: int) -> list[EvalResult]:
+def run_retrieval(
+    records: list[EvalRecord],
+    workspace: str | None,
+    top_k: int,
+    enable_comparison_source_reservation: bool = False,
+    enable_source_profile_recall: bool = False,
+    rerank_candidate_limit: int | None = None,
+) -> list[EvalResult]:
     from core.knowledge_base import LocalKnowledgeBase
 
     if not workspace:
         raise ValueError("workspace is required for live retrieval")
-    kb = LocalKnowledgeBase(workspace_path=workspace)
+    kb = LocalKnowledgeBase(
+        workspace_path=workspace,
+        enable_usage_ledger=False,
+        enable_comparison_source_reservation=enable_comparison_source_reservation,
+        enable_source_profile_recall=enable_source_profile_recall,
+        rerank_candidate_limit=rerank_candidate_limit,
+    )
     results = []
     try:
         for index, record in enumerate(records, start=1):
             if index == 1 or index % 10 == 0 or index == len(records):
                 print(f"[{index}/{len(records)}] 检索评测: {record.id}", flush=True)
             started_at = time.time()
-            retrieval = kb.search_with_evidence(record.question, top_k=top_k)
+            retrieval_kwargs = {"top_k": top_k}
+            if record.project_id:
+                retrieval_kwargs["project_id"] = record.project_id
+            retrieval = kb.search_with_evidence(record.question, **retrieval_kwargs)
             elapsed_ms = int((time.time() - started_at) * 1000)
             results.append(
                 EvalResult(
@@ -232,6 +340,7 @@ def run_retrieval(records: list[EvalRecord], workspace: str | None, top_k: int) 
                     answer="",
                     evidence=list(retrieval.get("evidence", [])),
                     elapsed_ms=elapsed_ms,
+                    project_id=record.project_id,
                 )
             )
     finally:
@@ -239,14 +348,27 @@ def run_retrieval(records: list[EvalRecord], workspace: str | None, top_k: int) 
     return results
 
 
-def run_answer_generation(records: list[EvalRecord], workspace: str | None, top_k: int) -> list[EvalResult]:
+def run_answer_generation(
+    records: list[EvalRecord],
+    workspace: str | None,
+    top_k: int,
+    enable_comparison_source_reservation: bool = False,
+    enable_source_profile_recall: bool = False,
+    rerank_candidate_limit: int | None = None,
+) -> list[EvalResult]:
     from core.knowledge_base import LocalKnowledgeBase
     from core.rag_engine import RAGEngine
 
     if not workspace:
         raise ValueError("workspace is required for answer generation")
     workspace_obj = SoulDriveWorkspace(workspace).ensure()
-    kb = LocalKnowledgeBase(workspace_path=workspace)
+    kb = LocalKnowledgeBase(
+        workspace_path=workspace,
+        enable_usage_ledger=False,
+        enable_comparison_source_reservation=enable_comparison_source_reservation,
+        enable_source_profile_recall=enable_source_profile_recall,
+        rerank_candidate_limit=rerank_candidate_limit,
+    )
     rag = None
     results = []
     try:
@@ -259,9 +381,13 @@ def run_answer_generation(records: list[EvalRecord], workspace: str | None, top_
         for index, record in enumerate(records, start=1):
             print(f"[{index}/{len(records)}] 生成答案: {record.id}", flush=True)
             started_at = time.time()
-            stream_text = "".join(rag.generate_response_stream(record.question, top_k=top_k))
+            answer, evidence = generate_answer_with_fallback(
+                rag,
+                record.question,
+                project_id=record.project_id,
+                top_k=top_k,
+            )
             elapsed_ms = int((time.time() - started_at) * 1000)
-            answer, evidence = split_answer_and_evidence(stream_text)
             results.append(
                 EvalResult(
                     id=record.id,
@@ -271,6 +397,7 @@ def run_answer_generation(records: list[EvalRecord], workspace: str | None, top_
                     evidence=evidence,
                     elapsed_ms=elapsed_ms,
                     model_name=model_name,
+                    project_id=record.project_id,
                 )
             )
     finally:
@@ -278,6 +405,57 @@ def run_answer_generation(records: list[EvalRecord], workspace: str | None, top_
             rag.close()
         kb.close()
     return results
+
+
+def configure_answer_generation_backend() -> None:
+    if str(os.environ.get("SOULDRIVE_CHAT_PROVIDER") or "").strip():
+        return
+    if importlib.util.find_spec("llama_cpp") is not None:
+        return
+    os.environ["SOULDRIVE_CHAT_PROVIDER"] = "ollama"
+    if not str(os.environ.get("SOULDRIVE_OLLAMA_MODEL") or "").strip():
+        os.environ["SOULDRIVE_OLLAMA_MODEL"] = "qwen3.5:9b"
+    if not str(os.environ.get("SOULDRIVE_OLLAMA_URL") or "").strip():
+        os.environ["SOULDRIVE_OLLAMA_URL"] = "http://127.0.0.1:11434"
+
+
+def generate_answer_with_fallback(
+    rag,
+    query: str,
+    *,
+    project_id: str | None,
+    top_k: int,
+) -> tuple[str, list[dict[str, Any]]]:
+    from core.rag_engine import evidence_fallback_answer, ensure_answer_section_label
+
+    interaction_context = None
+    if project_id:
+        interaction_context = {"active_context": {"project_id": project_id}}
+    try:
+        stream_text = "".join(
+            rag.generate_response_stream(
+                query,
+                top_k=top_k,
+                interaction_context=interaction_context,
+            )
+        )
+        answer, evidence = split_answer_and_evidence(stream_text)
+        if answer.strip() and evidence:
+            return answer, evidence
+        raise ValueError("generated answer missing usable evidence")
+    except Exception:
+        retrieved = rag.kb.search_with_evidence(
+            query=query,
+            graph_db=rag.graph_db,
+            top_k=top_k,
+            project_id=project_id,
+        )
+        evidence = list(retrieved.get("evidence") or [])
+        answer = ensure_answer_section_label(
+            evidence_fallback_answer(query, evidence, prefer_primary=True),
+            evidence,
+        )
+        return answer, evidence
 
 
 EVIDENCE_BLOCK_PATTERN = re.compile(r"```souldrive-evidence\s*(.*?)\s*```", re.DOTALL)
@@ -303,9 +481,9 @@ def resolve_workspace_arg(workspace: str | None) -> str | None:
     candidates = [
         workspace,
         os.environ.get("SOULDRIVE_WORKSPACE"),
-        runtime_workspace,
         find_unlocked_drive_workspace(),
         str(PROJECT_ROOT / "souldrive_db"),
+        runtime_workspace,
     ]
     for candidate in candidates:
         if candidate and is_workspace_path(candidate):
@@ -390,6 +568,7 @@ def save_results(path: Path, results: list[EvalResult]):
                     "retrieval_ms": result.retrieval_ms,
                     "generation_ms": result.generation_ms,
                     "model_name": result.model_name,
+                    "project_id": result.project_id,
                 },
                 ensure_ascii=False,
             )
@@ -409,6 +588,8 @@ def summarize(records: list[EvalRecord], results: list[EvalResult], top_k: int, 
     refusal_rows = [row for row in rows if row["should_refuse"] and row["has_answer"]]
     keyword_rows = [row for row in rows if row["keyword_sample"]]
     answerable_rows = [row for row in rows if row["has_answer"] and not row["should_refuse"]]
+    citation_support_rows = [row for row in rows if row["citation_support_applicable"]]
+    scoped_rows = [row for row in rows if row["project_id"]]
     multi_doc_rows = [row for row in rows if row["requires_multi_doc"]]
     graph_rows = [row for row in rows if row["graph_relevant"]]
     latencies = [row["elapsed_ms"] for row in rows if row["elapsed_ms"] is not None]
@@ -462,9 +643,32 @@ def summarize(records: list[EvalRecord], results: list[EvalResult], top_k: int, 
         },
         "citation_valid_rate": _ratio(sum(row["citation_valid"] for row in answer_rows), len(answer_rows)),
         "invalid_citation_rate": _ratio(sum(not row["citation_valid"] for row in answer_rows), len(answer_rows)),
+        "citation_support_valid_rate": _ratio(
+            sum(bool(row["citation_support_valid"]) for row in citation_support_rows),
+            len(citation_support_rows),
+        ),
+        "citation_support_invalid_rate": _ratio(
+            sum(not bool(row["citation_support_valid"]) for row in citation_support_rows),
+            len(citation_support_rows),
+        ),
+        "claim_support_checked_count": sum(row["claim_support_checked_count"] for row in rows),
+        "claim_support_unsupported_claim_count": sum(
+            row["claim_support_unsupported_claim_count"] for row in rows
+        ),
+        "claim_support_unsupported_rate": _ratio(
+            sum(row["claim_support_unsupported_claim_count"] for row in rows),
+            sum(row["claim_support_checked_count"] for row in rows),
+        ),
         "refusal_accuracy": _ratio(sum(row["refusal_correct"] for row in refusal_rows), len(refusal_rows)),
         "refusal_leak_rate": _ratio(sum(row["refusal_leak"] for row in refusal_rows), len(refusal_rows)),
         "false_refusal_rate": _ratio(sum(row["false_refusal"] for row in answerable_rows), len(answerable_rows)),
+        "scoped_sample_count": len(scoped_rows),
+        "wrong_project_sample_count": sum(row["wrong_project"] for row in scoped_rows),
+        "wrong_project_rate": _ratio(
+            sum(row["wrong_project"] for row in scoped_rows),
+            len(scoped_rows),
+        ),
+        "unscoped_sample_count": len(rows) - len(scoped_rows),
         "answerable_pass_rate": _ratio(sum(row["answerable_pass"] for row in answerable_rows), len(answerable_rows)),
         "overall_reliability_rate": _ratio(sum(row["reliable_answer"] for row in answer_rows), len(answer_rows)),
         "answer_keyword_coverage": _ratio(sum(row["keyword_coverage"] for row in keyword_rows), len(keyword_rows)),
@@ -492,22 +696,39 @@ def score_record(record: EvalRecord, result: EvalResult, top_k: int) -> dict[str
     source_coverage = (sum(source_hits) / len(expected_sources)) if expected_sources else 0.0
     citation_valid = citations_are_valid(answer, evidence)
     answer_refused = answer_refuses(answer)
+    expected_project_id = str(record.project_id or "").strip()
+    wrong_project_evidence = []
+    if expected_project_id:
+        wrong_project_evidence = [
+            item for item in evidence
+            if str(item.get("project_id") or "").strip()
+            and str(item.get("project_id") or "").strip() != expected_project_id
+        ]
+    citation_support = citation_support_summary(
+        answer,
+        evidence,
+        citation_valid=citation_valid,
+        answer_refused=answer_refused or record.should_refuse,
+    )
     refusal_correct = record.should_refuse and answer_refused
     source_ok = (not expected_sources) or any(source_hits)
+    scope_ok = not wrong_project_evidence if expected_project_id else None
     keyword_coverage = keyword_coverage_ratio(answer, record.expected_keywords)
     keyword_pass = (not record.expected_keywords) or keyword_coverage >= 0.5
     answerable_pass = (
         bool(answer.strip())
         and not record.should_refuse
         and not answer_refused
-        and citation_valid
+        and citation_support["valid"] is True
         and source_ok
+        and scope_ok is not False
         and keyword_pass
     )
     reliable_answer = refusal_correct if record.should_refuse else answerable_pass
     return {
         "id": record.id,
         "question": record.question,
+        "project_id": record.project_id,
         "expected_sources": expected_sources,
         "top_sources": [str(item.get("source_filename") or "未知来源") for item in evidence],
         "has_answer": bool(answer.strip()),
@@ -517,7 +738,15 @@ def score_record(record: EvalRecord, result: EvalResult, top_k: int) -> dict[str
         "first_match_rank": first_match_rank,
         "reciprocal_rank": (1.0 / first_match_rank) if first_match_rank else 0.0,
         "source_coverage": source_coverage,
+        "wrong_project": bool(wrong_project_evidence),
+        "wrong_project_evidence_count": len(wrong_project_evidence),
+        "scope_ok": scope_ok,
         "citation_valid": citation_valid,
+        "citation_support_applicable": citation_support["applicable"],
+        "citation_support_valid": citation_support["valid"],
+        "claim_support_checked_count": citation_support["checked_claim_count"],
+        "claim_support_unsupported_claim_count": citation_support["unsupported_claim_count"],
+        "citation_support_reason": citation_support["reason"],
         "refusal_correct": refusal_correct,
         "refusal_leak": bool(record.should_refuse and answer.strip() and not answer_refused),
         "false_refusal": bool(not record.should_refuse and answer.strip() and answer_refused),
@@ -577,13 +806,45 @@ def keyword_coverage_ratio(answer: str, expected_keywords: list[str]) -> float:
 
 
 def citations_are_valid(answer: str, evidence: list[dict[str, Any]]) -> bool:
-    cited_ids = {f"E{match}" for match in CITATION_PATTERN.findall(answer or "")}
+    cited_ids = set(CITATION_PATTERN.findall(answer or ""))
     if not answer:
         return True
     if not cited_ids:
         return answer_refuses(answer)
     available_ids = {str(item.get("id")) for item in evidence if item.get("id")}
     return cited_ids <= available_ids
+
+
+def citation_support_summary(
+    answer: str,
+    evidence: list[dict[str, Any]],
+    *,
+    citation_valid: bool,
+    answer_refused: bool,
+) -> dict[str, Any]:
+    """Summarize the production claim-support gate for offline evaluation.
+
+    Refusals and empty answers are outside the claim-support denominator.  A
+    non-refusal answer still fails when its citation IDs are invalid, even if
+    the core validator has no body text to inspect.
+    """
+    if not answer.strip() or answer_refused:
+        return {
+            "applicable": False,
+            "valid": None,
+            "checked_claim_count": 0,
+            "unsupported_claim_count": 0,
+            "reason": "not_applicable",
+        }
+    report = validate_answer_citations(answer, evidence, semantic=True)
+    semantic = report.get("semantic_support") or {}
+    return {
+        "applicable": True,
+        "valid": bool(citation_valid and report.get("valid")),
+        "checked_claim_count": int(semantic.get("checked_claim_count") or 0),
+        "unsupported_claim_count": int(semantic.get("unsupported_claim_count") or 0),
+        "reason": str(report.get("reason") or "unknown"),
+    }
 
 
 def answer_refuses(answer: str) -> bool:
@@ -609,9 +870,16 @@ def print_report(report: dict[str, Any]):
     print(f"图谱相关题命中率@{report['top_k']}: {_percent(report['graph_context_hit_rate'])}")
     print(f"引用合法率: {_percent(report['citation_valid_rate'])}")
     print(f"引用异常率: {_percent(report['invalid_citation_rate'])}")
+    print(f"引用内容支持率: {_percent(report['citation_support_valid_rate'])}")
+    print(f"引用内容不支持率: {_percent(report['citation_support_invalid_rate'])}")
+    print(f"已检查 claim 数: {report['claim_support_checked_count']}")
+    print(f"不支持 claim 数: {report['claim_support_unsupported_claim_count']}")
     print(f"拒答正确率: {_percent(report['refusal_accuracy'])}")
     print(f"拒答漏放率: {_percent(report['refusal_leak_rate'])}")
     print(f"误拒率: {_percent(report['false_refusal_rate'])}")
+    if report.get("scoped_sample_count"):
+        print(f"项目作用域样本数: {report['scoped_sample_count']}")
+        print(f"错误项目率: {_percent(report['wrong_project_rate'])}")
     print(f"可回答题达标率: {_percent(report['answerable_pass_rate'])}")
     print(f"综合可靠率: {_percent(report['overall_reliability_rate'])}")
     print(f"答案关键词覆盖率: {_percent(report['answer_keyword_coverage'])}")
@@ -658,8 +926,11 @@ def print_comparison_report(
         ("拒答正确率", "refusal_accuracy", "higher"),
         ("拒答漏放率", "refusal_leak_rate", "lower"),
         ("误拒率", "false_refusal_rate", "lower"),
+        ("错误项目率", "wrong_project_rate", "lower"),
         ("引用合法率", "citation_valid_rate", "higher"),
         ("引用异常率", "invalid_citation_rate", "lower"),
+        ("引用内容支持率", "citation_support_valid_rate", "higher"),
+        ("引用内容不支持率", "citation_support_invalid_rate", "lower"),
         ("答案关键词覆盖率", "answer_keyword_coverage", "higher"),
         (latency_label, "avg_latency_ms", "lower_ms"),
         ("平均检索阶段耗时", "avg_retrieval_ms", "lower_ms"),

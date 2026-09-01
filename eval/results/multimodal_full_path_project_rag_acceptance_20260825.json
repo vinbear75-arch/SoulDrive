@@ -1,0 +1,36 @@
+{
+  "schema_version": "souldrive_multimodal_full_path_project_rag_v1",
+  "created_at": "2026-08-25T16:32:00+08:00",
+  "dataset_id": "SoulDrive-PC-MMI-media-smoke-3-v0.2",
+  "dataset_type": "synthetic_development_fixture",
+  "project_id_override": "rag-cn-demo-20260824",
+  "measurement_count": 3,
+  "pipeline": ["ASR", "OCR", "SoulAlign", "project_scoped_retrieval", "Ollama_answer"],
+  "acceptance": {
+    "all_samples_completed": true,
+    "all_samples_evidence_backed": true,
+    "all_samples_cited": true,
+    "all_samples_not_refused": true,
+    "status": "pass_functionally"
+  },
+  "per_sample": [
+    {"episode_id": "MMI-TR-SELE-0000", "status": "pass", "evidence_count": 6, "citation": true, "evidence_backed": true, "response_chars": 6548},
+    {"episode_id": "MMI-TR-SELE-0001", "status": "pass", "evidence_count": 6, "citation": true, "evidence_backed": true, "response_chars": 6509},
+    {"episode_id": "MMI-TR-SELE-0002", "status": "pass", "evidence_count": 6, "citation": true, "evidence_backed": true, "response_chars": 6529}
+  ],
+  "warm_latency_ms": {
+    "complete_response": {"count": 2, "p50": 96978.225, "p95": 147478.141, "max": 147478.141},
+    "retrieval_and_context_gate": {"count": 2, "p50": 80108.098, "p95": 128695.593, "max": 128695.593},
+    "model_first_token": {"count": 2, "p50": 94696.07, "p95": 145317.176, "max": 145317.176}
+  },
+  "resources": {
+    "process_memory_mib_max": 9503.266,
+    "torch_peak_gpu_memory_mib": 6997.248
+  },
+  "limitations": [
+    "3 个合成样本，不是 30 个真实用户授权样本。",
+    "project_id_override 仅用于验证正确项目绑定，不修改 fixture 文件。",
+    "功能通过，但本机延迟明显不满足竞赛级交互要求。"
+  ],
+  "full_run_artifact": "eval/results/business_runtime_smoke_full_project_rag_recheck_20260825.json"
+}

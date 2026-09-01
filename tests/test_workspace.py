@@ -41,6 +41,26 @@ class WorkspaceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "removable SoulDrive workspace"):
                 resolve_workspace(None)
 
+    def test_resolve_workspace_uses_explicit_local_workspace_without_drive(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            configured = str(Path(temp_dir) / "pc-workspace")
+            with patch.dict(os.environ, {"SOULDRIVE_WORKSPACE": configured}, clear=True):
+                workspace = resolve_workspace(None)
+
+            self.assertEqual(workspace.root_path, configured)
+            self.assertTrue(Path(workspace.manifest_path).exists())
+
+    def test_resolve_workspace_keeps_removable_drive_precedence_when_provided(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            configured = str(Path(temp_dir) / "pc-workspace")
+            removable_drive = str(Path(temp_dir) / "removable")
+            Path(removable_drive).mkdir()
+            with patch.dict(os.environ, {"SOULDRIVE_WORKSPACE": configured}, clear=True):
+                workspace = resolve_workspace(removable_drive)
+
+            self.assertEqual(workspace.root_path, str(Path(removable_drive) / "SoulDrive"))
+            self.assertTrue(Path(workspace.manifest_path).exists())
+
     def test_default_workspace_can_be_explicitly_configured_for_tests(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             configured = str(Path(temp_dir) / "configured-workspace")

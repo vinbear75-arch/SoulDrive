@@ -1,0 +1,196 @@
+{
+  "schema_version": "souldrive_pc_mmi_media_runtime_metrics_v0.2",
+  "dataset_id": "SoulDrive-PC-MMI-media-480-v0.2",
+  "dataset_sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+  "evaluated_split": "test",
+  "evaluated_count": 80,
+  "full_test": true,
+  "selection_policy": "frozen test file order; no test labels used for threshold/model selection",
+  "threshold": {
+    "value": 0.7,
+    "source": "validation-only selection from B1/Candidate harness"
+  },
+  "b1_original_transcript_test": {
+    "sample_count": 80,
+    "intent_accuracy": 0.625,
+    "intent_macro_f1": 0.6430543815159199,
+    "target_binding_accuracy_on_targeted": 0.0,
+    "conflict_accuracy": 0.925,
+    "action_accuracy": 0.4875,
+    "clarification_accuracy": 0.7
+  },
+  "candidate_actual_asr_ocr_soulalign_test": {
+    "sample_count": 80,
+    "intent_accuracy": 0.65,
+    "intent_macro_f1": 0.669463368932865,
+    "target_binding_accuracy_on_targeted": 1.0,
+    "conflict_accuracy": 1.0,
+    "action_accuracy": 0.7625,
+    "clarification_accuracy": 0.7625
+  },
+  "runtime": {
+    "status_before": {
+      "schema_version": "souldrive_topic5_runtime_status_v0.1",
+      "mode": "lazy_local",
+      "gpu": {
+        "installed": true,
+        "cuda_available": true,
+        "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+        "memory_gib": 7.96
+      },
+      "dependencies": {
+        "funasr": true,
+        "rapidocr": true,
+        "transformers": true,
+        "qwen_vl_utils": true,
+        "bitsandbytes": true,
+        "pillow": true
+      },
+      "assets": {
+        "sensevoice_small": {
+          "ready": true,
+          "name": "SenseVoiceSmall"
+        },
+        "rapidocr": {
+          "ready": true,
+          "name": "RapidOCR"
+        },
+        "qwen2.5_vl_3b": {
+          "ready": true,
+          "name": "Qwen2.5-VL-3B-Instruct"
+        }
+      },
+      "loaded": {
+        "sensevoice_small": false,
+        "rapidocr": false,
+        "qwen2.5_vl_3b": false
+      },
+      "policy": {
+        "asr_requires_cuda": true,
+        "vlm_requires_cuda": true,
+        "media_scope": "workspace-relative-only",
+        "max_audio_seconds": 15,
+        "max_image_bytes": 8388608
+      }
+    },
+    "vlm_smoke_count": 0,
+    "stage_summary": {
+      "asr": {
+        "statuses": {
+          "pass": 80
+        },
+        "latency_ms": {
+          "count": 80,
+          "p50": 80.352,
+          "p95": 144.989,
+          "max": 21773.396
+        }
+      },
+      "ocr": {
+        "statuses": {
+          "pass": 80
+        },
+        "latency_ms": {
+          "count": 80,
+          "p50": 599.4259999999999,
+          "p95": 711.091,
+          "max": 1355.185
+        }
+      },
+      "vlm": {
+        "statuses": {
+          "skipped": 80
+        },
+        "latency_ms": {
+          "count": 80,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        }
+      },
+      "soulalign": {
+        "statuses": {
+          "pass": 80
+        },
+        "latency_ms": {
+          "count": 80,
+          "p50": 0.0275,
+          "p95": 0.043,
+          "max": 0.123
+        }
+      }
+    },
+    "runtime_total_latency_ms": {
+      "count": 80,
+      "p50": 688.855,
+      "p95": 787.239,
+      "max": 23129.619
+    },
+    "wall_clock_latency_ms": {
+      "count": 80,
+      "p50": 688.882,
+      "p95": 787.269,
+      "max": 23129.656
+    },
+    "cold_start": {
+      "episode_id": "MMI-TE-SELE-0000",
+      "runtime_total_ms": 23129.619,
+      "wall_clock_ms": 23129.656
+    },
+    "fast_path_all_latency_ms": {
+      "runtime": {
+        "count": 80,
+        "p50": 688.855,
+        "p95": 787.239,
+        "max": 23129.619
+      },
+      "wall_clock": {
+        "count": 80,
+        "p50": 688.882,
+        "p95": 787.269,
+        "max": 23129.656
+      }
+    },
+    "fast_path_hot_latency_ms": {
+      "runtime": {
+        "count": 79,
+        "p50": 688.179,
+        "p95": 787.239,
+        "max": 810.71
+      },
+      "wall_clock": {
+        "count": 79,
+        "p50": 688.209,
+        "p95": 787.269,
+        "max": 810.744
+      }
+    },
+    "vlm_sample_latency_ms": {
+      "runtime": {
+        "count": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "wall_clock": {
+        "count": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      }
+    },
+    "gpu_peak_allocated_mib": {
+      "count": 80,
+      "p50": 960.815,
+      "p95": 963.16,
+      "max": 963.17
+    }
+  },
+  "failure_count": 19,
+  "limitations": [
+    "This is an actual local SenseVoice + RapidOCR + SoulAlign runtime run on synthetic TTS/UI media, not a Huawei Topic 5 competition score.",
+    "The test split is used only once for post-hoc evaluation. Threshold 0.7 is fixed before this run from validation; no test-driven tuning is permitted.",
+    "B1 sees the provided synthetic transcript; Candidate transcribes local WAV and reads local synthetic screenshots. The two scores do not measure a public benchmark or human interaction quality.",
+    "VLM is sampled only on a fixed prefix when requested. Fast-path P95 and VLM-sampled P95 must be reported separately and cannot be averaged into a competition claim."
+  ]
+}

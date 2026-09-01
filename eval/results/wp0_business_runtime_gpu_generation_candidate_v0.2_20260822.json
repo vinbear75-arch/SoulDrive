@@ -1,0 +1,986 @@
+{
+  "schema_version": "souldrive_business_runtime_repeat_benchmark_v0.1",
+  "dataset_id": "SoulDrive-PC-MMI-media-runtime-smoke-v0.1",
+  "dataset_sha256": "5e1499bad9bb33f45baa814e4cb78d02bda49fba22fd71aa6a7d4acd0356c6e3",
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\runtime\\product_b1_candidate_v0.7\\SoulDrive",
+  "environment": {
+    "python": "3.10.20",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "llama_cpp": {
+      "version": "0.3.34",
+      "gpu_offload_supported": true
+    },
+    "model_runtime": {
+      "ready": true,
+      "config": {
+        "model_filename": "qwen2.5-3b-instruct-q4_k_m.gguf",
+        "chat_n_ctx": 8192,
+        "graph_n_ctx": 8192,
+        "temperature": 0.01,
+        "top_p": 0.85,
+        "repeat_penalty": 1.12,
+        "max_tokens": 900,
+        "graph_temperature": 0.1,
+        "graph_max_tokens": 2048,
+        "graph_repeat_penalty": 1.1
+      },
+      "gpu_layers": -1,
+      "chat_model": {
+        "ready": true,
+        "name": "qwen2.5-3b-instruct-q4_k_m.gguf",
+        "size": 2104932768,
+        "selected": "qwen2.5-3b-instruct-q4_k_m.gguf"
+      },
+      "embedding_model": {
+        "ready": true,
+        "name": "bge-small-zh-v1.5",
+        "size": 192253562
+      },
+      "reranker": {
+        "ready": true,
+        "selected": "Qwen3-Reranker-0.6B",
+        "mode": "enabled"
+      },
+      "search_roots": [
+        "models",
+        "models",
+        "models"
+      ]
+    }
+  },
+  "unique_episode_count": 3,
+  "repeat_count": 11,
+  "measurement_count": 33,
+  "cold_start_measurement_count": 1,
+  "warm_measurement_count": 32,
+  "query_source": "frozen_structured_business_query",
+  "pipeline_coverage": {
+    "asr": "measured",
+    "ocr": "measured",
+    "soulalign": "measured",
+    "project_scoped_retrieval": "measured",
+    "model_first_token": "measured",
+    "complete_response": "measured"
+  },
+  "warm_stage_latency_ms": {
+    "asr": {
+      "count": 32,
+      "p50": 95.751,
+      "p95": 118.512,
+      "max": 118.889
+    },
+    "ocr": {
+      "count": 32,
+      "p50": 908.155,
+      "p95": 954.035,
+      "max": 954.132
+    },
+    "soulalign": {
+      "count": 32,
+      "p50": 0.635,
+      "p95": 1.105,
+      "max": 1.272
+    },
+    "perception": {
+      "count": 32,
+      "p50": 1005.137,
+      "p95": 1059.968,
+      "max": 1066.524
+    },
+    "retrieval_and_context_gate": {
+      "count": 32,
+      "p50": 388.558,
+      "p95": 407.237,
+      "max": 408.802
+    },
+    "model_first_token": {
+      "count": 32,
+      "p50": 1614.709,
+      "p95": 1675.485,
+      "max": 1688.219
+    },
+    "first_response_chunk": {
+      "count": 32,
+      "p50": 1863.13,
+      "p95": 1950.315,
+      "max": 2056.248
+    },
+    "complete_response": {
+      "count": 32,
+      "p50": 1863.13,
+      "p95": 1950.315,
+      "max": 2056.248
+    },
+    "rag_response": {
+      "count": 32,
+      "p50": 841.324,
+      "p95": 912.489,
+      "max": 1016.024
+    }
+  },
+  "records": [
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 1,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 12629.575,
+        "ocr": 1872.732,
+        "soulalign": 10.541,
+        "perception": 14535.076,
+        "rag_initialization": 4257.568,
+        "retrieval_and_context_gate": 913.472,
+        "model_first_token": 20101.52,
+        "first_response_chunk": 20379.14,
+        "complete_response": 20379.14,
+        "rag_response": 1586.494
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5150.059,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 1,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 104.407,
+        "ocr": 910.057,
+        "soulalign": 1.272,
+        "perception": 1018.234,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 390.113,
+        "model_first_token": 1628.177,
+        "first_response_chunk": 1853.309,
+        "complete_response": 1853.309,
+        "rag_response": 835.074
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5160.809,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 1,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 82.537,
+        "ocr": 907.685,
+        "soulalign": 0.616,
+        "perception": 992.714,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 378.291,
+        "model_first_token": 1597.539,
+        "first_response_chunk": 1825.265,
+        "complete_response": 1825.265,
+        "rag_response": 832.55
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5167.633,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 2,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 90.28,
+        "ocr": 893.955,
+        "soulalign": 0.631,
+        "perception": 986.742,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 387.103,
+        "model_first_token": 1600.247,
+        "first_response_chunk": 1874.616,
+        "complete_response": 1874.616,
+        "rag_response": 887.873
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5171.719,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 2,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 91.914,
+        "ocr": 900.168,
+        "soulalign": 0.394,
+        "perception": 994.056,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 396.671,
+        "model_first_token": 1623.448,
+        "first_response_chunk": 1906.545,
+        "complete_response": 1906.545,
+        "rag_response": 912.489
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5175.82,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 2,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 95.189,
+        "ocr": 884.588,
+        "soulalign": 0.652,
+        "perception": 982.589,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 377.255,
+        "model_first_token": 1580.334,
+        "first_response_chunk": 1806.494,
+        "complete_response": 1806.494,
+        "rag_response": 823.904
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5175.973,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 3,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 118.889,
+        "ocr": 883.955,
+        "soulalign": 0.638,
+        "perception": 1005.9,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 385.64,
+        "model_first_token": 1609.659,
+        "first_response_chunk": 1833.605,
+        "complete_response": 1833.605,
+        "rag_response": 827.703
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5178.25,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 3,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 96.268,
+        "ocr": 908.626,
+        "soulalign": 0.495,
+        "perception": 1007.432,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 379.271,
+        "model_first_token": 1605.968,
+        "first_response_chunk": 1833.719,
+        "complete_response": 1833.719,
+        "rag_response": 826.286
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5179.621,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 3,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 102.677,
+        "ocr": 863.004,
+        "soulalign": 0.507,
+        "perception": 968.592,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 391.827,
+        "model_first_token": 1588.477,
+        "first_response_chunk": 1865.294,
+        "complete_response": 1865.294,
+        "rag_response": 896.701
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5182.637,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 4,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 90.813,
+        "ocr": 947.195,
+        "soulalign": 0.702,
+        "perception": 1040.689,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 382.379,
+        "model_first_token": 1649.328,
+        "first_response_chunk": 1866.795,
+        "complete_response": 1866.795,
+        "rag_response": 826.105
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5183.109,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 4,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 95.977,
+        "ocr": 888.571,
+        "soulalign": 0.65,
+        "perception": 987.425,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 393.07,
+        "model_first_token": 1603.197,
+        "first_response_chunk": 1827.594,
+        "complete_response": 1827.594,
+        "rag_response": 840.168
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5184.949,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 4,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 118.512,
+        "ocr": 944.06,
+        "soulalign": 1.105,
+        "perception": 1066.524,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 387.25,
+        "model_first_token": 1675.485,
+        "first_response_chunk": 1905.51,
+        "complete_response": 1905.51,
+        "rag_response": 838.984
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5185.441,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 5,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 89.831,
+        "ocr": 892.452,
+        "soulalign": 0.588,
+        "perception": 985.339,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 386.408,
+        "model_first_token": 1592.575,
+        "first_response_chunk": 1810.138,
+        "complete_response": 1810.138,
+        "rag_response": 824.797
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5188.66,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 5,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 95.525,
+        "ocr": 934.387,
+        "soulalign": 0.743,
+        "perception": 1032.459,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 391.685,
+        "model_first_token": 1644.438,
+        "first_response_chunk": 1889.863,
+        "complete_response": 1889.863,
+        "rag_response": 857.403
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5188.895,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 5,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4532,
+      "stage_latency_ms": {
+        "asr": 117.313,
+        "ocr": 919.504,
+        "soulalign": 0.616,
+        "perception": 1040.222,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 381.495,
+        "model_first_token": 1641.753,
+        "first_response_chunk": 2056.248,
+        "complete_response": 2056.248,
+        "rag_response": 1016.024
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5191.074,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 6,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 87.09,
+        "ocr": 939.656,
+        "soulalign": 1.02,
+        "perception": 1029.579,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 403.127,
+        "model_first_token": 1661.123,
+        "first_response_chunk": 1935.303,
+        "complete_response": 1935.303,
+        "rag_response": 905.723
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5191.938,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 6,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 93.424,
+        "ocr": 868.679,
+        "soulalign": 0.594,
+        "perception": 964.906,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 403.411,
+        "model_first_token": 1598.717,
+        "first_response_chunk": 1861.893,
+        "complete_response": 1861.893,
+        "rag_response": 896.985
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5194.418,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 6,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 90.069,
+        "ocr": 930.599,
+        "soulalign": 0.722,
+        "perception": 1023.667,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 393.815,
+        "model_first_token": 1645.688,
+        "first_response_chunk": 1873.061,
+        "complete_response": 1873.061,
+        "rag_response": 849.392
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5195.164,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 7,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 100.087,
+        "ocr": 881.476,
+        "soulalign": 0.547,
+        "perception": 984.107,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 400.399,
+        "model_first_token": 1611.124,
+        "first_response_chunk": 1859.651,
+        "complete_response": 1859.651,
+        "rag_response": 875.544
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5197.332,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 7,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 97.34,
+        "ocr": 878.811,
+        "soulalign": 0.473,
+        "perception": 978.624,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 380.153,
+        "model_first_token": 1580.236,
+        "first_response_chunk": 1805.615,
+        "complete_response": 1805.615,
+        "rag_response": 826.99
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5197.434,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 7,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 95.211,
+        "ocr": 912.567,
+        "soulalign": 0.607,
+        "perception": 1010.793,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 381.001,
+        "model_first_token": 1611.976,
+        "first_response_chunk": 1840.133,
+        "complete_response": 1840.133,
+        "rag_response": 829.338
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5199.418,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 8,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 89.7,
+        "ocr": 896.003,
+        "soulalign": 0.582,
+        "perception": 988.322,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 379.958,
+        "model_first_token": 1590.839,
+        "first_response_chunk": 1837.619,
+        "complete_response": 1837.619,
+        "rag_response": 849.291
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5182.094,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 8,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 97.934,
+        "ocr": 918.629,
+        "soulalign": 0.83,
+        "perception": 1019.661,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 392.873,
+        "model_first_token": 1638.675,
+        "first_response_chunk": 1917.151,
+        "complete_response": 1917.151,
+        "rag_response": 897.486
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5184.344,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 8,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 94.336,
+        "ocr": 954.132,
+        "soulalign": 0.618,
+        "perception": 1051.051,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 407.237,
+        "model_first_token": 1688.219,
+        "first_response_chunk": 1950.315,
+        "complete_response": 1950.315,
+        "rag_response": 899.263
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5184.496,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 9,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 89.84,
+        "ocr": 912.062,
+        "soulalign": 0.705,
+        "perception": 1004.374,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 408.802,
+        "model_first_token": 1644.7,
+        "first_response_chunk": 1903.235,
+        "complete_response": 1903.235,
+        "rag_response": 898.856
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5186.332,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 9,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4498,
+      "stage_latency_ms": {
+        "asr": 97.184,
+        "ocr": 903.834,
+        "soulalign": 0.507,
+        "perception": 1003.242,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 391.582,
+        "model_first_token": 1616.678,
+        "first_response_chunk": 1868.106,
+        "complete_response": 1868.106,
+        "rag_response": 864.863
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5187.137,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 9,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 96.252,
+        "ocr": 896.276,
+        "soulalign": 0.784,
+        "perception": 995.511,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 398.215,
+        "model_first_token": 1617.19,
+        "first_response_chunk": 1851.245,
+        "complete_response": 1851.245,
+        "rag_response": 855.732
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5188.891,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 10,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 107.674,
+        "ocr": 886.652,
+        "soulalign": 0.801,
+        "perception": 997.916,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 382.666,
+        "model_first_token": 1601.37,
+        "first_response_chunk": 1826.339,
+        "complete_response": 1826.339,
+        "rag_response": 828.422
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5188.945,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 10,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 96.25,
+        "ocr": 948.686,
+        "soulalign": 0.753,
+        "perception": 1047.608,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 388.012,
+        "model_first_token": 1661.801,
+        "first_response_chunk": 1887.368,
+        "complete_response": 1887.368,
+        "rag_response": 839.758
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5190.699,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 10,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 94.102,
+        "ocr": 898.742,
+        "soulalign": 0.558,
+        "perception": 995.264,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 381.977,
+        "model_first_token": 1598.54,
+        "first_response_chunk": 1837.745,
+        "complete_response": 1837.745,
+        "rag_response": 842.48
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5191.051,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-01",
+      "repeat": 11,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 103.255,
+        "ocr": 954.035,
+        "soulalign": 0.697,
+        "perception": 1059.968,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 385.323,
+        "model_first_token": 1666.345,
+        "first_response_chunk": 1893.368,
+        "complete_response": 1893.368,
+        "rag_response": 833.399
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5192.809,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-02",
+      "repeat": 11,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 97.941,
+        "ocr": 924.073,
+        "soulalign": 0.831,
+        "perception": 1025.105,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 391.568,
+        "model_first_token": 1638.725,
+        "first_response_chunk": 1864.366,
+        "complete_response": 1864.366,
+        "rag_response": 839.258
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5193.891,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    },
+    {
+      "episode_id": "MMI-MEDIA-SMOKE-03",
+      "repeat": 11,
+      "status": "pass",
+      "query": "七月文本检索基线实验报告中的 Macro-F1 是多少？",
+      "query_source": "frozen_structured_business_query",
+      "asr_text": "开饭时间早上9点至下午5点。",
+      "response_chars": 4496,
+      "stage_latency_ms": {
+        "asr": 91.368,
+        "ocr": 911.577,
+        "soulalign": 0.555,
+        "perception": 1005.931,
+        "rag_initialization": 0.0,
+        "retrieval_and_context_gate": 389.105,
+        "model_first_token": 1612.74,
+        "first_response_chunk": 1837.233,
+        "complete_response": 1837.233,
+        "rag_response": 831.301
+      },
+      "retrieval_evidence_count": 6,
+      "resources": {
+        "process_memory_mib": 5195.648,
+        "torch_peak_gpu_memory_mib": 2757.66
+      }
+    }
+  ],
+  "limitations": [
+    "固定公开媒体 fixture 仅验证本机链路，不是公开数据集或华为隐藏集成绩。",
+    "业务查询是冻结结构化输入；公开示例音频的 ASR 文本单独保留，未伪称为同一条业务查询。",
+    "model_first_token 是模型生成的首 token；为完成引用校验，RAG 当前在验证后才向 UI 输出首个响应块。"
+  ]
+}

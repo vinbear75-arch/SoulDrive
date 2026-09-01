@@ -1,0 +1,59 @@
+{
+  "schema_version": "souldrive_multimodal_uia_selected_text_contract_v0.1",
+  "performed_at": "2026-08-30",
+  "scope": "Windows UI Automation explicit focused-control capture and follow-up chat contract",
+  "design_basis": [
+    {
+      "name": "OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adaptation": "保留 UI Automation/结构化目标优先，视觉模型只作为需要时的慢路径"
+    },
+    {
+      "name": "Microsoft GraphRAG",
+      "url": "https://microsoft.github.io/graphrag/query/overview/",
+      "adaptation": "系统可读选区只解决当前屏幕文本，项目事实与原因分析仍进入文档/图谱证据路由"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "adaptation": "选区文本保持独立来源和 V# 可追溯引用，不与私有文献 E# 混淆"
+    }
+  ],
+  "implementation": {
+    "native_capture": "Windows UIA TextPattern.GetSelection reads at most four selected ranges and 4000 characters only during explicit focused-control capture",
+    "privacy": "password controls and unknown password state are redacted; control name and selected text remain separate fields",
+    "propagation": "selected_text is carried through Tauri snapshot, workflow planning, frontend perception event, /chat schema, runtime event normalization, and interaction context",
+    "evidence": "explicit UIA selected text becomes screen_text_selection evidence in the V# namespace with source_modality=ui_automation",
+    "routing": "direct selected-text transformation bypasses document retrieval only when the query has no factual/comparison markers; factual questions still include the selected text in retrieval context"
+  },
+  "verification": {
+    "targeted_backend_tests": "134 passed, 1 warning",
+    "full_backend_tests": "828 passed, 1 warning",
+    "python_compileall": "pass",
+    "frontend_tests": "pass",
+    "frontend_build": "pass",
+    "tauri_fmt_check": "pass",
+    "tauri_cargo_check": "pass"
+  },
+  "business_validation": {
+    "real_uia_selected_text_episodes": 0,
+    "current_real_pilot_selection_audit": {
+      "episode_count": 10,
+      "selection_event_count": 5,
+      "with_selected_text": 0,
+      "label_only": 5,
+      "report": "eval/results/real_mmi_selection_text_audit_20260830.json"
+    },
+    "cross_application_validation": "not_run",
+    "text_only_vs_full_multimodal_ablation": "not_run",
+    "answer_level_fact_or_nli_validation": "not_run",
+    "p95_gate": "not_evaluated",
+    "accuracy_claim": "not_allowed"
+  },
+  "decision": "integrate_contract_only",
+  "production_default_change": false,
+  "limitations": [
+    "现有 REAL-PILOT 数据中的 ui_selection 文本仍可能只是区域标签，不足以证明 UIA TextPattern 在真实应用中成功读取正文。",
+    "必须补采至少覆盖浏览器、Office/PDF 阅读器和桌面应用的真实选中文字 episode，并保留原始选区、应用、分辨率和人工真值后，才能评估改写准确率、错误绑定率和端到端延迟。"
+  ]
+}

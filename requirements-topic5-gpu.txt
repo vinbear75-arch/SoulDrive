@@ -1,0 +1,12 @@
+# Install into a CUDA-enabled environment (the stable souldrive environment
+# intentionally remains CPU-compatible). Install a matching PyTorch CUDA build
+# separately for the target NVIDIA driver.
+transformers==4.57.6
+accelerate==1.14.0
+safetensors==0.8.0
+sentencepiece==0.2.2
+qwen-vl-utils==0.0.14
+bitsandbytes==0.50.1
+rapidocr==3.9.2
+onnxruntime-gpu==1.29.0
+funasr==1.4.2

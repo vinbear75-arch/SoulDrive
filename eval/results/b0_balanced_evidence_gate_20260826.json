@@ -1,0 +1,29 @@
+{
+  "schema_version": "souldrive_evidence_gate_baseline_v0.1",
+  "baseline_level": "B0_CURRENT",
+  "status": "frozen_before_balanced_evidence_gate",
+  "scope": "single-source direct-definition evidence gate",
+  "query": "RAG 的核心思想是什么？",
+  "evidence": [
+    {
+      "id": "E1",
+      "score": 0.0203,
+      "source_filename": "rag.md",
+      "section": "RAG 原理",
+      "snippet": "RAG 通过检索外部知识增强生成模型回答。"
+    }
+  ],
+  "result": {
+    "allowed": false,
+    "decision": "retry",
+    "reason": "evidence confidence requires retry",
+    "evidence_count": 1,
+    "max_score": 0.0203
+  },
+  "run_conditions": {
+    "reject_score": 0.015,
+    "retry_score": 0.08,
+    "top_k": 6,
+    "code_state": "before_balanced_evidence_gate"
+  }
+}

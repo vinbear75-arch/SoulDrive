@@ -1,0 +1,17 @@
+{
+  "run_id": "candidate_soulalign_v0.1_20260818",
+  "dataset_sha256": "a08c4e8ccea5bae571bb1dae7518c5f5100d2d35716a4efb1c50152e2b69469e",
+  "training": "TF-IDF char 2-5 + balanced LogisticRegression seed=42",
+  "candidate": "trained intent + timestamp/project/confidence event gate",
+  "validation_selection": {
+    "parameter": "confidence_threshold",
+    "candidates": [
+      0.4,
+      0.5,
+      0.6,
+      0.7
+    ],
+    "selected": 0.7
+  },
+  "test_used_after_selection": true
+}

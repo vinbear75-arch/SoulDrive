@@ -1,0 +1,33 @@
+{
+  "schema_version": "souldrive_public_gui_speech_baseline_v0.1",
+  "dataset_sha256": "f17bb3b918717f92348927628865d6196aee1736623ee82d499d3801db3b43d2",
+  "sample_count": 30,
+  "asr_mean_cer": 1.0,
+  "asr_exact_match": 0.0,
+  "ocr_pass_rate": 1.0,
+  "target_binding_accuracy": 0.0,
+  "intent_distribution": {
+    "None": 30
+  },
+  "action_distribution": {
+    "None": 30
+  },
+  "cold_start_ms": 3370.603,
+  "warm_latency_ms": {
+    "count": 29,
+    "p50": 584.897,
+    "p95": 1220.058,
+    "max": 1438.675
+  },
+  "claim_policy": {
+    "baseline_only": true,
+    "real_user_speech": false,
+    "public_benchmark_score": false,
+    "huawei_score": false
+  },
+  "limitations": [
+    "ScreenSpot 真实 GUI 与合成中文语音的派生训练集，不是官方 ScreenSpot 协议。",
+    "显式 target_id 测量对齐管线，不等价于从截图自主预测 bbox。",
+    "当前 baseline 不包含项目检索或生成回答。"
+  ]
+}

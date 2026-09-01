@@ -1,0 +1,86 @@
+{
+  "session_id": "redis-accept-c05a926e892c4e5f",
+  "project_id": "redis-project-a369a5e7",
+  "redis_health_before": {
+    "enabled": true,
+    "status": "ok",
+    "url": "redis://127.0.0.1:6379/0",
+    "redis_version": "8.10.0",
+    "aof_enabled": true,
+    "vector_index": true,
+    "vector_index_status": "ready",
+    "vector_index_error": null,
+    "vector_index_backend": "vectorset",
+    "session_cache_count": 17,
+    "cached_message_count": 116
+  },
+  "before_close": {
+    "source": "redis+file",
+    "history": [
+      {
+        "role": "user",
+        "content": "\u77ed\u671f\u4f1a\u8bdd\u7528\u6237\u6d88\u606f",
+        "timestamp_ms": 1787673713701,
+        "sequence": 1
+      },
+      {
+        "role": "assistant",
+        "content": "\u77ed\u671f\u4f1a\u8bdd\u52a9\u624b\u6d88\u606f",
+        "timestamp_ms": 1787673713714,
+        "sequence": 2
+      }
+    ],
+    "redis_record_count": 2,
+    "redis_message_ids": [
+      "msg_c504feb17628d7523da305863e2d3e89e6cf5499",
+      "msg_ccd5ffe1e4c78ac918cf37e65140d76e3877132f"
+    ]
+  },
+  "after_reopen": {
+    "source": "redis+file",
+    "history": [
+      {
+        "role": "user",
+        "content": "\u77ed\u671f\u4f1a\u8bdd\u7528\u6237\u6d88\u606f",
+        "timestamp_ms": 1787673713701,
+        "sequence": 1
+      },
+      {
+        "role": "assistant",
+        "content": "\u77ed\u671f\u4f1a\u8bdd\u52a9\u624b\u6d88\u606f",
+        "timestamp_ms": 1787673713714,
+        "sequence": 2
+      }
+    ],
+    "redis_count": 2,
+    "archive_count": 2,
+    "project_sessions": [
+      "redis-accept-c05a926e892c4e5f"
+    ]
+  },
+  "redis_only_recovery": {
+    "source": "redis+file",
+    "redis_count": 2,
+    "archive_count": 0,
+    "history_count": 2
+  },
+  "vector_capability": {
+    "dimension": 2560,
+    "backend": "vectorset",
+    "write_ok": true,
+    "hit_memory_ids": [
+      "redis-vector-test-4269337c245b4132"
+    ],
+    "message_vectors_are_automatic": false
+  },
+  "acceptance": {
+    "redis_ping_and_health": true,
+    "short_term_messages_in_redis": true,
+    "session_id_project_binding": true,
+    "reopen_history_roundtrip": true,
+    "redis_only_hot_recovery": true,
+    "redis_vector_capability": true,
+    "short_term_memory_uses_vector_index": false
+  }
+}
+

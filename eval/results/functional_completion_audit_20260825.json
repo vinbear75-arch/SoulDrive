@@ -1,0 +1,82 @@
+{
+  "schema_version": "souldrive_functional_completion_audit_v1",
+  "created_at": "2026-08-25T16:09:22+08:00",
+  "scope": "按 SoulDrive PC 多模态项目规格和执行方案，对当前已规划功能链路进行证据审计",
+  "automated_regression": {
+    "command": "python -m pytest -q",
+    "passed": 566,
+    "failed": 0,
+    "warnings": 1,
+    "elapsed_seconds": 81.58,
+    "status": "pass"
+  },
+  "work_package_audit": {
+    "WP0_baseline_and_harness": {
+      "status": "pass_for_automated_regression",
+      "evidence": ["eval/results/functional_regression_recheck_20260825.json", "python -m pytest -q"],
+      "missing": "完整多模态 30 次运行的统一 P50/P95 资源记录"
+    },
+    "WP1_project_space_and_storage": {
+      "status": "pass_with_quarantined_legacy_test_event",
+      "evidence": ["eval/results/storage_acceptance_20260825.json", "eval/results/functional_acceptance_recheck_20260825_rerun.json"],
+      "verified": ["项目/会话隔离", "Redis 跨重开读回", "PostgreSQL 5432 存储", "文件历史归档", "项目切换"],
+      "remaining": "一个不可读的旧测试会话仍需人工决定是否清理"
+    },
+    "WP2_voice_screen_and_multimodal_runtime": {
+      "status": "pass_smoke_pending_end_to_end_latency",
+      "evidence": ["eval/results/media_validation_goal_latest.json", "eval/results/functional_acceptance_goal_after_smtp_ui_fix.json"],
+      "verified": ["SenseVoice", "RapidOCR", "Qwen2.5-VL-3B", "480 条媒体引用完整性"],
+      "remaining": "真实用户授权的语音+屏幕选区+任务样本、冷启动和 30 次热运行 P95"
+    },
+    "WP3_business_loops_and_artifacts": {
+      "status": "pass_smoke",
+      "evidence": ["eval/results/artifact_smoke_goal_full_recheck_live.json", "eval/results/functional_acceptance_current.json"],
+      "verified": ["证据式 RAG 问答", "PPTX OpenXML 生成", "ICS 日程草案导出", "项目/会话入口"],
+      "remaining": "完整 UI 端到端业务演示仍需在冷启动实例上复核"
+    },
+    "WP4_contacts_and_email": {
+      "status": "contacts_pass_real_smtp_pending",
+      "evidence": ["eval/results/functional_acceptance_goal_after_smtp_ui_fix.json", "eval/results/functional_regression_recheck_20260825.json"],
+      "verified": ["联系人按钮和弹窗", "联系人历史加载", "选择联系人填入收件人", "草稿确认门", "本地 SMTP mock/TLS/MIME/附件"],
+      "current_smtp_status": "credential_missing",
+      "sender": "1342325858@qq.com",
+      "recipient": "handsome_Vin <2956584050@qq.com>",
+      "remaining": "用户在 UI 配置授权码、确认草稿、真实发送并提供外部收件回执"
+    },
+    "WP5_dataset_and_public_audit": {
+      "status": "partial",
+      "evidence": ["eval/results/media_validation_goal_latest.json", "eval/results/public_dataset_contract_audit_v0.1.json"],
+      "verified": ["本地 480 条媒体 fixture 可校验"],
+      "remaining": "公开数据许可证/原始模态/官方划分的最终审计，以及封闭测试冻结"
+    },
+    "WP6_training_and_ablation": {
+      "status": "not_verified",
+      "evidence": ["python -m pytest -q"],
+      "remaining": "SoulAlign/QLoRA 候选训练、B0/B1/Candidate 同条件指标和文本-only/缺失模态/冲突门控消融"
+    },
+    "WP7_runtime_and_competition_delivery": {
+      "status": "not_ready",
+      "evidence": ["eval/results/graphrag_retest_20260825.json", "eval/results/functional_acceptance_recheck_20260825_rerun.json"],
+      "current_observations": ["旧 Tauri PID 20228 仍运行", "sidecar 仍监听 127.0.0.1:54656", "QQ SMTP 未配置", "RAG 单条回答约 127-144 秒"],
+      "remaining": "关闭旧实例后的冷启动、30 次热运行 P50/P95、失败率和资源数据"
+    },
+    "GraphRAG": {
+      "status": "functionally_passed_not_competition_ready",
+      "evidence": ["eval/results/graphrag_retest_20260825.json", "eval/results/graphrag_acceptance_project_rag_cn_retest_20260825.json"],
+      "verified": ["6 篇中文 PDF", "174 实体", "241 关系", "4 个 Leiden 社区", "hybrid/global/local 三路由", "3/3 引用且无拒答"]
+    }
+  },
+  "current_external_state": {
+    "tauri_cold_restart": "pending_user_action",
+    "smtp_real_delivery": "pending_user_action",
+    "authorization_code_read_or_recorded_by_agent": false,
+    "external_email_receipt": false
+  },
+  "overall_status": "incomplete",
+  "completion_blockers": [
+    "真实 QQ SMTP 配置、用户确认发送和外部收件回执缺失",
+    "Tauri 旧实例尚未关闭，冷启动链路未完成",
+    "完整多模态 30 次 P95 与资源证据缺失",
+    "训练/消融和公开数据最终审计尚未完成"
+  ]
+}

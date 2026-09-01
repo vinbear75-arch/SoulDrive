@@ -1,0 +1,88 @@
+{
+  "schema_version": "rag_cn_source_audit_v1",
+  "audited_at": "2026-08-24",
+  "purpose": "本地 RAG 功能验证资料，不作为竞赛正式数据集或公开再分发包",
+  "storage_root": "D:/AI_AGENTS/SoulDrive-main/runtime/workspace/data/source_materials/rag_cn",
+  "items": [
+    {
+      "title": "基于科学数据的检索增强生成（RAG）技术研究与应用",
+      "source_url": "https://cimc2024.casconf.cn/static/1787357624682024960/pages/file/a39b06927f894bbca09a449f35e4cbac.pdf",
+      "downloaded_at": "2026-08-24",
+      "file_name": "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+      "sha256": "5455da4b3bdfca85ac8183a9a183841ad58c28936b820ed01c9f8f9fcd8c105a",
+      "size_bytes": 6305037,
+      "pages": 26,
+      "license_status": "未在下载页确认明确再分发许可，仅限本机测试",
+      "ingest_status": "indexed"
+    },
+    {
+      "title": "面向知识密集型任务的检索增强生成技术综述",
+      "source_url": "https://mc.spacejournal.cn/cn/article/doi/10.19304/J.ISSN1000-7180.2025.0652",
+      "pdf_url": "https://mc.spacejournal.cn/cn/article/pdf/preview/10.19304/J.ISSN1000-7180.2025.0652.pdf",
+      "downloaded_at": "2026-08-24",
+      "file_name": "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "sha256": "93128a5b23dface4cf3cee44ad38a64ed4e592a70f6de01f7f4ba9e7d8c4b1aa",
+      "size_bytes": 777718,
+      "pages": 18,
+      "license_status": "来源页面标注 Creative Commons BY 3.0；正式公开使用前仍需核对出版物许可文本",
+      "ingest_status": "indexed"
+    },
+    {
+      "title": "检索增强生成（RAG）",
+      "source_url": "https://bimsa.net/doc/notes/31059.pdf",
+      "downloaded_at": "2026-08-24",
+      "file_name": "03_检索增强生成_BIMSA.pdf",
+      "sha256": "8f9f13630d1f18f40bea58e6f5083eedd289c320b8cefc5b470bf9be239e3f7d",
+      "size_bytes": 10096605,
+      "pages": 64,
+      "license_status": "未确认明确再分发许可，仅限本机测试",
+      "ingest_status": "indexed"
+    },
+    {
+      "title": "检索增强生成（RAG）技术解析：让 AI 更可靠的知识调用系统",
+      "source_url": "http://www.trustsz.com/upload/pdf/2025-07-30-161821-8.jszqsc(RAG)jsjx%EF%BC%9ArAIgkkdzsdyxt(zy).pdf",
+      "downloaded_at": "2026-08-24",
+      "file_name": "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "sha256": "78800d7cb3c03f3f51de24e4a57818e5f3e49226436c44cd088d445f1f2b35a2",
+      "size_bytes": 161998,
+      "pages": 3,
+      "license_status": "未确认明确再分发许可，仅限本机测试；作为补充材料",
+      "ingest_status": "indexed"
+    },
+    {
+      "title": "检索增强生成（RAG）",
+      "source_url": "https://www.sciopen.com/local/article_pdf/10.16510/j.cnki.kjycb.20250409.002.pdf",
+      "downloaded_at": "2026-08-24",
+      "file_name": "06_检索增强生成_SciOpen.pdf",
+      "sha256": "68a4dcd45a451db68c481e28ba3a43818a4caa964f8259fe7e95f65c911ed064",
+      "size_bytes": 1634095,
+      "pages": 10,
+      "license_status": "来源页面可访问；未确认明确再分发许可，仅限本机测试",
+      "ingest_status": "indexed"
+    },
+    {
+      "title": "GraphRAG 的原理、源码及应用介绍",
+      "source_url": "https://gitee.com/open-llm/llm-graph-rag/blob/master/docs/graphrag的原理、源码及应用介绍.pdf",
+      "downloaded_at": "2026-08-24",
+      "file_name": "07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+      "sha256": "7da648f9c564aff8ed57d6a7a843bba7930784bf4af9eaa15b367971bc53a690",
+      "size_bytes": 788547,
+      "pages": 12,
+      "license_status": "仓库文件可访问；许可证未确认，仅限本机测试，不作为竞赛公开数据再分发",
+      "ingest_status": "indexed"
+    }
+  ],
+  "index_result": {
+    "document_count": 6,
+    "page_count": 133,
+    "parent_chunk_count": 341,
+    "child_count": 404,
+    "conversion_status": "success",
+    "conversion_error_count": 0,
+    "failed_page_count": 0,
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding:4b",
+    "chunk_strategy": "formal_structure_paragraph_window_v2",
+    "elapsed_ms": 438675
+  }
+}

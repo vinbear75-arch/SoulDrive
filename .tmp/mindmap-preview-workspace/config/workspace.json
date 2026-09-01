@@ -1,0 +1,16 @@
+{
+  "product": "SoulDrive",
+  "workspace_version": 1,
+  "layout": {
+    "papers": "data/papers",
+    "documents": "data/documents",
+    "presentations": "data/presentations",
+    "calendars": "data/calendars",
+    "skills": "skills",
+    "index": "index",
+    "audit": "audit",
+    "models": "models",
+    "runtime": "runtime",
+    "history": "runtime/history"
+  }
+}

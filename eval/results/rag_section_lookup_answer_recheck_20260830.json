@@ -1,0 +1,92 @@
+{
+  "schema_version": "souldrive_rag_section_lookup_answer_recheck_v0.1",
+  "performed_at": "2026-08-30T20:28:27.8533693+08:00",
+  "design_basis": [
+    {
+      "name": "PageIndex",
+      "url": "https://github.com/VectifyAI/PageIndex",
+      "applied_principle": "按文档层级定位章节，并保留可解释的路径信息"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "文档解析、证据摘录和来源追溯分层，避免无关上下文进入生成"
+    }
+  ],
+  "scope": "章节号/章节标题定位问题的查询意图和答案摘录路由，不改变默认检索权重和冻结索引",
+  "implementation": {
+    "section_intent": "章节号出现在问题任意位置时进入章节查询意图；兼容 2.3、3.、3、等标题编号",
+    "extractive_route": "章节定位或关键原文请求在证据门通过后，从首个证据中截取请求标题到下一章节边界的局部正文",
+    "evidence_order": "当首条证据不含请求主题时，将包含请求主题的证据优先用于摘录和来源标签；完整证据块仍保留",
+    "scoped_topic_guard": "带有关于/围绕/针对/有关某主题的回答，引用证据必须包含该主题的紧凑文本",
+    "fail_closed": "只有章节标题而没有正文时不制造结论；证据门未通过仍拒答",
+    "citation_namespace": "继续使用 E# 文档证据引用"
+  },
+  "verification": {
+    "targeted_tests": "135 passed",
+    "full_backend_tests": "833 passed, 1 warning",
+    "dev_evidence_lookup_replay": {
+      "dataset": "eval/fixtures/rag_cn_raw_v0.1/dev.jsonl",
+      "answer_source": "eval/results/rag_cn_dev_answer_quality_gate_recheck_20260830.jsonl",
+      "sample_count": 4,
+      "all_direct_lookup": true,
+      "all_expected_keywords_present": true,
+      "ids": [
+        "RAGCN-93128a5b23df-03",
+        "RAGCN-8f9f13630d1f-03",
+        "RAGCN-78800d7cb3c0-03",
+        "RAGCN-7da648f9c564-03"
+      ],
+      "method": "使用当前确定性摘录函数对已保存证据只读重放；未调用生成模型"
+    },
+    "legacy_answer_guard_replay": {
+      "id": "RAGCN-7da648f9c564-03",
+      "legacy_answer_validation": "rejected",
+      "legacy_rejection_reason": "citation does not support answer claim",
+      "legacy_missing_scoped_topic": "3. graphrag的源码剖析",
+      "current_extractive_fallback_validation": "accepted",
+      "current_fallback_citation": "E1"
+    },
+    "frozen_retrieval_recheck": {
+      "dataset": "eval/retrieval_quality_blind_v0.3.jsonl",
+      "workspace": "runtime/rag-eval-workspace-v4",
+      "candidate_result": "eval/results/retrieval_primary_section_route_candidate_20260830.jsonl",
+      "baseline_result": "eval/results/retrieval_primary_isolated_baseline2_20260830.jsonl",
+      "conditions": {
+        "sample_count": 360,
+        "top_k": 3,
+        "usage_ledger": false,
+        "comparison_source_reservation": false,
+        "source_profile_recall": false,
+        "answer_generation": false,
+        "index_write": false
+      },
+      "metrics": {
+        "all_hit_at_3": 0.962963,
+        "any_hit_at_3": 0.984568,
+        "first_hit_at_1": 0.92284,
+        "mrr_at_3": 0.9490740740740741,
+        "average_source_coverage_at_3": 0.9737654320987654,
+        "cross_document_all_hit_at_3": 0.935185,
+        "graph_relevant_any_hit_at_3": 0.9822695035460993,
+        "average_retrieval_ms": 3820
+      },
+      "paired_change": {
+        "improved": 0,
+        "regressed": 0,
+        "unchanged": 360,
+        "exact_mcnemar_p": 1.0
+      },
+      "decision": "检索层逐 ID 无变化；章节路由修复未改变默认召回，不宣称检索精度提升"
+    },
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "decision": "保留章节定位摘录路由；不宣称答案语义准确率、NLI 或竞赛成绩提升",
+  "limitations": [
+    "4 条样本仅验证路由和关键词保留，不等于人工事实准确率或答案级召回率",
+    "当前仍缺少冻结答案级人工/NLI 评测，无法证明所有章节摘要都满足用户问题中的结论要求",
+    "正式加密工作区仍锁定，未据此宣称生产索引或 GraphRAG 业务验收完成",
+    "真实多模态 30 episode、完整 VLM+RAG P95 小于 5 秒和 sealed-test 仍未完成"
+  ]
+}

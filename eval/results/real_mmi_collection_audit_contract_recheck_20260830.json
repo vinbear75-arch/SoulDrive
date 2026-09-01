@@ -1,0 +1,99 @@
+{
+  "schema_version": "souldrive_real_mmi_collection_audit_contract_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "用结构化 UI 元数据表达目标类别和候选区域；本轮只吸收数据契约思想，不复制代码或模型"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "将媒体事件、文本知识和评测输出作为可独立审计的通道；本轮不引入其服务栈"
+    },
+    {
+      "project": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adopted": "将数据契约/检索证据/生成结果分开诊断；本轮审计不把集合合格误写成模型准确率"
+    }
+  ],
+  "implemented": {
+    "schema_additions": [
+      "speaker_id",
+      "capture.application",
+      "capture.speaker_id",
+      "capture.screen_size",
+      "capture.target_kind",
+      "ground_truth.target_bbox"
+    ],
+    "ingest_cli": [
+      "--speaker-id",
+      "--application",
+      "--target-kind",
+      "--target-bbox"
+    ],
+    "audit_script": "scripts/audit_real_mmi_collection.py",
+    "strict_checks": [
+      "schema and media references",
+      "unique episode/task/event IDs",
+      "aligned event references",
+      "exact speech_text/audio/screen event counts",
+      "speaker/resolution/project diversity",
+      "text/icon/chart target coverage",
+      "time misalignment/project conflict/low confidence/OOS coverage",
+      "real-authorized provenance and reviewed status"
+    ],
+    "failure_mode": "malformed or incomplete collection returns invalid and never fabricates rows, media, labels, or metrics"
+  },
+  "verification": {
+    "unit_regression": "5 passed: tests/test_real_mmi_collection.py",
+    "seed_collection_audit": {
+      "path": "eval/fixtures/souldrive_pc_mmi_seed_v0.2",
+      "command_mode": "minimum_episodes=30, require_real_capture=false",
+      "valid": true,
+      "schema_valid": true,
+      "media_valid": true,
+      "episode_count": 30,
+      "real_capture_claim": false
+    },
+    "media_smoke_collection_audit": {
+      "path": "eval/fixtures/souldrive_pc_mmi_media_smoke_v0.2",
+      "command_mode": "minimum_episodes=3, require_media=true",
+      "valid": true,
+      "schema_valid": true,
+      "media_valid": true,
+      "episode_count": 3,
+      "real_capture_claim": false
+    },
+    "local_real_pilot_strict_audit": {
+      "path": "data/local/souldrive_pc_mmi_real_v0.1",
+      "command_mode": "minimum_episodes=30, require_real_capture=true, require_reviewed=true",
+      "valid": false,
+      "schema_valid": true,
+      "media_valid": true,
+      "episode_count": 10,
+      "failure_is_expected": true,
+      "failed_requirements": [
+        "minimum_episode_count",
+        "speaker_diversity",
+        "resolution_diversity",
+        "project_diversity",
+        "difficulty_coverage"
+      ],
+      "source_declares_real_capture": true,
+      "full_real_collection_claim": false
+    },
+    "evaluation_asset_regression": "27 passed: tests/test_eval_assets.py",
+    "full_backend": "789 passed, 1 warning",
+    "python_compileall": "passed: core scripts tests",
+    "git_diff_check": "passed; existing LF to CRLF normalization warnings only",
+    "frontend_test_build": "no frontend changes; prior run passed"
+  },
+  "limits": [
+    "本轮没有创建或伪造任何真实用户授权 episode。",
+    "合成 seed 只验证 schema 和审计 harness，不是目标绑定、意图、回答或 RAG 准确率结果。",
+    "审计器不证明 ASR/OCR/VLM/对齐/检索/回答准确率，也不证明首 token 或完整回答 P95 小于 5 秒。",
+    "真实 30 条 episode、说话人/分辨率/跨项目覆盖、逐阶段延迟记录和 sealed-test 仍待用户授权数据与冻结流程。"
+  ]
+}

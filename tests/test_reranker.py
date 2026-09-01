@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from core.knowledge_base import _reranker_passage
+from core.retrieval import SearchCandidate
 from core.reranker import (
     LocalReranker,
     preferred_reranker_model_name,
@@ -76,7 +78,7 @@ class RerankerTests(unittest.TestCase):
 
         self.assertEqual(scores, [0.91])
 
-    def test_local_reranker_uses_cpu_device(self):
+    def test_local_reranker_uses_available_runtime_device(self):
         captured = {}
 
         class FakeCrossEncoder:
@@ -93,11 +95,11 @@ class RerankerTests(unittest.TestCase):
             with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
                 "sentence_transformers.CrossEncoder",
                 FakeCrossEncoder,
-            ):
+            ), patch("core.reranker._runtime_device", return_value="cuda"):
                 reranker = LocalReranker()
                 self.assertTrue(reranker.ready)
 
-        self.assertEqual(captured["device"], "cpu")
+        self.assertEqual(captured["device"], "cuda")
 
     def test_qwen3_reranker_uses_domain_instruction_and_probability_scores(self):
         captured = {}
@@ -125,6 +127,26 @@ class RerankerTests(unittest.TestCase):
         self.assertIn("government document", captured["options"]["prompts"]["souldrive"])
         self.assertIsNotNone(captured["activation_fn"])
         self.assertEqual(scores, [0.88])
+
+    def test_reranker_passage_uses_source_and_child_excerpt(self):
+        candidate = SearchCandidate(
+            id="child-1",
+            content="完整父文档正文不应直接送入重排器。" * 200,
+            metadata={
+                "source_filename": "rag.pdf",
+                "Header 4": "2.1.1 深层检索",
+                "Header 2": "2 基本原理",
+                "child_excerpt": "子块摘录是重排所需的最小证据。",
+            },
+        )
+
+        passage = _reranker_passage(candidate)
+
+        self.assertIn("rag.pdf", passage)
+        self.assertIn("2.1.1 深层检索", passage)
+        self.assertIn("子块摘录", passage)
+        self.assertNotIn("完整父文档正文", passage)
+        self.assertLessEqual(len(passage), 600 + len("rag.pdf") + len("2 基本原理") + 2)
 
 
 if __name__ == "__main__":

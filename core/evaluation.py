@@ -92,7 +92,7 @@ def evaluate_retrieval_cases(cases: list[RetrievalEvalCase], top_k: int = 3) -> 
             )[:top_k]
         ]
         dense_score = _score_ranked_ids(dense_ranked_ids, expected_groups)
-        evidence = build_citations(ranked)
+        evidence = build_citations(ranked, query=case.query)
         gate = evaluate_evidence_gate(evidence, query=case.query)
         if gate.allowed:
             accepted_cases += 1

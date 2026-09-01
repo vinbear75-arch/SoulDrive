@@ -11,7 +11,15 @@ import uvicorn
 from core.audit_log import default_audit_logger
 from core.paths import app_root
 from core.runtime_config import api_host, api_port
-from core.runtime_state import lock_runtime
+from core.runtime_state import lock_runtime, mark_software_unlocked, unlock_runtime, use_workspace_runtime_state
+from core.security_context import set_workspace_keys
+from core.workspace import SoulDriveWorkspace
+from core.workspace_crypto import (
+    IncorrectPassphraseError,
+    KeystoreNotInitializedError,
+    initialize_keystore,
+    unlock_keystore,
+)
 
 _RUNTIME_LOG_STREAM = None
 
@@ -91,6 +99,49 @@ def removable_watch_enabled():
     return os.environ.get("SOULDRIVE_WATCH_REMOVABLE", "1") != "0"
 
 
+def workspace_mode():
+    if os.environ.get("SOULDRIVE_PC_ONLY", "0") == "1":
+        return "local"
+    configured = os.environ.get("SOULDRIVE_WORKSPACE_MODE")
+    if configured:
+        normalized = configured.strip().lower()
+        if normalized not in {"local", "removable"}:
+            raise RuntimeError("SOULDRIVE_WORKSPACE_MODE must be 'local' or 'removable'")
+        return normalized
+    if os.environ.get("SOULDRIVE_WORKSPACE"):
+        return "local"
+    return "removable"
+
+
+def development_workspace_bypass_enabled():
+    return os.environ.get("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK", "0") == "1"
+
+
+def initialize_local_workspace():
+    workspace = SoulDriveWorkspace.default().ensure()
+    use_workspace_runtime_state(workspace.root_path)
+    unlock_runtime(
+        "LOCAL",
+        None,
+        None,
+        workspace.root_path,
+        reason="local PC workspace ready",
+    )
+    if development_workspace_bypass_enabled():
+        passphrase = os.environ.get("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE")
+        if not passphrase:
+            raise RuntimeError("development workspace bypass requires SOULDRIVE_DEV_WORKSPACE_PASSPHRASE")
+        try:
+            if not workspace.keystore_path or not Path(workspace.keystore_path).exists():
+                initialize_keystore(workspace, passphrase)
+            set_workspace_keys(workspace.root_path, unlock_keystore(workspace, passphrase))
+        except (KeystoreNotInitializedError, IncorrectPassphraseError) as exc:
+            raise RuntimeError("development workspace bypass could not unlock the local keystore") from exc
+        mark_software_unlocked("local development workspace auto-unlocked")
+        startup_log("local development workspace auto-unlocked")
+    return workspace
+
+
 def parent_process_is_alive(parent_pid: int):
     try:
         import psutil
@@ -104,6 +155,14 @@ def parent_process_is_alive(parent_pid: int):
         return True
 
 
+def parent_exit_grace_seconds() -> float:
+    raw = os.environ.get("SOULDRIVE_PARENT_EXIT_GRACE_SECONDS", "15")
+    try:
+        return max(1.0, min(float(raw), 300.0))
+    except ValueError:
+        return 15.0
+
+
 def start_parent_exit_monitor(shutdown_event: threading.Event, on_parent_exit):
     parent_pid = parent_pid_from_env()
     if parent_pid is None:
@@ -113,9 +172,15 @@ def start_parent_exit_monitor(shutdown_event: threading.Event, on_parent_exit):
         startup_log(f"parent monitor started pid={parent_pid}")
         while not shutdown_event.wait(1.0):
             if not parent_process_is_alive(parent_pid):
-                startup_log(f"parent process exited pid={parent_pid}")
-                on_parent_exit()
-                return
+                grace = parent_exit_grace_seconds()
+                startup_log(f"parent probe failed pid={parent_pid}; waiting {grace:.0f}s grace")
+                if shutdown_event.wait(grace):
+                    return
+                if not parent_process_is_alive(parent_pid):
+                    startup_log(f"parent process exited pid={parent_pid}")
+                    on_parent_exit()
+                    return
+                startup_log(f"parent process recovered pid={parent_pid}")
 
     thread = threading.Thread(target=monitor_parent, daemon=True)
     thread.start()
@@ -154,7 +219,20 @@ def main(argv: list[str] | None = None):
         host = api_host()
         port = api_port()
         startup_log(f"config host={host} port={port}")
-        if removable_watch_enabled():
+        mode = workspace_mode()
+        if mode == "local":
+            workspace = initialize_local_workspace()
+            startup_log(
+                "local PC workspace initialized; development auto-unlock active"
+                if development_workspace_bypass_enabled()
+                else "local PC workspace initialized; waiting for passphrase unlock"
+            )
+            audit_logger.append_event("sidecar.started", {
+                "host": host,
+                "port": port,
+                "workspace": "local-pc",
+            })
+        elif removable_watch_enabled():
             lock_runtime("waiting for removable SoulDrive workspace")
             from core.hardware_watcher import UDriveWatcher
 

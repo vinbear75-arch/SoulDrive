@@ -85,6 +85,32 @@ class LearningValidatorTests(unittest.TestCase):
 
         self.assertEqual(validate_learning_candidates(candidates, messages), [])
 
+    def test_marks_chinese_conflicting_preference_for_review(self):
+        messages = [{"role": "user", "content": "以后每次回答自动保存记忆。"}]
+        candidates = [{
+            "asset_type": "memory",
+            "subtype": "user_preference",
+            "title": "自动保存记忆",
+            "content": "以后每次回答自动保存记忆。",
+            "evidence": ["以后每次回答自动保存记忆。"],
+            "confidence": 0.9,
+            "selected_by_default": True,
+            "source_message_indexes": [0],
+        }]
+        existing_assets = {
+            "memories": [{
+                "memory_id": "mem_before_close",
+                "title": "关闭前审核",
+                "content": "只在关闭前集中审核记忆。",
+            }],
+            "skills": [],
+        }
+
+        [candidate] = validate_learning_candidates(candidates, messages, existing_assets=existing_assets)
+
+        assert candidate["conflicts_with"] == ["mem_before_close"]
+        assert candidate["selected_by_default"] is False
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,312 @@
+{
+  "schema_version": "souldrive_competition_closeout_v0.1",
+  "created_at": "2026-08-31T03:13:36.549954+00:00",
+  "product": "SoulDrive-PC",
+  "roadmap": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+  "positioning": "用户指着屏幕中的实验结果说“为什么比上个月差”，SoulDrive 在当前项目内对齐语音、授权选区、实验版本和历史偏好，在端侧给出可验证差异、原因证据等级和最小验证实验，并生成带引用的汇报草稿；歧义时先澄清，未经确认不执行外部动作。",
+  "workspace": {
+    "git_head": "0e216835775a93ed263e57911b6d6aa31d813acc",
+    "tracked_diff_sha256": "569f250cccb351133b3f8e91efdf89656f9da9c6edc142a687b53a74454ee3d9",
+    "changed_path_count": 548,
+    "untracked_path_count": 466,
+    "dirty": true
+  },
+  "evidence": [
+    {
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "label": "执行路线图",
+      "exists": true,
+      "sha256": "309cad6d2a9e65d6845a3ac2d8635f80dd0db9cc213af9b019951f764b9955e6",
+      "bytes": 143432
+    },
+    {
+      "path": "README.md",
+      "label": "项目主文档定位",
+      "exists": true,
+      "sha256": "eff2297a979a1f8a9b315d1df23e38c81c73b74ea1783c48445e625875dc34f2",
+      "bytes": 12480
+    },
+    {
+      "path": "docs/demo_runbook_v0.1.md",
+      "label": "3 分钟演示 runbook",
+      "exists": true,
+      "sha256": "d304f0f9090632566ccb5e5c9b7f4dc5a8567400bbf5f1b8434419f40d91f5e9",
+      "bytes": 4022
+    },
+    {
+      "path": "docs/known_issues_v0.1.md",
+      "label": "限制与问题清单",
+      "exists": true,
+      "sha256": "5240bd649e6ec621c931fa1c23c9c4c8c8f95c5208c0a64a4d145867e32c505a",
+      "bytes": 1946
+    },
+    {
+      "path": "docs/product_b1_corpus_and_baseline.md",
+      "label": "产品 B1 语料与 baseline",
+      "exists": true,
+      "sha256": "4010c67f24810a4952e79b3c0e79d018d7e27acd6b4679b8e188e055e7c5e962",
+      "bytes": 8391
+    },
+    {
+      "path": "eval/results/competition_scorecard_v0.1.json",
+      "label": "竞赛分项 scorecard",
+      "exists": true,
+      "sha256": "2b8d536b50b4be88b87a0c4dfece6a41d3615c58c0faaeb4250dd327b90d4c0f",
+      "bytes": 37787
+    },
+    {
+      "path": "eval/results/competition_release_gate_current.json",
+      "label": "旧版 release gate 快照",
+      "exists": true,
+      "sha256": "fd8bbd3f6482fc18b68d784f12dbe31bc02f3c19d7bf14d1fa5ea08ee938c4d8",
+      "bytes": 308865
+    },
+    {
+      "path": "eval/results/rag_rebuild_baseline_v0.1.json",
+      "label": "RAG 冻结 baseline",
+      "exists": true,
+      "sha256": "ff5af23a2460e2792b1ee30954b7a270f30975f0c463888934dd2c0b217b9222",
+      "bytes": 1609
+    },
+    {
+      "path": "eval/results/product_b1_scoped_current_20260830.jsonl",
+      "label": "项目作用域产品 RAG 结果",
+      "exists": true,
+      "sha256": "a310f52121a3081eefe236aa4e05d979a46e8a529c76bcb16f9af1e307df11aa",
+      "bytes": 60349
+    },
+    {
+      "path": "eval/results/rag_global_scope_answer_recheck_20260830.json",
+      "label": "全局文档跨项目最终回答回归",
+      "exists": true,
+      "sha256": "4567c47ba1925ef07215dde87bb122ce7e8888030344de843936c338b387e568",
+      "bytes": 2313
+    },
+    {
+      "path": "eval/results/rag_xlsx_table_ingestion_smoke_recheck_20260830.json",
+      "label": "XLSX 表格摄取烟测",
+      "exists": true,
+      "sha256": "243238a3a38db935d727357ab0afbe30fcd8dd54caaa17d3c3af8756c23d1c04",
+      "bytes": 2423
+    },
+    {
+      "path": "eval/results/rag_structured_source_locator_recheck_20260830.json",
+      "label": "结构化来源定位回归",
+      "exists": true,
+      "sha256": "1b6a18a5bea028327d56074322531d8d7a45ab44a36656175f3ff42b1273e220",
+      "bytes": 3530
+    },
+    {
+      "path": "eval/results/real_mmi_stage_ledger_recheck_20260830.json",
+      "label": "真实多模态阶段账本回归",
+      "exists": true,
+      "sha256": "af9f924b69902bd2989c2fddf489e7585e633614f813bcd7a9bcce5c60f4696b",
+      "bytes": 2670
+    },
+    {
+      "path": "eval/results/multimodal_structured_event_contract_recheck_20260830.json",
+      "label": "多模态事件契约回归",
+      "exists": true,
+      "sha256": "83210dd2b5665cccb7874bf0ac553b0c1b39318077e09fd8ff91299b268f08fe",
+      "bytes": 1793
+    }
+  ],
+  "config_and_data_hashes": [
+    {
+      "path": "configs/soulalign_lite_v0.1.json",
+      "label": "SoulAlign-lite 配置",
+      "exists": true,
+      "sha256": "591857064edfeb0ec0ee46643978ef793468ce4b5578fef0ecafa03c9d9bab46",
+      "bytes": 732406
+    },
+    {
+      "path": "requirements.txt",
+      "label": "Python 依赖",
+      "exists": true,
+      "sha256": "da3caa1a66773fa5bee30b034674c3ff84b4a4541ba287afe1cc3989845db22e",
+      "bytes": 594
+    },
+    {
+      "path": "requirements-topic5-gpu.txt",
+      "label": "Topic5 GPU 依赖",
+      "exists": true,
+      "sha256": "05679e9e9ea0c1c9e6d1eb6b285f7054852c180e6e90970b6184fbf8fdda1eb1",
+      "bytes": 375
+    },
+    {
+      "path": "souldrive-ui/package.json",
+      "label": "前端依赖声明",
+      "exists": true,
+      "sha256": "c0dcb81c4ea0a86bffabf1ebfc4a6caa3e51a674740b7583cc5a1b2da6fdb481",
+      "bytes": 1952
+    },
+    {
+      "path": "souldrive-ui/src-tauri/Cargo.toml",
+      "label": "Tauri/Rust 依赖声明",
+      "exists": true,
+      "sha256": "ed111c6d9fbf164802cedcab12c04990879f8106ec56b4f4610130c1a201ae60",
+      "bytes": 1222
+    },
+    {
+      "path": "eval/fixtures/product_b1_current_v0.1/product_benchmark_manifest_v0.1.json",
+      "label": "产品 B1 当前语料 manifest",
+      "exists": true,
+      "sha256": "791b4f996a445776553980bd2d9b30cf9e80437bb2213bf45829275b159e574e",
+      "bytes": 26112
+    },
+    {
+      "path": "eval/fixtures/product_b1_current_v0.1/product_rag_eval_v0.1.jsonl",
+      "label": "产品 B1 RAG 评测集",
+      "exists": true,
+      "sha256": "8a812073d05dba58233c38077da48982be5ca89980b7036cc23f92a48cdd40c7",
+      "bytes": 14739
+    },
+    {
+      "path": "eval/fixtures/souldrive_pc_mmi_media_480_v0.2/manifest.json",
+      "label": "多模态媒体集 manifest",
+      "exists": true,
+      "sha256": "2fd7cf29922cfecf21c6356dd4fbe304e45ed173f611143cd4225ca55e702643",
+      "bytes": 1672
+    },
+    {
+      "path": "eval/fixtures/souldrive_pc_mmi_media_480_v0.2/episodes.jsonl",
+      "label": "多模态媒体 episode",
+      "exists": true,
+      "sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+      "bytes": 990806
+    }
+  ],
+  "evidence_missing": [],
+  "roadmap_stage_audit": [
+    {
+      "stage": "S0",
+      "name": "冻结定位与评测契约",
+      "status": "partial",
+      "done": [
+        "一句话定位已写入 README、演示 runbook 和 closeout 快照。",
+        "主场景、B0/B1/Candidate 和证据边界已有文档化。",
+        "Git HEAD、未提交 diff 哈希、配置与数据哈希由 closeout 脚本生成。"
+      ],
+      "gap": [
+        "PPT 首页是否已更新需要人工检查最终参赛 PPT 文件。",
+        "sealed-test 最终冻结和演示材料冻结仍需提交前人工确认。"
+      ]
+    },
+    {
+      "stage": "S1",
+      "name": "真实数据与完整端到端基线",
+      "status": "blocked",
+      "done": [
+        "已有 10 条真实授权 pilot 和合成/媒体回归证据。",
+        "已有阶段账本和部分 text-only/full-multimodal 对比记录。"
+      ],
+      "gap": [
+        "不足 30 条独立真实业务 episode。",
+        "缺少跨说话人、分辨率、项目、指代方式的完整冻结集。",
+        "缺少完整 ASR/OCR/VLM/对齐/检索/首 token/完整回答逐样本 P50/P95。"
+      ]
+    },
+    {
+      "stage": "S2",
+      "name": "实验账本与严格比较",
+      "status": "partial",
+      "done": [
+        "CSV/XLSX、YAML/JSON、日志和实验报告摄取已落地。",
+        "measurement 版本化、项目隔离和来源定位已有回归。",
+        "结构化指标可带 sheet/row/line 来源进入证据链。"
+      ],
+      "gap": [
+        "确认卡 UI 对日期、单位、数据集版本和 split 的完整人工流程仍需演示机复核。",
+        "复杂实验原因分析仍不能宣称因果结论，只能给证据等级和验证计划。"
+      ]
+    },
+    {
+      "stage": "S3",
+      "name": "SoulAlign-T 与 GUI 目标验证",
+      "status": "partial",
+      "done": [
+        "UIA-first、OCR 降级、授权裁剪 VLM、多候选 verifier、低置信澄清均已有实现/回归。",
+        "多模态事件 start/end/project/time origin 已贯通前端、API 和归一化层。"
+      ],
+      "gap": [
+        "VLM 慢路径完整回答 P95 未稳定小于 5 秒。",
+        "图标目标相对 ScreenSpot 约 1.9% 基线的显著提升仍未证明。"
+      ]
+    },
+    {
+      "stage": "S4",
+      "name": "可验证个性化",
+      "status": "partial",
+      "done": [
+        "结构化偏好、全局/项目偏好、查看修改删除和成对画像评测已有证据。",
+        "事实和引用不应被个性化改写的边界已有测试约束。"
+      ],
+      "gap": [
+        "真实 30 episode 上的成对画像收益、撤销残留率和人工事实复核仍未完成。"
+      ]
+    },
+    {
+      "stage": "S5",
+      "name": "证据式生成与项目 Playbook",
+      "status": "partial",
+      "done": [
+        "候选摘要/支持度、检索测试 UI、版本化 Playbook、确认门和产物来源记录已有实现/回归。",
+        "全局文档跨项目最终回答和结构化来源定位已回归。"
+      ],
+      "gap": [
+        "长论文和标准的真实层级文档树路由仍需在生产加密工作区重建后验收。",
+        "产物级 E/V/A/M 引用语义仍需人工或 NLI 评测。"
+      ]
+    },
+    {
+      "stage": "S6",
+      "name": "竞赛冻结与回归",
+      "status": "partial",
+      "done": [
+        "closeout 快照、声明清单、限制清单和关键回归已经生成。",
+        "公开/合成/真实业务/隐藏集结果边界已分开披露。"
+      ],
+      "gap": [
+        "最终真实演示视频需要人工录制。",
+        "正式提交包的代码、模型、配置、数据和随机种子需要在提交前最后冻结。",
+        "Tauri cargo check 和真实端到端演示仍需在最终演示机上确认。"
+      ]
+    }
+  ],
+  "mvp_ready_for_demo": true,
+  "competition_ready": false,
+  "passable_claims": [
+    "端侧 Windows PC 本地运行，不默认依赖云端推理。",
+    "支持语音、授权屏幕/UIA/OCR、项目上下文和 RAG 证据的组合链路。",
+    "项目内优先检索并支持全局文档回退，已有跨项目私有来源隔离回归。",
+    "实验指标 CSV/XLSX、配置、日志和文档能带来源定位进入证据链。",
+    "邮件、日历、删除和外部动作保留确认门，不自动执行不可逆动作。"
+  ],
+  "forbidden_claims": [
+    "不能宣称通过外部未公开评测或获得官方成绩。",
+    "不能把 targeted tests、烟测或合成集称为整体答案准确率。",
+    "不能宣称 GraphRAG 生产业务验收已经完成。",
+    "不能宣称 VLM 慢路径完整回答 P95 已稳定小于 5 秒。",
+    "不能宣称已有 30 条以上独立真实多模态业务 episode。"
+  ],
+  "blocking_items": [
+    "正式加密工作区生产索引重建和人工验收仍需在演示机上完成。",
+    "真实多模态独立 episode 数量仍不足路线图 S1 的 30 条门槛。",
+    "完整 VLM+RAG 首 token/完整回答 P95 仍缺真实冻结集实测。",
+    "外部未公开评测协议未在当前工作区发布。"
+  ],
+  "verification_summary": [
+    "后端关键组合测试：136 passed, 1 warning",
+    "closeout 报告测试：2 passed",
+    "前端媒体事件测试：8 passed",
+    "前端项目/文档测试：3 passed",
+    "Python compileall：通过",
+    "前端 npm run build：通过，仅有既有 chunk size warning",
+    "Tauri cargo check --locked：通过"
+  ],
+  "today_manual_closeout": [
+    "用 docs/demo_runbook_v0.1.md 录制一条真实演示。",
+    "演示前确认工作区已解锁、索引已完成、模型已预热。",
+    "提交材料中保留 forbidden_claims 和 blocking_items，不写成已完成项。"
+  ]
+}

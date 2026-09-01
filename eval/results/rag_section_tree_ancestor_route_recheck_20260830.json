@@ -1,0 +1,38 @@
+{
+  "schema_version": "rag_section_tree_ancestor_route_recheck_v0.1",
+  "performed_at": "2026-08-30T17:31:40+08:00",
+  "change": "persisted_section_tree_ancestor_reconstruction",
+  "design_basis": [
+    {
+      "name": "PageIndex",
+      "url": "https://github.com/VectifyAI/PageIndex",
+      "adapted_mechanism": "按长文档节点和祖先关系导航"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "adapted_mechanism": "父子分块保留结构元数据，并从可追溯记录回读原始证据"
+    }
+  ],
+  "implementation": {
+    "metadata_field": "section_tree_document_id",
+    "legacy_fallback": "derive tree document identity from parent_id when the field is absent",
+    "reconstruction": "rebuild every ancestor node from the persisted full section path before route matching",
+    "answer_evidence": "ancestor routing only selects source-grounded child/parent evidence; it does not generate facts"
+  },
+  "full_ingestion_smoke": {
+    "document_id": "paper-1",
+    "sections": ["总览 > 检索 > 稠密", "总览 > 生成"],
+    "query": "请定位“检索”的原文",
+    "route_source": "persisted_section_tree_v1",
+    "route_mode": "descendant",
+    "route_node": "总览 > 检索",
+    "evidence_count": 1,
+    "section_tree_document_id": "paper-1"
+  },
+  "verification": {
+    "tests": "53 passed",
+    "scope": "document tree, plain parser, full ordinary ingestion/retrieval, secure metadata round-trip, and indexer observability"
+  },
+  "interpretation": "完整摄取链路已经验证祖先章节可以通过持久化树路由命中后代证据；这不是 RAG 召回率、答案事实准确率或正式加密生产索引全量验收。"
+}

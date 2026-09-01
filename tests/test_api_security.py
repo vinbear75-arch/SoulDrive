@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from core.api_security import is_authorized_token
+from core.enterprise_security import max_body_bytes
 from core.observability import RuntimeMetrics
 
 
@@ -19,6 +20,10 @@ class ApiSecurityTests(unittest.TestCase):
         self.assertTrue(is_authorized_token("secret", configured_token="secret"))
         self.assertFalse(is_authorized_token("wrong", configured_token="secret"))
         self.assertFalse(is_authorized_token(None, configured_token="secret"))
+
+    def test_configured_media_upload_budget_is_read_from_runtime_environment(self):
+        with patch.dict(os.environ, {"SOULDRIVE_MAX_BODY_BYTES": "16777216"}, clear=False):
+            self.assertEqual(max_body_bytes(), 16 * 1024 * 1024)
 
     def test_metrics_include_remote_rejection_counter(self):
         metrics = RuntimeMetrics()
@@ -37,6 +42,22 @@ class ApiSecurityTests(unittest.TestCase):
 
         self.assertEqual(snapshot["model_load_failures"], 1)
         self.assertEqual(snapshot["last_model_load_ms"], 1234)
+
+    def test_metrics_report_chat_first_token_completion_and_under_5s_rate(self):
+        metrics = RuntimeMetrics()
+
+        metrics.record_chat_latency(450, 3200, success=True)
+        metrics.record_chat_latency(700, 6100, success=True)
+        metrics.record_chat_latency(200, 500, success=False)
+        snapshot = metrics.snapshot()
+
+        self.assertEqual(snapshot["chat_completed"], 2)
+        self.assertEqual(snapshot["chat_under_5s"], 1)
+        self.assertEqual(snapshot["chat_under_5s_rate"], 0.5)
+        self.assertEqual(snapshot["last_chat_first_token_ms"], 200)
+        self.assertEqual(snapshot["last_chat_total_ms"], 500)
+        self.assertEqual(snapshot["average_chat_first_token_ms"], 575.0)
+        self.assertEqual(snapshot["average_chat_total_ms"], 4650.0)
 
     def test_metrics_include_indexing_status(self):
         metrics = RuntimeMetrics()

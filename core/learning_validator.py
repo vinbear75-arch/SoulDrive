@@ -151,6 +151,12 @@ def _looks_conflicting(left: str, right: str) -> bool:
         ("always", "never"),
         ("every answer", "before closing"),
         ("without review", "review before"),
+        ("自动", "手动"),
+        ("每次回答", "关闭前"),
+        ("每次提问", "关闭前"),
+        ("无需审核", "需要审核"),
+        ("不需要审核", "需要审核"),
+        ("中文", "英文"),
     )
     return any((a in left and b in right) or (b in left and a in right) for a, b in opposite_pairs)
 

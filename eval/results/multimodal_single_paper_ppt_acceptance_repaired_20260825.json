@@ -1,0 +1,68 @@
+{
+  "schema_version": "souldrive_multimodal_single_paper_ppt_acceptance_v2",
+  "case": "single_paper",
+  "generated_at": "2026-08-25T19:56:04+0800",
+  "project_id": "rag-cn-demo-20260824",
+  "selected_sources": [
+    "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf"
+  ],
+  "task_id": "task_c95b3797d684d8914325",
+  "status": "completed",
+  "result": {
+    "outline_source": "local_ollama",
+    "slide_count": 8,
+    "renderer": "SoulDrive OpenXML",
+    "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\单篇中文 RAG 论文多模态研究汇报验收 20260825 修复验收-d8914325.pptx",
+    "elapsed_ms": 28937.0,
+    "evidence_metrics": {
+      "attributed_slide_count": 6,
+      "cited_source_count": 1,
+      "evidence_bound_point_count": 18,
+      "evidence_slide_count": 6,
+      "evidence_slide_coverage": 1.0,
+      "selected_source_count": 1,
+      "selected_source_coverage": 1.0
+    },
+    "verify": {
+      "errors": [],
+      "expected_slide_count": 8,
+      "output_path": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace\\data\\presentations\\单篇中文 RAG 论文多模态研究汇报验收 20260825 修复验收-d8914325.pptx",
+      "size_bytes": 19293,
+      "slide_count": 8,
+      "valid": true
+    }
+  },
+  "outline_quality": {
+    "contains_markdown_hash": false,
+    "contains_truncation_ellipsis": false,
+    "point_count": 21
+  },
+  "step_status": [
+    {
+      "step_name": "collect_evidence",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "build_outline",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "render_pptx",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "verify_pptx",
+      "status": "completed",
+      "error": null
+    },
+    {
+      "step_name": "open_in_wps",
+      "status": "completed",
+      "error": null
+    }
+  ],
+  "workspace": "D:\\AI_AGENTS\\SoulDrive-main\\runtime\\workspace"
+}

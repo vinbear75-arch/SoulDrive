@@ -1,0 +1,59 @@
+{
+  "schema_version": "souldrive_rag_xlsx_table_structure_recheck_v0.1",
+  "performed_at": "2026-08-30T21:37:11.9243881+08:00",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "applied_principle": "表格解析保留工作表、表头和数据行边界，避免按普通段落把字段关系打散"
+    },
+    {
+      "name": "Dify Knowledge Pipeline",
+      "url": "https://docs.dify.ai/en/cloud/use-dify/knowledge/knowledge-pipeline/knowledge-pipeline-orchestration",
+      "applied_principle": "结构化摄取先恢复可检索字段关系，再交给统一父子上下文链路"
+    }
+  ],
+  "scope": "PlainDocumentParser 的 XLSX -> RAG 父文档输入；不改变 embedding 模型、召回分数、排序权重、Top-K 或项目权限",
+  "implementation": {
+    "worksheet_structure": "保留工作表名称作为章节标题，并将 XML 单元格按列坐标恢复为 Markdown 表格",
+    "cell_types": "支持普通值、inline string、shared string 和公式缓存值的可读文本；空列按列坐标补位",
+    "lightweight_export": "支持缺少 workbook.xml 的 sheetN 以及单元格内嵌 CSV，嵌入数据按逻辑行展开",
+    "provenance": "标准行定位为 sheet:name/rows:N-M；嵌入 CSV 定位为 sheet:name/embedded_rows:N-M",
+    "chunking": "输出接入既有 table-aware parent/child splitter，表头和字段关系不再被普通文本拼接隐藏"
+  },
+  "verification": {
+    "targeted_tests": "145 passed",
+    "standard_fixture": {
+      "sheet": "Metrics",
+      "content_shape": [
+        "## Metrics",
+        "| metric | value |",
+        "| accuracy | 0.921 |",
+        "| p95_latency_ms | 960 |"
+      ],
+      "source_locator": "sheet:Metrics/rows:2-3",
+      "source_locator_kind": "xlsx_sheet_row_range"
+    },
+    "product_fixture": {
+      "file": "eval/fixtures/product_b1_current_v0.1/project_vision_optimizer/vision_august_metrics.xlsx",
+      "content_shape": [
+        "## sheet1",
+        "| metric | value |",
+        "| accuracy | 0.921 |",
+        "| p95_latency_ms | 960 |"
+      ],
+      "source_locator": "sheet:sheet1/embedded_rows:2-3",
+      "source_locator_kind": "xlsx_sheet_row_range"
+    },
+    "full_backend_tests": "845 passed, 1 warning",
+    "compileall": "passed",
+    "diff_check": "passed with only Windows LF/CRLF normalization warnings"
+  },
+  "decision": "保留 XLSX 工作表/表头/行结构恢复；它降低指标字段和数值的结构错配风险，但在新索引上重跑产品评测前不宣称召回率或答案准确率提升",
+  "limitations": [
+    "XML 读取只使用文件中已有的值或公式缓存，不执行 Excel 公式，也不恢复样式、图表和合并单元格语义",
+    "当前产品夹具缺少 workbook 元数据，工作表名称只能回退为 sheet1；完整真实资产需要重新导入验收",
+    "来源定位仍是工作表/逻辑行范围，不是单元格地址；答案级数值人工/NLI 校验尚未完成",
+    "正式加密工作区仍锁定，GraphRAG 生产业务验收、真实多模态 30 episode、完整 VLM+RAG P95 和 sealed-test 仍未完成"
+  ]
+}

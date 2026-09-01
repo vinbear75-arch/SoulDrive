@@ -1,0 +1,8 @@
+{
+  "documents": 6,
+  "dev_documents": 4,
+  "sealed_documents": 2,
+  "dev_queries": 16,
+  "sealed_queries": 8,
+  "output": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\fixtures\\rag_cn_raw_v0.1"
+}

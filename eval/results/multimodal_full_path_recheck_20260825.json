@@ -1,0 +1,32 @@
+{
+  "schema_version": "souldrive_multimodal_full_path_recheck_v1",
+  "created_at": "2026-08-25T16:21:03+08:00",
+  "dataset_id": "SoulDrive-PC-MMI-media-smoke-3-v0.2",
+  "dataset_type": "synthetic_development_fixture",
+  "measurement_count": 3,
+  "pipeline": ["ASR", "OCR", "SoulAlign", "project_scoped_retrieval", "Ollama_answer"],
+  "perception_to_answer": {
+    "status": "pass",
+    "sample_statuses": ["pass", "pass", "pass"],
+    "warm_complete_response_ms": {"count": 2, "p50": 1420.694, "p95": 1460.489, "max": 1460.489},
+    "warm_retrieval_and_context_gate_ms": {"count": 2, "p50": 577.636, "p95": 585.96, "max": 585.96},
+    "warm_asr_ms": {"count": 2, "p50": 88.599, "p95": 98.323, "max": 98.323},
+    "warm_ocr_ms": {"count": 2, "p50": 730.041, "p95": 749.893, "max": 749.893},
+    "warm_soulalign_ms": {"count": 2, "p50": 19.066, "p95": 37.679, "max": 37.679}
+  },
+  "project_rag_binding": {
+    "fixture_project_id": "project_souldrive_agent",
+    "queried_project_id": "project_souldrive_agent",
+    "retrieval_evidence_count_per_sample": [0, 0, 0],
+    "independent_project_scope_check": "0 evidence for project_souldrive_agent; current paper index is project:rag-cn-demo-20260824",
+    "status": "not_passed",
+    "reason": "fixture project has no indexed evidence in the current workspace; isolation correctly prevented cross-project retrieval"
+  },
+  "full_run_artifact": "eval/results/business_runtime_smoke_full_20260825.json",
+  "limitations": [
+    "3 个合成样本，不是 30 个真实用户授权样本。",
+    "不代表公开赛题成绩或真实用户多模态准确率。",
+    "需要将真实媒体样本绑定到已导入资料所属项目后，才能验收带证据的多模态 RAG。",
+    "首 token 当前未被该 Harness 单独记录；完整响应已记录。"
+  ]
+}

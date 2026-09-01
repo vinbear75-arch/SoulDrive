@@ -13,8 +13,15 @@ TERM_ALIASES = (
     ("分类分级", "data classification grading"),
     ("个人信息", "personal information"),
     ("生成式人工智能服务安全基本要求", "生成式AI AIGC 人工智能安全 标准 合规 风险治理"),
+    ("生成式 AI 安全规范", "生成式人工智能服务安全基本要求 生成式人工智能服务安全 生成式AI AIGC 人工智能安全 标准 合规 风险治理"),
+    ("生成式AI安全规范", "生成式人工智能服务安全基本要求 生成式人工智能服务安全 生成式AI AIGC 人工智能安全 标准 合规 风险治理"),
+    ("生成式人工智能安全规范", "生成式人工智能服务安全基本要求 生成式人工智能服务安全 生成式AI AIGC 人工智能安全 标准 合规 风险治理"),
     ("生成式人工智能", "生成式AI AIGC generative AI"),
+    ("人工智能安全治理框架", "人工智能安全治理框架 AI safety governance framework 安全治理 风险治理"),
+    ("AI 安全治理框架", "人工智能安全治理框架 AI safety governance framework 安全治理 风险治理"),
     ("人工智能安全标准体系", "AI safety standard 人工智能安全 标准体系"),
+    ("个人信息保护标准", "个人信息保护国家标准体系（2025版） personal information privacy data protection"),
+    ("数据安全标准体系", "数据安全国家标准体系（2025版） data security national standards data security"),
     ("数据分类分级规则", "数据安全技术 数据分类分级规则 data classification data grading 敏感个人信息"),
     ("数据分类分级", "数据安全技术 数据分类分级规则 data classification data grading"),
     ("敏感个人信息", "personal information privacy data protection"),
@@ -47,12 +54,8 @@ def expand_query_variants(query: str, limit: int = 5) -> list[str]:
     variants = [base]
     lowered = base.lower()
 
-    comparison_variants = split_comparison_query(base)
-    for comparison_query in comparison_variants:
-        variants.append(comparison_query)
-        alias_query = build_alias_query(comparison_query)
-        if alias_query:
-            variants.append(alias_query)
+    for comparison_group in comparison_query_groups(base):
+        variants.extend(comparison_group)
 
     if any(token in base for token in ("怎么", "如何")):
         variants.append(base.replace("怎么", "实现方式").replace("如何", "实现方式"))
@@ -114,6 +117,18 @@ def split_comparison_query(query: str) -> list[str]:
         f"{_clean_comparison_subject(match.group('left'))} 核心证据",
         f"{_clean_comparison_subject(match.group('right'))} 核心证据",
     ]
+
+
+def comparison_query_groups(query: str) -> list[list[str]]:
+    """Return one bounded retrieval group for each side of a comparison."""
+    groups = []
+    for subject_query in split_comparison_query(query):
+        group = [subject_query]
+        alias_query = build_alias_query(subject_query)
+        if alias_query:
+            group.append(alias_query)
+        groups.append(list(dict.fromkeys(group)))
+    return groups
 
 
 def query_requires_source_diversity(query: str) -> bool:

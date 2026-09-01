@@ -1,0 +1,53 @@
+{
+  "schema_version": "rag_retrieval_test_ui_recheck_v0.1",
+  "performed_at": "2026-08-30T02:22:18+08:00",
+  "status": "implemented_increment",
+  "change": "read_only_retrieval_diagnostics_ui",
+  "design_basis": [
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "adapted_mechanism": "可检查分块和检索结果，而不是只展示最终回答"
+    },
+    {
+      "name": "SoulDrive roadmap",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "S5 分块检查、关键词修正和检索测试"
+    }
+  ],
+  "contract": {
+    "endpoint": "/diagnostics/retrieval",
+    "read_only": true,
+    "requires_workspace_and_software_unlock": true,
+    "loads_chat_model": false,
+    "max_query_chars": 6000,
+    "top_k_range": [1, 20],
+    "chunk_content_cap_chars": 2400,
+    "project_scope": "current_project_plus_global_fallback",
+    "unknown_project_status": 404,
+    "index_update_status": 409,
+    "ui_surface": [
+      "editable query",
+      "deterministic query variants",
+      "project/global route",
+      "section_path",
+      "support score and terms",
+      "bounded chunk content",
+      "ranking breakdown"
+    ]
+  },
+  "verification": {
+    "backend_targeted": "3 passed, 1 warning",
+    "backend_full": "715 passed, 1 warning",
+    "frontend_tests": "npm test passed",
+    "frontend_build": "npm run build passed",
+    "python_compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "limitations": [
+    "查询变体是现有确定性扩展和人工选择，不是自动从用户反馈学习关键词。",
+    "该增量提供可解释诊断面，不等于检索或回答准确率提升。",
+    "未修改 sealed-test 主评测口径，也未重建现有加密生产工作区。",
+    "前端构建验证了类型和打包，真实解锁工作区中的人工 UI 流程仍需在冻结 episode 上验收。"
+  ]
+}

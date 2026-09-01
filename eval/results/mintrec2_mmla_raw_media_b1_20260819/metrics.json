@@ -1,0 +1,41 @@
+{
+  "schema_version": "mintrec2_mmla_raw_media_b1_metrics_v0.1",
+  "protocol": "THUIAR/MMLA pinned raw-video mirror; not original WavLM/Swin runner",
+  "sample_counts": {
+    "train": 6165,
+    "dev": 1106,
+    "test": 2033
+  },
+  "feature_version": "mmla_raw_media_av_v0.1",
+  "feature_dimensions": {
+    "visual": 51,
+    "audio": 18,
+    "total": 69
+  },
+  "variants": {
+    "text_only_control": {
+      "accuracy": 0.42400393507132317,
+      "macro_f1": 0.38292118928608104,
+      "weighted_f1": 0.4191350171588113
+    },
+    "media_only": {
+      "accuracy": 0.05853418593212002,
+      "macro_f1": 0.04996688237596396,
+      "weighted_f1": 0.059867182704928225
+    },
+    "text_audio_video_early_fusion": {
+      "accuracy": 0.35956714215445157,
+      "macro_f1": 0.3260827503584748,
+      "weighted_f1": 0.36414053911610184
+    }
+  },
+  "media_delta_macro_f1": -0.05683843892760626,
+  "latency_ms": {
+    "feature_extraction_total": 1211963.8282000087,
+    "feature_extraction_per_sample": 130.26266425193558
+  },
+  "limitations": [
+    "Handcrafted B1 features establish a real-media floor; they are not learned WavLM/Swin embeddings.",
+    "This in-scope closed-set run does not measure OOS detection, PC grounding, or Huawei hidden-set generalization."
+  ]
+}

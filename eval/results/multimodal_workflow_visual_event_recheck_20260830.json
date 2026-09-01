@@ -1,0 +1,33 @@
+{
+  "schema_version": "souldrive_multimodal_workflow_visual_event_recheck_v1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "project": "Microsoft OmniParser",
+      "url": "https://github.com/microsoft/omniparser",
+      "adopted": "工作流输入使用结构化视觉事件，而不是只依赖单一 image 字面标签"
+    },
+    {
+      "project": "LlamaIndex multimodal",
+      "url": "https://docs.llamaindex.ai/en/v0.10.19/use_cases/multimodal.html",
+      "adopted": "视觉事件先作为独立输入通道进入工作流，再由后续 RAG/证据门决定是否可回答"
+    }
+  ],
+  "bug_fixed": {
+    "before": "chat workflow readiness only counted PerceptionEvent.modality=image with non-empty text",
+    "impact": "ocr_region/image_region events produced by the current runtime could be rejected as missing screen evidence",
+    "after": "visual event modalities image/image_region/ocr_region count when text, bbox, or structured target candidates are present",
+    "safety_boundary": "this changes readiness detection only; visual confidence, authorization, project evidence, and citation gates remain unchanged"
+  },
+  "verification": {
+    "targeted_regression": "18 passed, 1 warning: tests/test_multimodal_workflows.py",
+    "full_backend_before_this_small_fix": "789 passed, 1 warning",
+    "full_backend_after_this_small_fix": "790 passed, 1 warning",
+    "frontend": "no frontend changes"
+  },
+  "limits": [
+    "工作流准备通过不等于视觉识别正确，也不等于 RAG 或回答通过。",
+    "本修复没有放宽屏幕授权范围，没有引入后台录屏，也没有绕过项目文档证据门。",
+    "真实 30 条跨应用 episode、图标/图表准确率和完整链路 P95 仍未完成。"
+  ]
+}

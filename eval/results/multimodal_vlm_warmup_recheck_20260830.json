@@ -1,0 +1,40 @@
+{
+  "schema_version": "multimodal_vlm_warmup_recheck_v0.1",
+  "performed_at": "2026-08-30T00:50:59+08:00",
+  "image_ref": "eval/fixtures/product_b1_candidate_v0.1/project_souldrive_agent/08_selection_ui.png",
+  "runtime": {
+    "speech_text": "解释当前图片中的可见界面",
+    "run_ocr": false,
+    "run_vlm": true,
+    "visual_mode": "slow",
+    "max_new_tokens": 24,
+    "model": "Qwen2.5-VL-3B-Instruct"
+  },
+  "cold_without_explicit_warmup": {
+    "same_parameters": true,
+    "process_isolation": "fresh_runtime_process",
+    "wall_ms": 13234.199,
+    "runtime_total_ms": 13234.171,
+    "vlm_ms": 13194.502,
+    "status": "pass",
+    "cache_hit": false
+  },
+  "explicit_warmup_then_inference": {
+    "same_parameters": true,
+    "process_isolation": "fresh_runtime_process",
+    "warmup_wall_ms": 13203.469,
+    "warmup_runtime_total_ms": 13203.462,
+    "warm_inference_wall_ms": 2661.241,
+    "warm_inference_runtime_total_ms": 2661.2,
+    "warm_inference_vlm_ms": 2646.962,
+    "status": "pass",
+    "cache_hit": false
+  },
+  "interpretation": "显式预热把模型加载从实际视觉请求前移；在本次单样本中，预热后的视觉请求不再承担冷启动加载成本。",
+  "limitations": [
+    "仅一张本地产品截图和一个问题，不能代表跨应用样本、准确率或竞赛成绩。",
+    "冷启动与预热测量分别运行在新进程中，未作为多样本 P50/P95 A/B。",
+    "预热消耗的 13.203 s 仍然存在；只有在用户提前点击预热时，交互请求才可避开该成本。",
+    "本次未接入 RAG 检索、首 token 或完整回答生成。"
+  ]
+}

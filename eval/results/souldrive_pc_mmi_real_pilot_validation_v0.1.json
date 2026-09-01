@@ -1,0 +1,9 @@
+{
+  "dataset": "data\\local\\souldrive_pc_mmi_real_v0.1\\episodes.jsonl",
+  "media_root": "D:\\AI_AGENTS\\SoulDrive-main\\data\\local\\souldrive_pc_mmi_real_v0.1",
+  "episode_count": 10,
+  "require_media": true,
+  "valid": true,
+  "error_count": 0,
+  "errors": []
+}

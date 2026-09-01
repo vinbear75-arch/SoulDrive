@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="RAG 论文精读结构化思维导图">
+  <style>
+    text { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; fill: #203a33; }
+    .edge { fill: none; stroke: #78a795; stroke-width: 2.5; }
+    .node { fill: #fffefa; stroke: #92b8aa; stroke-width: 1.5; }
+    .root { fill: #e4f1e9; stroke: #367a67; stroke-width: 2; }
+    .level { fill: #e5f0eb; stroke: #8fb3a5; }
+    .tag { font-size: 12px; font-weight: 700; fill: #367a67; }
+    .title { font-size: 17px; font-weight: 700; }
+    .leaf { font-size: 14px; }
+  </style>
+  <rect width="1280" height="720" fill="#f7f6f0"/>
+  <text x="46" y="48" font-size="20" font-weight="700">本轮回答结构导图</text>
+  <text x="46" y="74" font-size="13" fill="#6a756f">SVG 矢量 · L1 / L2 / L3 · 分支可折叠</text>
+
+  <path class="edge" d="M330 357 C380 357 390 139 440 139"/><path class="edge" d="M330 357 C380 357 390 329 440 329"/><path class="edge" d="M330 357 C380 357 390 539 440 539"/>
+  <path class="edge" d="M740 139 C790 139 800 101 850 101"/><path class="edge" d="M740 139 C790 139 800 177 850 177"/>
+  <path class="edge" d="M740 329 C790 329 800 291 850 291"/><path class="edge" d="M740 329 C790 329 800 367 850 367"/>
+  <path class="edge" d="M740 539 C790 539 800 501 850 501"/><path class="edge" d="M740 539 C790 539 800 577 850 577"/>
+
+  <g transform="translate(60 310)"><rect class="root" width="270" height="94" rx="7"/><rect class="level" x="14" y="14" width="30" height="20" rx="4"/><text class="tag" x="21" y="29">L1</text><text class="title" x="58" y="39">RAG 论文精读</text><text class="leaf" x="18" y="69">方法、实验与证据结论</text></g>
+  <g transform="translate(440 94)"><rect class="node" width="300" height="90" rx="7"/><rect class="level" x="14" y="14" width="30" height="20" rx="4"/><text class="tag" x="21" y="29">L2</text><text class="title" x="58" y="39">研究问题</text><text class="leaf" x="18" y="67">要解决什么，为什么重要</text></g>
+  <g transform="translate(440 284)"><rect class="node" width="300" height="90" rx="7"/><rect class="level" x="14" y="14" width="30" height="20" rx="4"/><text class="tag" x="21" y="29">L2</text><text class="title" x="58" y="39">方法与证据</text><text class="leaf" x="18" y="67">检索、切片、重排与引用</text></g>
+  <g transform="translate(440 494)"><rect class="node" width="300" height="90" rx="7"/><rect class="level" x="14" y="14" width="30" height="20" rx="4"/><text class="tag" x="21" y="29">L2</text><text class="title" x="58" y="39">实验比较</text><text class="leaf" x="18" y="67">设置、结果、局限与缺口</text></g>
+
+  <g transform="translate(850 66)"><rect class="node" width="350" height="70" rx="7"/><rect class="level" x="14" y="13" width="30" height="20" rx="4"/><text class="tag" x="21" y="28">L3</text><text class="leaf" x="58" y="31">任务与待验证假设</text><text class="leaf" x="58" y="52">问题边界、已有结论</text></g>
+  <g transform="translate(850 142)"><rect class="node" width="350" height="70" rx="7"/><rect class="level" x="14" y="13" width="30" height="20" rx="4"/><text class="tag" x="21" y="28">L3</text><text class="leaf" x="58" y="31">贡献与适用条件</text><text class="leaf" x="58" y="52">与基线方案的差异</text></g>
+  <g transform="translate(850 256)"><rect class="node" width="350" height="70" rx="7"/><rect class="level" x="14" y="13" width="30" height="20" rx="4"/><text class="tag" x="21" y="28">L3</text><text class="leaf" x="58" y="31">结构感知切片</text><text class="leaf" x="58" y="52">保留标题、章节、页码</text></g>
+  <g transform="translate(850 332)"><rect class="node" width="350" height="70" rx="7"/><rect class="level" x="14" y="13" width="30" height="20" rx="4"/><text class="tag" x="21" y="28">L3</text><text class="leaf" x="58" y="31">混合检索与重排</text><text class="leaf" x="58" y="52">事实均回指原始证据</text></g>
+  <g transform="translate(850 466)"><rect class="node" width="350" height="70" rx="7"/><rect class="level" x="14" y="13" width="30" height="20" rx="4"/><text class="tag" x="21" y="28">L3</text><text class="leaf" x="58" y="31">指标与数据集版本</text><text class="leaf" x="58" y="52">只比较兼容的评测条件</text></g>
+  <g transform="translate(850 542)"><rect class="node" width="350" height="70" rx="7"/><rect class="level" x="14" y="13" width="30" height="20" rx="4"/><text class="tag" x="21" y="28">L3</text><text class="leaf" x="58" y="31">局限与下一步</text><text class="leaf" x="58" y="52">证据不足时明确标注</text></g>
+</svg>

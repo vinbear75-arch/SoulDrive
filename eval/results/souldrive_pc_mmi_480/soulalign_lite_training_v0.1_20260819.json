@@ -1,0 +1,42 @@
+{
+  "schema_version": "souldrive_soulalign_lite_training_report_v0.1",
+  "checkpoint": "configs/soulalign_lite_v0.1.json",
+  "checkpoint_sha256": "591857064edfeb0ec0ee46643978ef793468ce4b5578fef0ecafa03c9d9bab46",
+  "baseline": "eval/results/souldrive_pc_mmi_480/candidate_soulalign_v0.1_20260818/metrics.json",
+  "train_count": 320,
+  "validation_count": 80,
+  "test_count_excluded": 80,
+  "validation_threshold_candidates": [
+    {
+      "threshold": 0.45,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "threshold": 0.55,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "threshold": 0.65,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "threshold": 0.75,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "threshold": 0.85,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    }
+  ],
+  "selected_minimum_confidence": 0.85,
+  "limitations": [
+    "The source is the synthetic SoulDrive-PC-MMI v0.1 fixture; this checkpoint is an engineering integration artifact, not a competition model claim.",
+    "The sealed test split is excluded from training, threshold selection, and this report.",
+    "Rules remain the final safety boundary for destructive requests, confirmation, cancellation, target ambiguity, and external side effects."
+  ]
+}

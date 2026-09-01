@@ -1,0 +1,98 @@
+{
+  "schema_version": "souldrive_pc_mmi_media_metrics_v0.2",
+  "dataset_id": "SoulDrive-PC-MMI-media-480-v0.2",
+  "dataset_sha256": "8d54a8bdded9b858d7a663bb09d22dc736eaa68df6bddcac14f6c10839cbe99c",
+  "split": {
+    "train": 320,
+    "validation": 80,
+    "test": 80
+  },
+  "media_gate": {
+    "require_media": true,
+    "valid": true,
+    "audio_episode_count": 480,
+    "screenshot_episode_count": 480
+  },
+  "b1_text_only_validation": {
+    "sample_count": 80,
+    "intent_accuracy": 0.3875,
+    "intent_macro_f1": 0.3413240103285352,
+    "target_accuracy_on_targeted": 0.0,
+    "alignment_exact_match": 0.0,
+    "conflict_accuracy": 0.925,
+    "action_accuracy": 0.45,
+    "clarification_accuracy": 0.7
+  },
+  "b1_text_only_test": {
+    "sample_count": 80,
+    "intent_accuracy": 0.625,
+    "intent_macro_f1": 0.6430543815159199,
+    "target_accuracy_on_targeted": 0.0,
+    "alignment_exact_match": 0.0,
+    "conflict_accuracy": 0.925,
+    "action_accuracy": 0.4875,
+    "clarification_accuracy": 0.7
+  },
+  "candidate_validation_selection": {
+    "parameter": "target_confidence_threshold",
+    "candidates": [
+      {
+        "threshold": 0.4,
+        "action_accuracy": 0.65
+      },
+      {
+        "threshold": 0.5,
+        "action_accuracy": 0.725
+      },
+      {
+        "threshold": 0.6,
+        "action_accuracy": 0.725
+      },
+      {
+        "threshold": 0.7,
+        "action_accuracy": 0.725
+      }
+    ],
+    "selected": 0.7
+  },
+  "structured_media_candidate_test": {
+    "sample_count": 80,
+    "intent_accuracy": 0.625,
+    "intent_macro_f1": 0.6430543815159199,
+    "target_accuracy_on_targeted": 1.0,
+    "alignment_exact_match": 1.0,
+    "conflict_accuracy": 1.0,
+    "action_accuracy": 0.775,
+    "clarification_accuracy": 1.0
+  },
+  "latency_ms": {
+    "b1_text_only": {
+      "p50": 0.0030500232242047787,
+      "p95": 0.006199989002197981,
+      "max": 0.013199984095990658
+    },
+    "structured_media_candidate": {
+      "media_header_io": {
+        "p50": 0.16379999578930438,
+        "p95": 0.21949998335912824,
+        "max": 0.31370000215247273
+      },
+      "structured_gate": {
+        "p50": 0.0071499962359666824,
+        "p95": 0.010800024028867483,
+        "max": 0.025500019546598196
+      },
+      "total": {
+        "p50": 0.1711999939288944,
+        "p95": 0.22610003361478448,
+        "max": 0.3254999755881727
+      }
+    }
+  },
+  "failure_count": 30,
+  "limitations": [
+    "This is a synthetic media-backed harness result, not a public benchmark or Huawei Topic 5 score.",
+    "B1 uses the provided synthetic transcript only; the candidate reads WAV/PNG headers and structured events, but does not run ASR, OCR, VLM, QLoRA, or a learned multimodal fusion model.",
+    "The result proves media-file integrity and target/timestamp gate behavior only. It must not be presented as real speech or visual recognition accuracy."
+  ]
+}

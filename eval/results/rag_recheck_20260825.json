@@ -1,0 +1,86 @@
+{
+  "schema_version": "souldrive_rag_recheck_v1",
+  "created_at": "2026-08-25T15:19:31+08:00",
+  "scope": "中文 RAG 项目清理后的核心链路与 GraphRAG 路由复验",
+  "project_id": "rag-cn-demo-20260824",
+  "corpus": {
+    "document_count": 6,
+    "legacy_english_sources": [],
+    "sources": [
+      "01_基于科学数据的检索增强生成_RAG_技术研究与应用.pdf",
+      "02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "03_检索增强生成_BIMSA.pdf",
+      "04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "06_检索增强生成_SciOpen.pdf",
+      "07_GraphRAG原理源码及应用介绍_Gitee.pdf"
+    ],
+    "cleanup_artifact": "D:\\AI_AGENTS\\SoulDrive-main\\eval\\results\\rag_corpus_cleanup_20260825.json"
+  },
+  "graph_index": {
+    "index_name": "project:rag-cn-demo-20260824",
+    "algorithm": "leiden_v1_local_move_refine",
+    "entity_count": 174,
+    "relationship_count": 241,
+    "community_count": 4,
+    "ready": true
+  },
+  "queries": [
+    {
+      "route": "hybrid",
+      "query": "RAG 的核心流程包括哪些阶段？",
+      "evidence_count": 6,
+      "elapsed_ms": 195293,
+      "completed": true,
+      "cited": true,
+      "refusal": false,
+      "graph_enabled": false
+    },
+    {
+      "route": "global",
+      "query": "请从这些中文资料总结 RAG 检索、重排与生成的共同优化思路。",
+      "evidence_count": 10,
+      "elapsed_ms": 241084,
+      "completed": true,
+      "cited": true,
+      "refusal": false,
+      "graph_enabled": true,
+      "community_report_count": 4
+    },
+    {
+      "route": "local",
+      "query": "GraphRAG 中实体、关系、社区报告之间是什么关系？",
+      "evidence_count": 9,
+      "elapsed_ms": 223966,
+      "completed": true,
+      "cited": true,
+      "refusal": false,
+      "graph_enabled": true,
+      "community_report_count": 4
+    }
+  ],
+  "acceptance": {
+    "index_ready": true,
+    "project_scope_isolated": true,
+    "ordinary_hybrid_route_verified": true,
+    "global_route_verified": true,
+    "local_route_verified": true,
+    "all_queries_completed": true,
+    "all_answers_cited": true,
+    "no_refusal": true,
+    "competition_latency_ready": false,
+    "real_sidecar_after_cold_restart": "pending"
+  },
+  "test_evidence": {
+    "rag_specialized_tests": "139 passed",
+    "storage_runtime_tests": "30 passed",
+    "conversation_project_persistence_tests": "37 passed, 1 warning",
+    "cargo_check_after_postgres_port_fix": true,
+    "postgres_direct_health": "ok on 127.0.0.1:5432",
+    "redis_health": "ok on 127.0.0.1:6379"
+  },
+  "open_gates": [
+    "当前运行中的旧 sidecar 仍使用 5433 配置，必须冷启动后验证新配置和新内存索引。",
+    "PostgreSQL 控制面仍有 1 条旧 Redis 重放事件因历史会话密钥不一致而待处理，不能把历史恢复标成完全通过。",
+    "QQ SMTP 授权码尚未由用户在界面保存，真实邮件发送没有外部回执。"
+  ]
+}

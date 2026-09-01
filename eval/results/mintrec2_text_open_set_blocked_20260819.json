@@ -1,0 +1,8 @@
+{
+  "dataset": "MIntRec2.0",
+  "task": "text open-set OOS baseline",
+  "status": "blocked",
+  "reason": "official source/in-scope dev/test and out-of-scope test files are currently Google Drive quota error pages; the builder rejects them instead of treating HTML as TSV",
+  "available": "official source train and out-of-scope dev text files are present, but no valid fixed test split",
+  "action": "do not report an OOS score until the official files are restored or a license-equivalent fixed mirror is verified"
+}

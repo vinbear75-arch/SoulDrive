@@ -1,0 +1,306 @@
+{
+  "schema_version": "souldrive_run_manifest_v0.1",
+  "run_id": "product_b1_simple_20260818",
+  "created_at": "2026-08-18T03:39:06Z",
+  "baseline_level": "B1_SIMPLE",
+  "status": "complete",
+  "repository": {
+    "head": "0e216835775a93ed263e57911b6d6aa31d813acc",
+    "branch": "main",
+    "tracked_diff_sha256": "b6f6e946cbe2ec73befbaca0778d0fc7dee65a28af9047be6c6e4b8b2a22955e",
+    "untracked_files": [
+      {
+        "path": "core/document_types.py",
+        "sha256": "327196f8a29b57dc5575e765f093465548a8384db05beb32c62d3c44e9e669aa"
+      },
+      {
+        "path": "core/image_ocr.py",
+        "sha256": "174b8a715f0cbe82c280160309f7ee214c32af402f6104f16ac0460b32923f17"
+      },
+      {
+        "path": "core/interaction_context.py",
+        "sha256": "c219c672d9ccff4bf5fc49383260b9553dc48550a9888856d9b8dc19b8f88cff"
+      },
+      {
+        "path": "core/project_catalog.py",
+        "sha256": "bb720e06dcd0bc8924fb79d287f47eb6ab0910fdff648def5566a27e9e65f129"
+      },
+      {
+        "path": "docs/contest_topic5_product_blueprint.md",
+        "sha256": "e8c18f6960f171f31081f7f01075d63df520da5274f04903f1d170ca6d235bf2"
+      },
+      {
+        "path": "docs/dataset_audit_topic5_v0.1.md",
+        "sha256": "ed29ab8ae44aa8295d40cbebcfef7478a671a6dde223d987b97c9008071244c1"
+      },
+      {
+        "path": "docs/image_ocr_evaluation_protocol.md",
+        "sha256": "0438f84623d7779b3f3465c4bb0a7acf97de25362e2ab336f05244959ba82489"
+      },
+      {
+        "path": "docs/product_b1_corpus_and_baseline.md",
+        "sha256": "0a00da6b1ce894a9237cc1dd1c646010a5a3838bed8074f8789a120bf19ea9aa"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-17-souldrive-pc-multimodal-execution-plan.md",
+        "sha256": "cad1f26f1c638ad09e2ab77d78555611ad83e3cf59f0bdb253db3c1178b2ab5e"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-17-souldrive-pc-multimodal-project-spec.md",
+        "sha256": "43acdd2f87ac83c5ec58689c3fc7ad5cea11af9a968eed2a0763b5e9b8a7d213"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/product_benchmark_manifest_v0.1.json",
+        "sha256": "73cc9dbe0fbd4ee811e9082e562cc7e759f40e5e374b521635ef1004015079de"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/07_baseline_config.yaml",
+        "sha256": "6d4a1e254a02395a9a3c5b97055923b5d507f17580a4de3268425f24964a5ef2"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/07_baseline_metrics.csv",
+        "sha256": "6e9833fe04b398b859a4034785187eeeafe8a2ed442e95bb40b4306506668449"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_alignment_config.yaml",
+        "sha256": "10d3164319c10ccfe392a56964aa4c9b3753684ff6f8ef029d33794092386ebc"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_alignment_metrics.csv",
+        "sha256": "f5b023b47b6c429156b5a1ae065ec2b0ca72ce63b242419cca457df132b822cf"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_metrics_chart.png",
+        "sha256": "0200c96ae06aebc30fc36ac708334eb8ccf53150c416523073d3925f17cdf536"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_metrics_chart.png.caption.txt",
+        "sha256": "1982ea1a6800cd03912b5782beb4bd9bf284aba7b924013b68e0829244f90c1c"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_selection_ui.png",
+        "sha256": "0200c96ae06aebc30fc36ac708334eb8ccf53150c416523073d3925f17cdf536"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_selection_ui.png.caption.txt",
+        "sha256": "91b83041f41112e78ad731541d81767d1758749d84a5ec1cb641fa3c0ff94cd9"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_tasks.md",
+        "sha256": "71e123b5c755d7b5ac5e4db1f542f909ed1a04d5b483d9617d5d68dceafaf826"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_ui_context_config.json",
+        "sha256": "88c57aa4e8d65b26e97ec014cc63b5dd5198cf509cd7ba7305a9c4a606f74564"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/08_ui_context_metrics.xlsx",
+        "sha256": "521011623a167eeae464437edd56c993dfb1ec11cfd2e7dbb5d22de44cd8bad6"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/ambiguous_metric.txt",
+        "sha256": "c54b123c9b67319f7eef5fe34746448db8baf7c6068ecdf62cb18d0ac6e48e89"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/presentation_template.pptx",
+        "sha256": "66dfab4f3f0ac59fbc2d0d7f14b5fa96f65b6edbc4d4b1919f0429f9e94692c0"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/report_template.md",
+        "sha256": "de130127d35c967bb561081bc25175d78587fb2239ed9c17b77bfdd843f9e77b"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_souldrive_agent/undated_note.txt",
+        "sha256": "6fa4969fc1daf37eb08e7eeb54dc65ebe0932660a6062a72851c8b8ecb99a843"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_vision_optimizer/vision_august_metrics.xlsx",
+        "sha256": "c916401647a29f8f3d7ca618d6e6f911c9a34b39469c39cf933aa3be1196b113"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_vision_optimizer/vision_confusion_matrix.png",
+        "sha256": "0200c96ae06aebc30fc36ac708334eb8ccf53150c416523073d3925f17cdf536"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_vision_optimizer/vision_confusion_matrix.png.caption.txt",
+        "sha256": "c03e8db00a063f38170df62f8a93c35e78e69cd005f9d1353f53a40219839291"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_vision_optimizer/vision_july_config.yaml",
+        "sha256": "5070cf3a3e0afc1707a499ddeb9a1eada4288186ac16e6615fb95b6eabcac4bb"
+      },
+      {
+        "path": "eval/fixtures/product_b1_v0.1/project_vision_optimizer/vision_july_metrics.csv",
+        "sha256": "a7fa03a1c47015786e2f954d88d8603f5a609aabe04695f0f129dab59f109dcd"
+      },
+      {
+        "path": "eval/project_query_benchmark_v0.1.json",
+        "sha256": "0c4f2e707e96d5e589143f1e1b1ca90a381d52a979432568391bd253c3f77fa8"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/failures.jsonl",
+        "sha256": "5855a9892173878ac2360bfeb081b346748036c39dc496378b6c5ee1b0aa706a"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/latency.jsonl",
+        "sha256": "d72f38ae7e1e9cc0152812dde825a2685828f35608bd0d3090556b9e33589475"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/metrics.json",
+        "sha256": "afdb3ed3435ee1e925e20c63e7bd37dea39ec7c456aa91e546fea2883848988e"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/predictions.jsonl",
+        "sha256": "1fe479d12b7ed9c68ffd8a572c747300143be2d5df00ef61726867fb0aa2b217"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/run_manifest.json",
+        "sha256": "ddc2afe2357a3d0b90d78965adf219e815a7cd9075143cae1a490ff654b1b006"
+      },
+      {
+        "path": "eval/results/b0_current/b0_current_20260817/summary.md",
+        "sha256": "cc103e1c4ef1896580d9250c23c1e1852543cccbbbe5a186a73f23af11f5c0a8"
+      },
+      {
+        "path": "eval/results/product_b1_v0.1/ingestion_metrics.json",
+        "sha256": "09e0f4e6bc4c700b7f23953f5ae9108850c173a18e8522ed604abf0f1e1a4581"
+      },
+      {
+        "path": "eval/results/wp1_b1_unscoped_lexical/b1_unscoped_lexical_20260817/failures.jsonl",
+        "sha256": "29a5f1ab450798f923b3ecd6562fa7d2daa5b6ec25fb8db49895e4d7e541192f"
+      },
+      {
+        "path": "eval/results/wp1_b1_unscoped_lexical/b1_unscoped_lexical_20260817/latency.jsonl",
+        "sha256": "c0f0bf23d12e16f2079b278779e719beb87aba9ee7f0e943263bafec259c39f4"
+      },
+      {
+        "path": "eval/results/wp1_b1_unscoped_lexical/b1_unscoped_lexical_20260817/metrics.json",
+        "sha256": "a405ff7524d9f575891dbf7b303c6440cb5a9d17c18a7f283aebde60d25c0481"
+      },
+      {
+        "path": "eval/results/wp1_b1_unscoped_lexical/b1_unscoped_lexical_20260817/predictions.jsonl",
+        "sha256": "5a6f3259c23b8c30bfbd88c0ca8e45c98d91f4a37110f985156e57793da73dfe"
+      },
+      {
+        "path": "eval/results/wp1_b1_unscoped_lexical/b1_unscoped_lexical_20260817/run_manifest.json",
+        "sha256": "9ba57cc63a0f4fe8258a9fd049a39f08e78e46b7607b9f9bea58bda192b7c39d"
+      },
+      {
+        "path": "eval/results/wp1_b1_unscoped_lexical/b1_unscoped_lexical_20260817/summary.md",
+        "sha256": "dee2c490391ef2643fac906f6e3f6ca76d440088f2be25742bb539bdd0b3862d"
+      },
+      {
+        "path": "eval/results/wp1_candidate_catalog/candidate_catalog_20260817/failures.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "eval/results/wp1_candidate_catalog/candidate_catalog_20260817/latency.jsonl",
+        "sha256": "df0e41cdc02c73b9548b7dc39094f203b89a04d1b3bac6bc26db06af62c473d2"
+      },
+      {
+        "path": "eval/results/wp1_candidate_catalog/candidate_catalog_20260817/metrics.json",
+        "sha256": "c7b130cb43bcb5a1f0562e90943326f642c25a824625cef9b982f15900ed5ef2"
+      },
+      {
+        "path": "eval/results/wp1_candidate_catalog/candidate_catalog_20260817/predictions.jsonl",
+        "sha256": "9777cdf0a8c04ce6de837a91a7cbe3f4100f7397060fcd6a45f0334d4333f10f"
+      },
+      {
+        "path": "eval/results/wp1_candidate_catalog/candidate_catalog_20260817/run_manifest.json",
+        "sha256": "6ec2d52933f0d383e91eaf8194fb96ae22bc3df8281a3ebd787b3b98bb7d87a9"
+      },
+      {
+        "path": "eval/results/wp1_candidate_catalog/candidate_catalog_20260817/summary.md",
+        "sha256": "6a38087d68f0a61e202864b0aa7dfe6c816a49de8720f0a4dc3b6a0f243ab8a8"
+      },
+      {
+        "path": "eval/schemas/episode_v0.1.schema.json",
+        "sha256": "6d3be675383474a26c77e7f2ecc6566afc672fb2be07a436b6745d0043e43f3d"
+      },
+      {
+        "path": "eval/schemas/infer_response_v0.1.schema.json",
+        "sha256": "c1c44d3fe1617886c1d7a8e1c6f341edd21ce91020d0f49589fd83a3f73ec378"
+      },
+      {
+        "path": "eval/schemas/run_manifest_v0.1.schema.json",
+        "sha256": "5873b40893677443ef71f53a251781a3ba361e05944373493abaeb9ab82cada8"
+      },
+      {
+        "path": "scripts/build_product_b1_corpus.py",
+        "sha256": "e5e24a287677ccbecfdeb06107effb267b2599c26d08cee8e32133ccf0164088"
+      },
+      {
+        "path": "scripts/capture_b0_baseline.py",
+        "sha256": "ae5527ff99e46938c8169bc4b877cd75db1e6b2a9e65227a03867f4c7cf74e9c"
+      },
+      {
+        "path": "scripts/eval_image_ocr.py",
+        "sha256": "181660272ec660fe5ad7c359c724b751304c32e37978839f75724ee732951ead"
+      },
+      {
+        "path": "scripts/eval_product_b1_ingestion.py",
+        "sha256": "b6e38e0c9eb645c13d77d189c152ff8fc52788c9b47ed9b1070e29f3ba8b4a4c"
+      },
+      {
+        "path": "scripts/eval_project_query.py",
+        "sha256": "19207afce5cd120572b105c58dcf864c26d3a93d3046881e8db64d4ed08597a3"
+      },
+      {
+        "path": "tests/test_baseline_schemas.py",
+        "sha256": "b05fc90d1896f5be642310acb997b4aa86149f2eeb4b7b96e8a750a7264d8ea8"
+      },
+      {
+        "path": "tests/test_image_ocr.py",
+        "sha256": "835afb77578c7e66b1f491c3a2e4ab2c9feb428b61bf5b940242f80c14b92101"
+      },
+      {
+        "path": "tests/test_image_ocr_eval.py",
+        "sha256": "68a6ed9d5a2cda67225b1ea38f370a2bda2b67ddad1e4a6710b75adf8af582c6"
+      },
+      {
+        "path": "tests/test_interaction_context.py",
+        "sha256": "ccdc778c28c30bdb18dc13579c5949ee4ba5c2db16f79e0cdd3b080f7bb25584"
+      },
+      {
+        "path": "tests/test_product_b1_corpus.py",
+        "sha256": "a433b72a2e42ce7160d4eba0105a6dd33a8efb18458a929848112c050562a4aa"
+      },
+      {
+        "path": "tests/test_project_catalog.py",
+        "sha256": "e3e3c9f4155e07cc1477c3bf16243b4d15149848262393a5646dbd6b5af8993c"
+      },
+      {
+        "path": "tests/test_project_query_eval.py",
+        "sha256": "9cb846d5ed3f48e0ff4c06d63f8eb06401121cdeb87924a104db23ef875b9100"
+      }
+    ],
+    "workspace_state_sha256": "2c7e5e74c30dc485007b402e6cc9f618860213a1b7d46c0dcc785069d53e63ed"
+  },
+  "environment": {
+    "python": "3.10.20",
+    "mode": "unscoped_lexical"
+  },
+  "inputs": [
+    {
+      "path": "eval/project_query_benchmark_v0.1.json",
+      "sha256": "0c4f2e707e96d5e589143f1e1b1ca90a381d52a979432568391bd253c3f77fa8",
+      "bytes": 7730,
+      "provenance": "frozen synthetic WP1 evaluation dataset"
+    }
+  ],
+  "components": {
+    "retriever": "character/token overlap; ties prefer latest imported_at; no project, performed_at, type, or version filtering",
+    "top_k": 3
+  },
+  "outputs": {
+    "predictions": "predictions.jsonl",
+    "metrics": "metrics.json",
+    "latency": "latency.jsonl",
+    "failures": "failures.jsonl",
+    "summary": "summary.md"
+  },
+  "limitations": [
+    "This B1 is a deterministic simple baseline, not a live replay of the archived RAG system.",
+    "The benchmark is synthetic and measures only project, time, type, and version isolation semantics."
+  ]
+}

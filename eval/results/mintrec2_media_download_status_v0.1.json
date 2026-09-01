@@ -1,0 +1,13 @@
+{
+  "schema_version": "souldrive_topic5_public_media_download_status_v0.1",
+  "dataset": "MIntRec2.0",
+  "target": "MIntRec2.0_video.tar.gz",
+  "expected_bytes": 9162133399,
+  "partial_bytes": 427819008,
+  "completed_range_bytes": 4429185024,
+  "available_bytes": 4857004032,
+  "verified": false,
+  "source_revision": "ff135d32adaac2c3d5b0268e88a7ce6af200f544",
+  "sha256": "78bd9ab4a0f9e5768ed2a094524165ecc51926e210a4701a9548d036a68d5e29",
+  "note": "Partial bytes are retained for resumable download and are not usable dataset media."
+}

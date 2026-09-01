@@ -1,0 +1,41 @@
+{
+  "schema_version": "rag_answer_quality_gate_recheck_v0.1",
+  "performed_at": "2026-08-30T02:04:23+08:00",
+  "change": "repeated_answer_block_quality_gate",
+  "dataset": "eval/fixtures/rag_cn_raw_v0.1/dev.jsonl",
+  "workspace": "runtime/rag-cn-hierarchy-recheck-20260830",
+  "model": "qwen2.5-3b-instruct-q4_k_m.gguf",
+  "comparison": {
+    "before_result": "eval/results/rag_cn_dev_answer_correction_recheck_20260830.jsonl",
+    "candidate_result": "eval/results/rag_cn_dev_answer_quality_gate_recheck_20260830.jsonl",
+    "sample_count": 16,
+    "retrieval_all_hit_at_6": {"before": 1.0, "candidate": 1.0},
+    "citation_valid_rate": {"before": 1.0, "candidate": 1.0},
+    "answerable_pass_rate": {"before": 1.0, "candidate": 1.0},
+    "keyword_coverage": {"before": 0.96875, "candidate": 1.0},
+    "repeated_output_rows": {"before": 1, "candidate": 0},
+    "max_answer_chars": {"before": 1522, "candidate": 467},
+    "mean_end_to_end_ms": {"before": 4827.4, "candidate": 3390.6},
+    "changed_answer_rows": 11
+  },
+  "quality_gate": {
+    "checks": [
+      "repeated numbered Markdown headings",
+      "exact repeated long answer blocks"
+    ],
+    "action": "reuse existing extractive evidence fallback",
+    "citation_contract": "unchanged"
+  },
+  "validation": {
+    "targeted_tests": "85 passed",
+    "full_backend_tests": "713 passed, 1 warning",
+    "compileall": "passed",
+    "git_diff_check": "passed"
+  },
+  "interpretation": "The candidate run removed the observed repeated-answer pathology while preserving retrieval and citation metrics. Local 3B generation is not seeded and 11 answer strings changed between runs, so the keyword and latency differences are observations rather than a causal accuracy claim.",
+  "limitations": [
+    "This is a 16-sample dev rerun on an isolated plaintext index, not a sealed-test or real-business result.",
+    "The gate detects exact structural repetition conservatively; broader semantic answer quality still needs labeled evaluation.",
+    "No retrieval weight, metric definition, sealed data, or production encrypted workspace was changed."
+  ]
+}

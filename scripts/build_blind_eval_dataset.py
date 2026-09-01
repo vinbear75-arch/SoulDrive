@@ -83,6 +83,7 @@ def main() -> None:
 def refresh_record(record: dict, index: int, docs: dict, doc_order: list[str]) -> dict:
     record = dict(record)
     record["id"] = f"SRQ3-{index:03d}"
+    record["split"] = "sealed_test"
     record["allows_title_reference"] = bool(record.get("allows_title_reference"))
     focus = list(record.get("focus", []))
     doc_ids = list(record.get("doc_ids") or [])

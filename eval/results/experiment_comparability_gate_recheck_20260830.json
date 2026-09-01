@@ -1,0 +1,54 @@
+{
+  "schema_version": "experiment_comparability_gate_recheck_v0.1",
+  "performed_at": "2026-08-30T04:07:28+08:00",
+  "status": "implemented_increment",
+  "change": "strict_full_metric_and_provenance_comparability_gate",
+  "problem": "两次运行只有部分指标匹配，或数据集/脚本版本不一致时，旧比较器仍会暴露已匹配指标的数值变化，容易把部分差异误读为完整实验结论。",
+  "design_basis": [
+    {
+      "name": "MLflow Tracking",
+      "url": "https://mlflow.org/docs/latest/tracking",
+      "adapted_mechanism": "把 run 的指标、参数、数据集和产物视为同一可复现运行的元数据；SoulDrive 在比较时将数据集、脚本和完整指标集合一起作为门控条件。"
+    },
+    {
+      "name": "SoulDrive roadmap S2",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "遵循不可比材料不计算百分比变化、差异必须带来源和缺失字段的验收要求。"
+    }
+  ],
+  "contract": {
+    "required_run_provenance": [
+      "same_project",
+      "dataset_version",
+      "evaluation_script_ref"
+    ],
+    "required_metric_contract": [
+      "metric name",
+      "unit",
+      "definition_version",
+      "split",
+      "direction"
+    ],
+    "strict_behavior": "只有运行元数据和全部指标集合均可匹配时才返回 changes；部分匹配或任何不兼容项返回 changes=[]，同时保留 matching_metric_count、missing_or_incompatible_metrics 和 change_computation=blocked。",
+    "evidence_boundary": "不兼容时不计算绝对/相对差异；可比时每个变化继续保留 baseline/current 的 evidence_version_id、file_ref 和 source_locator。"
+  },
+  "verification": {
+    "targeted_regression": "19 passed, 1 warning",
+    "backend_full": "737 passed, 1 warning",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "regression_cases": [
+      "数据集版本不一致时不再返回数值变化",
+      "当前运行多出一个指标时，部分匹配仍阻断完整比较",
+      "可比运行继续返回带来源定位的绝对/相对变化",
+      "项目/API 既有实验导入、查询和比较契约保持通过"
+    ]
+  },
+  "interpretation": "该增量修复了比较结果可能泄露部分差异的可靠性问题，并通过定向与后端全量回归；它不代表实验数据质量、RAG 准确率或模型效果已经提升。",
+  "limitations": [
+    "正式加密工作区尚未导入并重跑一批真实跨月份实验，因此没有真实业务比较质量结论。",
+    "当前仍是严格门控和确定性账本比较，不替代人工确认因果、重复运行置信区间或完整实验报告摄取。",
+    "S2 的创建/版本化接口完整性、低置信度字段确认卡和真实材料覆盖仍未全部达到路线图验收门。",
+    "本次未修改模型、检索排序、评测数据或主评测口径。"
+  ]
+}

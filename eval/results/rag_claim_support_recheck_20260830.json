@@ -1,0 +1,60 @@
+{
+  "schema_version": "rag_claim_support_recheck_v0.1",
+  "performed_at": "2026-08-30T03:44:00+08:00",
+  "status": "implemented_increment",
+  "change": "claim_to_citation_support_gate",
+  "design_basis": [
+    {
+      "name": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067",
+      "adapted_mechanism": "把检索质量与生成/引用质量分开检查；生成后对每条 claim 的引用进行独立校验。"
+    },
+    {
+      "name": "CRAG",
+      "url": "https://arxiv.org/abs/2401.15884",
+      "adapted_mechanism": "检索/证据质量不足时进入受控重试或保守回退，而不是继续生成无依据答案。"
+    },
+    {
+      "name": "SoulDrive roadmap",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adapted_mechanism": "事实性回答必须带可定位引用；Playbook 产物的事实级 E#/V#/A#/M# 语义校验仍需逐步完成。"
+    }
+  ],
+  "contract": {
+    "existing_checks": "保留引用 ID 存在性、每个 claim 有引用和未知 ID 拒绝。",
+    "support_check": "生产生成路径启用 semantic=true，对每条带引用的 claim 只汇总被引用证据的章节、章节路径、摘录和原始上下文，要求主题词有最低重叠；标题和文件名只用于来源定位，不单独支撑事实。",
+    "numeric_boundary": "claim 中出现的数字/百分比/模型规格等事实 token 必须在其引用证据中出现，否则重试或回退。",
+    "retry": "支持不足时复用现有 ANSWER_RETRY_LIMIT 和引用修复链，不增加模型调用类型；重试提示明确要求引用与结论相符。",
+    "explainability": "校验结果记录 shared_terms、coverage、missing_fact_tokens 和 unsupported_claims，便于错误分析。",
+    "scaffold_boundary": "固定来源/章节/证据定位脚手架只用于定位，不作为事实 claim；实际结论仍需引用。",
+    "location_boundary": "页码、切片号和引用序号不作为业务数字参与支持判定，其他数字事实仍需在证据正文中出现。",
+    "scope": "只使用当前回答的 E#/V#/A# 证据，不把 GraphRAG community report 当作事实来源。"
+  },
+  "verification": {
+    "answer_quality_and_prompting": "76 passed",
+    "backend_full": "736 passed, 1 warning",
+    "python_compileall": "passed",
+    "git_diff_check": "passed",
+    "audit_summary": {
+      "event": "rag.completed",
+      "fields": ["citation_validation.mode", "citation_validation.valid", "citation_validation.checked_claim_count", "citation_validation.unsupported_claim_count"],
+      "mode": "claim_support_lexical",
+      "purpose": "让回答审计能够区分引用 ID 存在但正文不支持 claim 的失败。"
+    },
+    "regression_cases": [
+      "无关事实和证据不匹配时拒绝",
+      "claim 数字不在证据中时拒绝",
+      "视觉证据中的准确率数字匹配时接受",
+      "既有未知引用、缺少引用、重试和抽取式回退仍通过",
+      "来源/章节/证据说明等固定定位脚手架不再被误判为事实 claim，但真实无引用结论仍拒绝",
+      "无证据的视觉/语音专用回答路径保持原有行为"
+    ]
+  },
+  "interpretation": "该增量把生成后校验从“引用 ID 存在”收紧到“引用内容对 claim 有可解释的本地支持”，并通过现有回归；它不是 NLI/LLM entailment，也不证明事实为真、回答准确率或 sealed-test 指标提升。",
+  "limitations": [
+    "支持判定是确定性词法代理，中文分词、同义改写和隐含推理可能产生假拒绝或假接受。",
+    "尚未为所有 PPT/邮件/日程产物事实建立 E#/V#/A#/M# 级逐事实映射。",
+    "尚未在冻结真实业务 episode 和 sealed-test 上统计 citation validity、claim support precision/recall 或回答准确率。",
+    "本次未修改模型权重、检索排序权重、评测数据或主评测口径。"
+  ]
+}

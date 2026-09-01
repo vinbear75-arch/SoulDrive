@@ -1,0 +1,16 @@
+{
+  "schema_version": "souldrive_public_data_provenance_v0.1",
+  "dataset": "ScreenSpot",
+  "scope": "official fixed benchmark annotations and images",
+  "source": "https://box.nju.edu.cn/d/5b8892c1901c4dbeb715/",
+  "source_repository": "https://github.com/njucckevin/SeeClick",
+  "source_revision": "0ef37ac4d7aaf37ba7b990e3e3c3ca77e1fb8f93",
+  "license_boundary": "SeeClick code is Apache-2.0; README states dataset images retain original-source licenses. Redistribution and competition use require checking those original licenses.",
+  "files": [
+    {"path": "screenspot_desktop.json", "sha256": "D101500A238F2F7D7F00684279C0DE4D8E046EA5FC410B609D86C8D15A600A0D", "samples": 334},
+    {"path": "screenspot_mobile.json", "sha256": "7EA52A90FEB79C039560232E24BA0209824D21EC7ADC3755C8A629343F54C0CD", "samples": 502},
+    {"path": "screenspot_web.json", "sha256": "0DF1F5A55A2255F32E26314A8FA299A38449CCBAC7C04457E7810923EBA97352", "samples": 436},
+    {"path": "screenspot_imgs.tar", "sha256": "76AEB06A56D86DA2BD404BDA31B3D240608DA08064CDB2C945F03B562D0D9C69", "bytes": 597412864}
+  ],
+  "evaluation_boundary": "B0_FIXED_CENTER is a geometry-free lower bound. It is not an OCR, VLM, voice, personalization, or competition score."
+}

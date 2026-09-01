@@ -1,0 +1,55 @@
+{
+  "schema_version": "souldrive_multimodal_perception_capture_warmup_v0.1",
+  "performed_at": "2026-08-30",
+  "scope": "user-authorized audio capture to local ASR/OCR model readiness",
+  "design_basis": [
+    {
+      "name": "Microsoft GraphRAG query overview",
+      "url": "https://microsoft.github.io/graphrag/query/overview/",
+      "adaptation": "把感知预热与后续文档/图谱检索分开计时，不把前置模型构造误计为答案质量。"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "adaptation": "保持多模态输入的可追踪边界；预热只改变运行时准备，不创建或注入证据。"
+    },
+    {
+      "name": "SoulDrive roadmap",
+      "path": "docs/plans/2026-08-29-souldrive-competition-value-roadmap.md",
+      "adaptation": "只在用户明确授权录音或屏幕采集后前移本地模型构造，仍保留端到端 P95 验收门。"
+    }
+  ],
+  "implementation": {
+    "trigger": "麦克风授权并正式开始录音后启动后台 ASR/OCR 预热",
+    "deduplication": "前端以单个 in-flight Promise 合并重复预热请求",
+    "handoff": "真正执行端侧感知前等待尚未完成的预热；预热失败仍沿用运行时原有按需加载",
+    "privacy": "预热接口只构造本地模型，不读取录音内容、不读取屏幕、不执行推理",
+    "manual_entry": "原有手动预热按钮复用同一请求，保留服务端错误状态和阶段信息"
+  },
+  "verification": {
+    "frontend_tests": "pass",
+    "frontend_build": "pass",
+    "backend_full_tests": "828 passed, 1 warning",
+    "python_compileall": "pass",
+    "tauri_fmt_check": "pass",
+    "tauri_cargo_check": "pass",
+    "wiring_regression": "capture-triggered prewarm and pre-inference await assertion passed"
+  },
+  "real_pilot_observation": {
+    "report": "eval/results/real_mmi_perception_warmup_10_20260830/metrics.json",
+    "sample_count": 10,
+    "warmup_ms": 9665.257,
+    "first_measured_request_ms": 2020.935,
+    "steady_state_p50_ms": 84.691,
+    "steady_state_p95_ms": 1540.954,
+    "failure_count": 0,
+    "measurement_scope": "perception_and_alignment_only"
+  },
+  "decision": "integrate_capture_triggered_warmup",
+  "production_default_change": "capture_triggered_only",
+  "limitations": [
+    "现有 pilot 只有 10 条且来自同一演示语料，不代表跨应用、分辨率、说话人或困难样本。",
+    "该测量未接入完整 RAG、首 token 和完整回答，不能证明路线图要求的端到端 P95 小于 5 秒。",
+    "预热成本仍存在，只是移动到用户授权采集后的后台时段；设备资源竞争和真实交互体验需在新增 episode 上复核。"
+  ]
+}

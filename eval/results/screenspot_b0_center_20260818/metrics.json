@@ -1,0 +1,21 @@
+{
+  "schema_version": "screenspot_metrics_v0.1",
+  "sample_count": 1272,
+  "accuracy": 0.026729559748427674,
+  "by_platform": {
+    "mobile": 0.035856573705179286,
+    "desktop": 0.02694610778443114,
+    "web": 0.016055045871559634
+  },
+  "by_type": {
+    "text": 0.03299856527977044,
+    "icon": 0.019130434782608695
+  },
+  "missing_predictions": 0,
+  "latency_ms": {
+    "p50": 0.0,
+    "p95": 0.0
+  },
+  "official_rule": "normalized predicted point lies inside pixel bbox converted from [x,y,width,height]",
+  "limitations": []
+}

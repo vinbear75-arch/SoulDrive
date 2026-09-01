@@ -1,0 +1,52 @@
+{
+  "schema_version": "souldrive_personalization_profile_management_recheck_v0.1",
+  "performed_at": "2026-08-30",
+  "design_basis": [
+    {
+      "name": "Mem0",
+      "url": "https://github.com/mem0ai/mem0",
+      "borrowed_mechanism": "区分 user/project/run 作用域，并允许记忆更新和删除。"
+    },
+    {
+      "name": "Letta",
+      "url": "https://github.com/letta-ai/letta",
+      "borrowed_mechanism": "记忆应可检查、可演进，并由系统状态而非提示词单独承担边界。"
+    },
+    {
+      "name": "Claude Code permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "borrowed_mechanism": "将用户确认和强制边界放在模型之外。"
+    }
+  ],
+  "implemented": [
+    "偏好记录保留 confirmation_status、confirmed_at、last_used_at、record_version、scope、project_id 和 source_trace。",
+    "编辑在同一事务中同步加密 memories 与 learning_chunks，防止旧标题或内容继续参与检索。",
+    "停用为软撤销，删除需 confirm=true 并从活动索引移除；两者都保留加密审计同步入口。",
+    "管理 API 按当前项目返回 project_plus_global，其他项目的 project memory 不进入管理列表。",
+    "实际注入 RAG 上下文后记录 last_used_at，长期未使用或未人工确认的偏好在读取门中降低权重。",
+    "读取门对明确相反的 user_preference 做有界冲突消解：项目范围优先、人工确认优先，并记录被拒绝的冲突 ID。",
+    "新增只读成对画像评测契约，固定同一问题/证据下的 Preference Adherence、Factual Invariance、Citation Invariance、Irrelevant Preference Rejection 和 Cross-project Leakage Rate。"
+  ],
+  "verification": {
+    "targeted_backend_tests": "58 passed, 1 warning",
+    "paired_seed_eval": {
+      "dataset": "eval/personalization_pair_v0.1.jsonl",
+      "sample_count": 2,
+      "pass_rate": 1.0,
+      "preference_adherence": 1.0,
+      "factual_invariance": 1.0,
+      "citation_invariance": 1.0,
+      "cross_project_leakage_rate": 1.0,
+      "note": "仅为契约种子样例，不代表真实业务或竞赛准确率。"
+    },
+    "frontend_tests_and_build": "npm test and npm run build passed; existing bundle size warning only",
+    "full_backend_regression": "764 passed, 1 warning"
+  },
+  "limitations": [
+    "当前没有至少 30 条独立真实 episode 的成对画像结果。",
+    "成对评测使用可见事实词和引用 ID 做契约检查，不等价于 NLI、人工事实判断或真实用户 Preference Adherence。",
+    "长期未使用衰减目前是确定性读取权重，不替代人工确认，也没有自动删除偏好。",
+    "正式加密工作区、跨项目真实问答、sealed-test 和完整多模态 P95 仍未重新冻结验证。"
+  ],
+  "status": "implemented_contract_not_competition_gate"
+}
