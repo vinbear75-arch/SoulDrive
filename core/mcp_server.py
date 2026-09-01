@@ -200,6 +200,7 @@ session_store_workspace_path: str | None = None
 session_store_lock = threading.Lock()
 indexer_process: subprocess.Popen | None = None
 indexer_lock = threading.Lock()
+_graphrag_auto_start_attempted: set[str] = set()
 presentation_threads: dict[str, threading.Thread] = {}
 presentation_thread_lock = threading.Lock()
 document_delete_authorizations: dict[str, dict[str, float | str]] = {}
@@ -3569,6 +3570,18 @@ async def diagnostics_graphrag(project_id: str | None = Query(default=None, max_
                 diagnostics["status"] = "ready"
             else:
                 diagnostics["status"] = "not_built"
+            if not diagnostics.get("ready") and diagnostics.get("status") == "not_built":
+                workspace_key = str(workspace.root_path)
+                discovered_files = int(indexing.get("discovered_files") or 0)
+                if discovered_files > 0 and workspace_key not in _graphrag_auto_start_attempted:
+                    _graphrag_auto_start_attempted.add(workspace_key)
+                    try:
+                        process = _start_indexer_worker(workspace, str(state.get("auth_level") or "PRO"))
+                        if process is not None:
+                            diagnostics.update(status="building", reason="graphrag_auto_build_started")
+                            indexing_status = "queued"
+                    except Exception as exc:
+                        logger.warning("[GraphRAG] automatic build start failed: %s", exc)
         diagnostics["indexing_status"] = indexing_status
         return diagnostics
     finally:

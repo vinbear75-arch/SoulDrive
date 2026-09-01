@@ -390,6 +390,35 @@ def test_graphrag_diagnostics_reports_building_from_indexing_state():
     assert response.json()["indexing_status"] == "indexing"
 
 
+def test_graphrag_diagnostics_starts_a_missing_index_once_when_documents_exist():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+        state_path = str(Path(temp_dir) / "runtime_state.json")
+        graph_store = MagicMock()
+        graph_store.load_graphrag_index.return_value = None
+        with patch.object(runtime_state, "STATE_PATH", state_path), patch(
+            "core.mcp_server.current_workspace", return_value=workspace
+        ), patch("core.mcp_server.get_workspace_keys", return_value=object()), patch(
+            "core.mcp_server.SecureGraphStore", return_value=graph_store
+        ), patch("core.mcp_server._start_indexer_worker", return_value=object()) as start_worker, patch.dict(
+            "os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False
+        ):
+            runtime_state.unlock_runtime("PRO", "SN-1", temp_dir, workspace.root_path)
+            runtime_state.mark_software_unlocked()
+            runtime_state.update_indexing_status(status="completed", discovered_files=4)
+            mcp_server._graphrag_auto_start_attempted.clear()
+            client = TestClient(mcp_server.app)
+            response = client.get("/diagnostics/graphrag", headers={"X-SoulDrive-Token": "test-token"})
+            repeated = client.get("/diagnostics/graphrag", headers={"X-SoulDrive-Token": "test-token"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "building"
+    assert response.json()["reason"] == "graphrag_auto_build_started"
+    assert response.json()["indexing_status"] == "queued"
+    assert repeated.status_code == 200
+    start_worker.assert_called_once()
+
+
 def test_graphrag_diagnostics_reports_failed_build_from_indexer_observation():
     with tempfile.TemporaryDirectory() as temp_dir:
         workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()

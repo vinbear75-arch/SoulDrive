@@ -1298,7 +1298,7 @@ export default function App() {
   const [documentImportScope, setDocumentImportScope] = useState<"global" | "project">("global");
   const [documentScopeBusy, setDocumentScopeBusy] = useState(false);
   const [documentScopeMessage, setDocumentScopeMessage] = useState("");
-  const [artifactCollapsed, setArtifactCollapsed] = useState(true);
+  const [artifactCollapsed, setArtifactCollapsed] = useState(false);
   const [artifactTab, setArtifactTab] = useState<"evidence" | "graph" | "audit">("evidence");
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
   const [workbenchLayout, setWorkbenchLayout] = useState<WorkbenchLayoutPreference>(() => readWorkbenchLayoutPreference());
