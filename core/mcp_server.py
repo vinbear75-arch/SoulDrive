@@ -861,7 +861,7 @@ class EmailDraftRequest(BaseModel):
 
 
 class ScheduleDraftRequest(BaseModel):
-    project_id: str = Field(min_length=1, max_length=128)
+    project_id: str | None = Field(default=None, max_length=128)
     title: str = Field(min_length=1, max_length=240)
     start_at: str = Field(min_length=1, max_length=64)
     duration_minutes: int = Field(default=60, ge=5, le=1440)
@@ -2770,7 +2770,7 @@ async def contacts_resolve(request: ContactResolveRequest):
         catalog.close()
 
 
-def _draft_contact_or_response(catalog: ProjectCatalog, query: str, project_id: str):
+def _draft_contact_or_response(catalog: ProjectCatalog, query: str, project_id: str | None):
     matches = catalog.resolve_contacts(query, project_id=project_id)
     if not matches:
         return None, JSONResponse({"error": "contact_not_found", "query": query}, status_code=404)
@@ -2786,7 +2786,7 @@ def _draft_contact_or_response(catalog: ProjectCatalog, query: str, project_id: 
 
 def _artifact_source_refs(
     catalog: ProjectCatalog,
-    project_id: str,
+    project_id: str | None,
     source_names: list[str] | None = None,
     source_version_ids: list[str] | None = None,
 ) -> tuple[list[str], list[dict[str, str]]]:
@@ -2802,7 +2802,7 @@ def _artifact_source_refs(
         if not name:
             continue
         evidence = catalog.find_asset_version_for_file(name)
-        if evidence is not None and str(evidence.get("project_id") or "") == project_id:
+        if evidence is not None and (project_id is None or str(evidence.get("project_id") or "") == project_id):
             version_id = str(evidence.get("version_id") or "").strip()
             if version_id and version_id not in resolved_ids:
                 resolved_ids.append(version_id)
@@ -2917,9 +2917,12 @@ async def schedule_draft_create(request: ScheduleDraftRequest):
         return locked_response
     catalog = ProjectCatalog(current_workspace())
     try:
+        context_project_id = str(request.project_id or "").strip() or None
+        if context_project_id and not _project_exists(current_workspace(), context_project_id):
+            return JSONResponse({"error": "unknown project"}, status_code=404)
         participant = None
         if request.participant_query:
-            participant, response = _draft_contact_or_response(catalog, request.participant_query, request.project_id)
+            participant, response = _draft_contact_or_response(catalog, request.participant_query, context_project_id)
             if response is not None:
                 return response
         plan = {
@@ -2939,13 +2942,13 @@ async def schedule_draft_create(request: ScheduleDraftRequest):
         }
         source_version_ids, source_refs = _artifact_source_refs(
             catalog,
-            request.project_id,
+            context_project_id,
             source_version_ids=request.source_version_ids,
         )
         plan["source_refs"] = source_refs
         try:
             artifact_id = catalog.create_artifact(
-                request.project_id,
+                None,
                 "schedule_draft",
                 plan,
                 idempotency_key=request.idempotency_key,
@@ -2971,11 +2974,27 @@ async def schedule_draft_create(request: ScheduleDraftRequest):
         artifact = catalog.get_artifact(artifact_id)
         current_audit_logger().append_event(
             "artifact.schedule_draft_created",
-            {"artifact_id": artifact_id, "project_id": request.project_id},
+            {"artifact_id": artifact_id, "project_id": None, "context_project_id": context_project_id},
         )
         return {"artifact": artifact}
     except (ValueError, sqlite3.IntegrityError) as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
+    finally:
+        catalog.close()
+
+
+@app.get("/schedules")
+async def global_schedules():
+    """Return all schedules; calendar is workspace-wide, not project-scoped."""
+    mounted_response = require_workspace_mounted()
+    if mounted_response is not None:
+        return mounted_response
+    locked_response = require_software_unlock()
+    if locked_response is not None:
+        return locked_response
+    catalog = ProjectCatalog(current_workspace())
+    try:
+        return {"artifacts": catalog.list_artifacts(None, artifact_type="schedule_draft")}
     finally:
         catalog.close()
 
@@ -3540,6 +3559,12 @@ async def diagnostics_graphrag(project_id: str | None = Query(default=None, max_
                     status="disabled",
                     reason=str(observed.get("reason") or "auth_level_not_graph_enabled"),
                 )
+            elif observed_status == "completed" and not diagnostics.get("ready"):
+                diagnostics.update(
+                    status="not_built",
+                    reason="graphrag_index_missing_runtime_state_stale",
+                    observation_stale=True,
+                )
             elif diagnostics.get("ready"):
                 diagnostics["status"] = "ready"
             else:
@@ -4012,7 +4037,7 @@ def _project_exists(workspace: SoulDriveWorkspace, project_id: str) -> bool:
 
 def _verified_source_version_ids(
     catalog: ProjectCatalog,
-    project_id: str,
+    project_id: str | None,
     source_version_ids: list[str],
 ) -> list[str]:
     """Keep explicitly supplied source versions inside the selected project."""
@@ -4024,18 +4049,27 @@ def _verified_source_version_ids(
     if not cleaned:
         return []
     placeholders = ",".join("?" for _ in cleaned)
-    rows = catalog.conn.execute(
-        f"""
-        SELECT v.version_id
-        FROM asset_versions v
-        JOIN assets a ON a.asset_id = v.asset_id
-        WHERE a.project_id = ? AND v.version_id IN ({placeholders})
-        """,
-        [project_id, *cleaned],
-    ).fetchall()
+    if project_id:
+        rows = catalog.conn.execute(
+            f"""
+            SELECT v.version_id
+            FROM asset_versions v
+            JOIN assets a ON a.asset_id = v.asset_id
+            WHERE a.project_id = ? AND v.version_id IN ({placeholders})
+            """,
+            [project_id, *cleaned],
+        ).fetchall()
+    else:
+        rows = catalog.conn.execute(
+            f"SELECT version_id FROM asset_versions WHERE version_id IN ({placeholders})",
+            cleaned,
+        ).fetchall()
     verified = {str(row[0]) for row in rows}
     if verified != set(cleaned):
-        raise ValueError("source_version_ids must belong to the selected project")
+        raise ValueError(
+            "source_version_ids must belong to the selected project"
+            if project_id else "source_version_ids contain unknown versions"
+        )
     return cleaned
 
 

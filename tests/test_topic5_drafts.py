@@ -240,12 +240,16 @@ def test_schedule_draft_normalizes_html_datetime_for_ics_export():
             client = TestClient(mcp_server.app)
             headers = {"X-SoulDrive-Token": "draft-token"}
             created = client.post("/drafts/schedule", headers=headers, json={"project_id": "demo", "title": "组会", "start_at": "2026-08-24T10:00", "duration_minutes": 60})
+            listed = client.get("/schedules", headers=headers)
 
     assert created.status_code == 200
+    assert created.json()["artifact"]["project_id"] is None
     assert created.json()["artifact"]["confirmation_record"]["required"] is True
     assert "未写入外部日历" in created.json()["artifact"]["change_summary"]
     assert "T10:00:00" in created.json()["artifact"]["plan"]["start_at"]
     assert created.json()["artifact"]["plan"]["reminder_sound_enabled"] is True
+    assert listed.status_code == 200
+    assert [item["artifact_id"] for item in listed.json()["artifacts"]] == [created.json()["artifact"]["artifact_id"]]
 
 
 def test_schedule_draft_can_be_edited_and_confirmed_schedule_returns_to_draft():

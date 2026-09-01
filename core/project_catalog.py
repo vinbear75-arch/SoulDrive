@@ -165,7 +165,7 @@ class ProjectCatalog:
 
             CREATE TABLE IF NOT EXISTS artifacts (
                 artifact_id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+                project_id TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
                 artifact_type TEXT NOT NULL,
                 idempotency_key TEXT UNIQUE,
                 source_version_ids_json TEXT NOT NULL DEFAULT '[]',
@@ -200,14 +200,102 @@ class ProjectCatalog:
         measurement_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(measurements)")}
         if "source_locator" not in measurement_columns:
             self.conn.execute("ALTER TABLE measurements ADD COLUMN source_locator TEXT NOT NULL DEFAULT ''")
-        artifact_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(artifacts)")}
+        artifact_info = list(self.conn.execute("PRAGMA table_info(artifacts)"))
+        artifact_columns = {row[1] for row in artifact_info}
+        artifact_needs_confirmation_backfill = "confirmation_record_json" not in artifact_columns
+        artifact_needs_change_summary_backfill = "change_summary" not in artifact_columns
+        artifact_project = next((row for row in artifact_info if row[1] == "project_id"), None)
+        if artifact_project is not None and int(artifact_project[3] or 0) == 1:
+            # Rebuild the parent and child tables together; SQLite otherwise
+            # leaves email_deliveries pointing at the renamed legacy table.
+            self.conn.commit()
+            self.conn.execute("PRAGMA foreign_keys = OFF")
+            try:
+                email_exists = self.conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'email_deliveries'"
+                ).fetchone() is not None
+                if email_exists:
+                    self.conn.execute("ALTER TABLE email_deliveries RENAME TO email_deliveries_legacy_artifact_scope")
+                self.conn.execute("ALTER TABLE artifacts RENAME TO artifacts_legacy_project_scope")
+                self.conn.executescript(
+                    """
+                    CREATE TABLE artifacts (
+                        artifact_id TEXT PRIMARY KEY,
+                        project_id TEXT REFERENCES projects(project_id) ON DELETE CASCADE,
+                        artifact_type TEXT NOT NULL,
+                        idempotency_key TEXT UNIQUE,
+                        source_version_ids_json TEXT NOT NULL DEFAULT '[]',
+                        plan_json TEXT NOT NULL DEFAULT '{}',
+                        confirmation_status TEXT NOT NULL,
+                        confirmation_record_json TEXT NOT NULL DEFAULT '{}',
+                        change_summary TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE TABLE email_deliveries (
+                        artifact_id TEXT PRIMARY KEY REFERENCES artifacts(artifact_id) ON DELETE CASCADE,
+                        idempotency_key TEXT NOT NULL UNIQUE,
+                        status TEXT NOT NULL,
+                        sent_at TEXT,
+                        detail_json TEXT NOT NULL DEFAULT '{}'
+                    );
+                    """
+                )
+                artifact_target_columns = (
+                    "artifact_id", "project_id", "artifact_type", "idempotency_key",
+                    "source_version_ids_json", "plan_json", "confirmation_status",
+                    "confirmation_record_json", "change_summary", "created_at",
+                )
+                artifact_defaults = {
+                    "artifact_id": "''",
+                    "project_id": "NULL",
+                    "artifact_type": "'unknown'",
+                    "idempotency_key": "NULL",
+                    "source_version_ids_json": "'[]'",
+                    "plan_json": "'{}'",
+                    "confirmation_status": "'draft'",
+                    "confirmation_record_json": "'{}'",
+                    "change_summary": "''",
+                    "created_at": "CURRENT_TIMESTAMP",
+                }
+                select_expr = ", ".join(
+                    f'"{column}"' if column in artifact_columns else artifact_defaults[column]
+                    for column in artifact_target_columns
+                )
+                columns_sql = ", ".join(artifact_target_columns)
+                self.conn.execute(
+                    f"INSERT INTO artifacts ({columns_sql}) SELECT {select_expr} FROM artifacts_legacy_project_scope"
+                )
+                if email_exists:
+                    email_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(email_deliveries_legacy_artifact_scope)")}
+                    email_target_columns = ("artifact_id", "idempotency_key", "status", "sent_at", "detail_json")
+                    email_defaults = {"sent_at": "NULL", "detail_json": "'{}'"}
+                    email_select = ", ".join(
+                        f'"{column}"' if column in email_columns else email_defaults[column]
+                        for column in email_target_columns
+                    )
+                    email_columns_sql = ", ".join(email_target_columns)
+                    self.conn.execute(
+                        f"INSERT INTO email_deliveries ({email_columns_sql}) SELECT {email_select} FROM email_deliveries_legacy_artifact_scope"
+                    )
+                    self.conn.execute("DROP TABLE email_deliveries_legacy_artifact_scope")
+                self.conn.execute("DROP TABLE artifacts_legacy_project_scope")
+            finally:
+                self.conn.commit()
+                self.conn.execute("PRAGMA foreign_keys = ON")
+            artifact_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(artifacts)")}
+        # Calendar drafts are workspace-wide. Preserve all rows while removing
+        # the old project binding so switching projects cannot hide history.
+        self.conn.execute(
+            "UPDATE artifacts SET project_id = NULL WHERE artifact_type = 'schedule_draft' AND project_id IS NOT NULL"
+        )
         if "idempotency_key" not in artifact_columns:
             self.conn.execute("ALTER TABLE artifacts ADD COLUMN idempotency_key TEXT")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_idempotency_key ON artifacts(idempotency_key)")
-        if "confirmation_record_json" not in artifact_columns:
-            self.conn.execute(
-                "ALTER TABLE artifacts ADD COLUMN confirmation_record_json TEXT NOT NULL DEFAULT '{}'"
-            )
+        if artifact_needs_confirmation_backfill:
+            if "confirmation_record_json" not in artifact_columns:
+                self.conn.execute(
+                    "ALTER TABLE artifacts ADD COLUMN confirmation_record_json TEXT NOT NULL DEFAULT '{}'"
+                )
             for row in self.conn.execute(
                 "SELECT artifact_id, confirmation_status, plan_json, created_at FROM artifacts"
             ).fetchall():
@@ -226,10 +314,11 @@ class ProjectCatalog:
                         row["artifact_id"],
                     ),
                 )
-        if "change_summary" not in artifact_columns:
-            self.conn.execute(
-                "ALTER TABLE artifacts ADD COLUMN change_summary TEXT NOT NULL DEFAULT ''"
-            )
+        if artifact_needs_change_summary_backfill:
+            if "change_summary" not in artifact_columns:
+                self.conn.execute(
+                    "ALTER TABLE artifacts ADD COLUMN change_summary TEXT NOT NULL DEFAULT ''"
+                )
         self._backfill_measurement_revisions()
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
@@ -1132,7 +1221,7 @@ class ProjectCatalog:
 
     def create_artifact(
         self,
-        project_id: str,
+        project_id: str | None,
         artifact_type: str,
         plan: dict[str, Any],
         *,
@@ -1173,7 +1262,7 @@ class ProjectCatalog:
             """,
             (
                 artifact_id,
-                _required(project_id, "project_id"),
+                str(project_id).strip() if project_id is not None and str(project_id).strip() else None,
                 _required(artifact_type, "artifact_type"),
                 _required(idempotency_key, "idempotency_key") if idempotency_key else None,
                 json.dumps(_clean_list(source_version_ids, 64, 160), ensure_ascii=False),
@@ -1201,9 +1290,9 @@ class ProjectCatalog:
         item["confirmation_record"] = confirmation_record if isinstance(confirmation_record, dict) else {}
         return item
 
-    def list_artifacts(self, project_id: str, *, artifact_type: str | None = None) -> list[dict[str, Any]]:
-        query = ["SELECT artifact_id FROM artifacts WHERE project_id = ?"]
-        params: list[Any] = [project_id]
+    def list_artifacts(self, project_id: str | None, *, artifact_type: str | None = None) -> list[dict[str, Any]]:
+        query = ["SELECT artifact_id FROM artifacts WHERE project_id IS NULL"] if project_id is None else ["SELECT artifact_id FROM artifacts WHERE project_id = ?"]
+        params: list[Any] = [] if project_id is None else [project_id]
         if artifact_type:
             query.append("AND artifact_type = ?")
             params.append(artifact_type)

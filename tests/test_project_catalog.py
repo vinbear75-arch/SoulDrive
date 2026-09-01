@@ -94,6 +94,38 @@ def test_catalog_migrates_legacy_artifact_provenance_columns():
             catalog.close()
 
 
+def test_catalog_artifact_scope_migration_preserves_email_delivery_foreign_key():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+        legacy = sqlite3.connect(workspace.project_catalog_path)
+        try:
+            legacy.executescript(
+                """
+                CREATE TABLE projects (project_id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);
+                CREATE TABLE artifacts (artifact_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, artifact_type TEXT NOT NULL, source_version_ids_json TEXT NOT NULL DEFAULT '[]', plan_json TEXT NOT NULL DEFAULT '{}', confirmation_status TEXT NOT NULL, created_at TEXT NOT NULL);
+                CREATE TABLE email_deliveries (artifact_id TEXT PRIMARY KEY REFERENCES artifacts(artifact_id) ON DELETE CASCADE, idempotency_key TEXT NOT NULL UNIQUE, status TEXT NOT NULL, sent_at TEXT, detail_json TEXT NOT NULL DEFAULT '{}');
+                INSERT INTO projects VALUES ('legacy', '旧项目', 'active', '2026-08-01T00:00:00+00:00');
+                INSERT INTO artifacts VALUES ('artifact-legacy', 'legacy', 'email_draft', '[]', '{}', 'confirmed', '2026-08-01T00:00:00+00:00');
+                INSERT INTO email_deliveries VALUES ('artifact-legacy', 'delivery-1', 'sent', NULL, '{}');
+                """
+            )
+            legacy.commit()
+        finally:
+            legacy.close()
+
+        catalog = ProjectCatalog(workspace)
+        try:
+            assert catalog.conn.execute("PRAGMA foreign_key_check").fetchall() == []
+            assert catalog.conn.execute(
+                "SELECT status FROM email_deliveries WHERE artifact_id = 'artifact-legacy'"
+            ).fetchone()[0] == "sent"
+            catalog.conn.execute("DELETE FROM artifacts WHERE artifact_id = 'artifact-legacy'")
+            catalog.conn.commit()
+            assert catalog.conn.execute("SELECT COUNT(*) FROM email_deliveries").fetchone()[0] == 0
+        finally:
+            catalog.close()
+
+
 def test_project_stores_folder_and_memory_policy():
     temp_dir, workspace, catalog = _catalog()
     try:

@@ -636,6 +636,7 @@ interface GraphRagDiagnostics {
   error?: string;
   project_id?: string | null;
   indexing_status?: string;
+  observation_stale?: boolean;
   algorithm?: string;
   document_count?: number;
   entity_count?: number;
@@ -1636,17 +1637,20 @@ export default function App() {
   }, [apiBaseUrl, apiToken, runtimeConfigLoaded, runtimeStatus?.locked, smtpProvider, smtpSender]);
 
   useEffect(() => {
-    if (!draftOpen || !runtimeConfigLoaded || !activeProjectId) {
+    if (!draftOpen || !runtimeConfigLoaded || (draftKind === "email" && !activeProjectId)) {
       setContacts([]);
       return;
     }
     let active = true;
-    void fetch(`${apiBaseUrl}/contacts?project_id=${encodeURIComponent(activeProjectId)}`, { headers: authHeaders() })
+    const contactQuery = draftKind === "email" && activeProjectId
+      ? `?project_id=${encodeURIComponent(activeProjectId)}`
+      : "";
+    void fetch(`${apiBaseUrl}/contacts${contactQuery}`, { headers: authHeaders() })
       .then(async (response) => response.ok ? await response.json() as { contacts?: LocalContact[] } : { contacts: [] })
       .then((payload) => { if (active) setContacts(Array.isArray(payload.contacts) ? payload.contacts : []); })
       .catch(() => { if (active) setContacts([]); });
     return () => { active = false; };
-  }, [activeProjectId, apiBaseUrl, apiToken, draftOpen, runtimeConfigLoaded]);
+  }, [activeProjectId, apiBaseUrl, apiToken, draftKind, draftOpen, runtimeConfigLoaded]);
 
   useEffect(() => {
     setCollapsedNodeIds(new Set());
@@ -2036,14 +2040,6 @@ export default function App() {
     setWorkflowMessage("");
     setBaselineExperimentRunId("");
     setCurrentExperimentRunId("");
-    setProjectScheduleArtifacts([]);
-    setScheduleReminderArtifactId(null);
-    setScheduleReminderOpen(false);
-    setScheduleReminderPhase(null);
-    setScheduleReminderMessage("");
-    scheduleStartedEligibleRef.current.clear();
-    scheduleStartedNotifiedRef.current.clear();
-    scheduleReminderKeyRef.current = "";
     setScheduleExportPath("");
   }, [activeProjectId]);
 
@@ -2125,7 +2121,7 @@ export default function App() {
   }, [activeProjectId, apiBaseUrl, apiToken, runtimeConfigLoaded]);
 
   useEffect(() => {
-    if (!runtimeConfigLoaded || !apiToken || !activeProjectId) {
+    if (!runtimeConfigLoaded || !apiToken) {
       setProjectScheduleArtifacts([]);
       setScheduleReminderArtifactId(null);
       setScheduleReminderMessage("");
@@ -2140,8 +2136,8 @@ export default function App() {
     const headers = authHeaders();
     const loadSchedules = async () => {
       try {
-        const response = await fetch(`${apiBaseUrl}/projects/${encodeURIComponent(activeProjectId)}/artifacts?artifact_type=schedule_draft`, { headers });
-        if (!response.ok) throw new Error("project schedules unavailable");
+        const response = await fetch(`${apiBaseUrl}/schedules`, { headers });
+        if (!response.ok) throw new Error("global schedules unavailable");
         const payload = await response.json() as { artifacts?: ProjectArtifactSummary[] };
         if (active) setProjectScheduleArtifacts(Array.isArray(payload.artifacts) ? payload.artifacts : []);
       } catch {
@@ -2154,14 +2150,14 @@ export default function App() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [activeProjectId, apiBaseUrl, apiToken, runtimeConfigLoaded]);
+  }, [apiBaseUrl, apiToken, runtimeConfigLoaded]);
 
   useEffect(() => {
-    if (!activeProjectId || !projectScheduleArtifacts.length) return;
+    if (!projectScheduleArtifacts.length) return;
     setScheduleNowMs(Date.now());
     const timer = window.setInterval(() => setScheduleNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [activeProjectId, projectScheduleArtifacts.length]);
+  }, [projectScheduleArtifacts.length]);
 
   useEffect(() => {
     if (!visibleScheduleArtifacts.length) {
@@ -2210,7 +2206,7 @@ export default function App() {
       })
       .filter((item): item is { artifact: ProjectArtifactSummary; startMs: number } => Boolean(item))
       .filter((item) => item.artifact.confirmation_status !== "cancelled");
-    const scheduleKey = (item: { artifact: ProjectArtifactSummary; startMs: number }) => `${activeProjectId || "global"}:${item.artifact.artifact_id}:${item.startMs}`;
+    const scheduleKey = (item: { artifact: ProjectArtifactSummary; startMs: number }) => `${item.artifact.artifact_id}:${item.startMs}`;
     schedules
       .filter((item) => item.startMs > scheduleNowMs)
       .forEach((item) => scheduleStartedEligibleRef.current.add(scheduleKey(item)));
@@ -2243,7 +2239,7 @@ export default function App() {
       scheduleReminderKeyRef.current = "";
       return;
     }
-    const reminderBaseKey = `${activeProjectId || "global"}:${nextReminder.artifact.artifact_id}:${nextReminder.startMs}`;
+    const reminderBaseKey = `${nextReminder.artifact.artifact_id}:${nextReminder.startMs}`;
     const reminderKey = `${reminderBaseKey}:upcoming`;
     const remainingMinutes = Math.max(1, Math.ceil((nextReminder.startMs - now) / (60 * 1000)));
     scheduleReminderKeyRef.current = reminderKey;
@@ -2285,7 +2281,7 @@ export default function App() {
     } catch {
       // 声音提醒失败不影响界面提醒。
     }
-  }, [activeProjectId, projectScheduleArtifacts, scheduleNowMs, scheduleReminderArtifactId, scheduleReminderOpen]);
+  }, [projectScheduleArtifacts, scheduleNowMs, scheduleReminderArtifactId, scheduleReminderOpen]);
 
   useEffect(() => {
     if (latestMindmap) {
@@ -3303,7 +3299,7 @@ export default function App() {
       });
       setMediaMessage("已锁定框选区域，正在进入知识问答。");
     }
-    if (mediaFiles.audio && !result.speech_text.trim()) {
+    if (mediaFiles.audio && !result.speech_text.trim() && !query.trim()) {
       setMediaMessage("语音未得到可靠转写，本次未发送；请重录或确认文字后重试");
       return;
     }
@@ -3312,7 +3308,7 @@ export default function App() {
       return;
     }
     if (mediaFiles.audio && !forceConfirmed) {
-      const transcript = result.speech_text.trim();
+      const transcript = result.speech_text.trim() || query.trim();
       setInput(transcript);
       speechDraftRef.current = transcript;
       setSpeechConfirmationPending(true);
@@ -4182,7 +4178,7 @@ export default function App() {
 
   const openDraftBuilder = (kind: "email" | "schedule") => {
     selectDraftKind(kind);
-    if (!activeProjectId) setDraftMessage("请先选择一个项目，再创建草稿。");
+    if (kind === "email" && !activeProjectId) setDraftMessage("请先选择一个项目，再创建邮件草稿。");
     setDraftOpen(true);
   };
 
@@ -4382,7 +4378,7 @@ export default function App() {
   };
 
   const createLocalContact = async () => {
-    if (locked || !activeProjectId || !contactName.trim() || !contactEmail.trim()) return;
+    if (locked || (draftKind === "email" && !activeProjectId) || !contactName.trim() || !contactEmail.trim()) return;
     setDraftBusy(true);
     setContactMessage("正在保存本地联系人...");
     try {
@@ -4459,8 +4455,8 @@ export default function App() {
   };
 
   const createCommunicationDraft = async () => {
-    if (locked || !activeProjectId) {
-      setDraftMessage("请先选择一个已解锁的项目。");
+    if (locked || (draftKind === "email" && !activeProjectId)) {
+      setDraftMessage(draftKind === "email" ? "请先选择一个已解锁的项目。" : "请先解锁工作区。");
       return;
     }
     setDraftBusy(true);
@@ -4470,13 +4466,12 @@ export default function App() {
     try {
       const scheduleFingerprint = isEmail
         ? ""
-        : [activeProjectId, scheduleTitle.trim(), scheduleStartAt, String(scheduleDuration), scheduleParticipant.trim(), scheduleNotes.trim(), String(scheduleSoundEnabled)].join("|\u001f|");
+        : [scheduleTitle.trim(), scheduleStartAt, String(scheduleDuration), scheduleParticipant.trim(), scheduleNotes.trim(), String(scheduleSoundEnabled)].join("|\u001f|");
       if (!isEmail && !isScheduleEdit && scheduleDraftFingerprintRef.current !== scheduleFingerprint) {
         scheduleDraftFingerprintRef.current = scheduleFingerprint;
         scheduleDraftIdempotencyKeyRef.current = crypto.randomUUID();
       }
       const schedulePayload = {
-        ...(!isScheduleEdit ? { project_id: activeProjectId } : {}),
         title: scheduleTitle.trim(),
         start_at: scheduleStartAt,
         duration_minutes: scheduleDuration,
@@ -5468,9 +5463,11 @@ export default function App() {
                         ? "工作区已锁定（解锁后查看）"
                       : graphRagDiagnostics.status === "disabled"
                         ? "未启用"
-                        : graphRagDiagnostics.ready
+                      : graphRagDiagnostics.ready
                           ? `Leiden · ${graphRagDiagnostics.community_count ?? 0} 社区`
-                          : "未构建（请在知识文档区重建）"}
+                          : graphRagDiagnostics.observation_stale
+                            ? "未构建（运行记录已完成，但当前索引文件缺失；请重建）"
+                            : "未构建（请在知识文档区重建）"}
                 </strong>
               </div>
               <div>
@@ -6631,7 +6628,7 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  disabled={draftBusy || locked || !activeProjectId}
+                  disabled={draftBusy || locked || (draftKind === "email" && !activeProjectId)}
                   onClick={() => { setContactMessage(""); setContactDialogOpen(true); }}
                 >
                   <UserRoundPlus size={15} />
@@ -6815,7 +6812,7 @@ export default function App() {
                       <span>说明（可选）</span>
                       <textarea value={scheduleNotes} maxLength={12000} onChange={(event) => setScheduleNotes(event.target.value)} placeholder="议程、地点或准备事项。" />
                     </label>
-                    <button type="submit" disabled={draftBusy || locked || !activeProjectId || !scheduleTitle.trim() || !scheduleStartAt}>
+                    <button type="submit" disabled={draftBusy || locked || !scheduleTitle.trim() || !scheduleStartAt}>
                       <CalendarDays size={15} />
                       {editingScheduleArtifactId ? "保存日程修改" : "创建日程草稿"}
                     </button>
