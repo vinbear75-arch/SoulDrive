@@ -661,7 +661,7 @@ async fn skill_api_request(
 #[tauri::command]
 fn select_document_files() -> Vec<String> {
     rfd::FileDialog::new()
-        .add_filter("PDF 与图像", &["pdf", "png", "jpg", "jpeg", "webp"])
+        .add_filter("项目资料", &["pdf", "docx", "xlsx", "pptx", "md", "txt", "csv", "json", "yaml", "yml", "log", "png", "jpg", "jpeg", "webp"])
         .pick_files()
         .unwrap_or_default()
         .into_iter()

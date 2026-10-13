@@ -395,6 +395,20 @@ test("answer bubble actions occupy the full bottom row and align to the right", 
   assert.doesNotMatch(actionsRule, /width: max-content;/);
 });
 
+test("multiple selected filenames cannot expand the chat column or hide the send control", () => {
+  const dialogRule = css.match(/\.dialog-panel \{[\s\S]*?\n\}/)?.[0] || "";
+  const contextRule = css.match(/\.active-document-context \{[\s\S]*?\n\}/)?.[0] || "";
+  const namesRule = css.match(/\.active-document-context span \{[\s\S]*?\n\}/)?.[0] || "";
+  const hintRule = css.match(/\.active-document-context small \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(dialogRule, /grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(contextRule, /flex-wrap: wrap;/);
+  assert.match(namesRule, /flex: 1 1 0;/);
+  assert.match(namesRule, /min-width: 0;/);
+  assert.match(hintRule, /flex: 1 0 100%;/);
+  assert.match(hintRule, /order: 1;/);
+  assert.ok(app.includes('title={activeDocumentNames.join("、")}'));
+});
+
 test("skills are deduplicated by skill_id and PPT only shows presentation skills", () => {
   assert.match(app, /function uniqueSkillsById/);
   assert.match(app, /uniqueSkillsById\(\(payload\.skills \|\| \[\]\)\.filter\(isPresentationSkill\)\)/);

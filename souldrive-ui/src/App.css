@@ -2245,6 +2245,7 @@ button {
 
 .dialog-panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
@@ -2611,6 +2612,7 @@ button {
 .active-document-context {
   min-height: 34px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -2622,12 +2624,14 @@ button {
 }
 
 .active-document-context small {
-  flex: 0 0 auto;
+  flex: 1 0 100%;
+  order: 1;
   color: #697064;
   font-size: 10px;
 }
 
 .active-document-context span {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

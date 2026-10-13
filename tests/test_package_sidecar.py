@@ -1,8 +1,23 @@
 from pathlib import Path
+import re
 import unittest
+
+from core.document_types import SUPPORTED_DOCUMENT_EXTENSIONS
 
 
 class PackageSidecarTests(unittest.TestCase):
+    def test_desktop_document_picker_matches_supported_project_document_types(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "souldrive-ui/src-tauri/src/lib.rs").read_text(encoding="utf-8")
+        picker = content.split("fn select_document_files()", 1)[1].split("#[tauri::command]", 1)[0]
+        extensions = set()
+        for extension_list in re.findall(r"\.add_filter\([^,]+,\s*&\[([^]]+)\]", picker):
+            extensions.update("." + value for value in re.findall(r'"([a-z0-9]+)"', extension_list))
+        self.assertEqual(extensions, set(SUPPORTED_DOCUMENT_EXTENSIONS))
+        app = (root / "souldrive-ui/src/App.tsx").read_text(encoding="utf-8")
+        self.assertEqual(app.count('title="导入项目资料（报告、指标、配置等）"'), 2)
+        self.assertNotIn('title="导入 PDF 或截图"', app)
+
     def test_package_script_collects_docling_pdf_resources(self):
         script_path = Path(__file__).resolve().parents[1] / "scripts" / "package-sidecar.ps1"
         content = script_path.read_text(encoding="utf-8")

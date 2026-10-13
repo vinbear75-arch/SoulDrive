@@ -5869,7 +5869,7 @@ export default function App() {
             <button
               type="button"
               className="rail-button"
-              title="导入 PDF 或截图"
+              title="导入项目资料（报告、指标、配置等）"
               disabled={locked || documentImportStatus === "selecting" || documentImportStatus === "importing"}
               onClick={() => void importDocuments()}
             >
@@ -6208,7 +6208,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                title="导入 PDF 或截图"
+                title="导入项目资料（报告、指标、配置等）"
                 disabled={locked || documentImportStatus === "selecting" || documentImportStatus === "importing"}
                 onClick={() => void importDocuments()}
               >
