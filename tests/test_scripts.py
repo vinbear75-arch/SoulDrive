@@ -21,6 +21,19 @@ class ScriptTests(unittest.TestCase):
         self.assertNotIn("npm run build", script)
         self.assertNotIn("npm audit", script)
 
+    def test_check_script_isolates_default_runtime_writes_and_restores_environment(self):
+        script = (ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
+
+        self.assertIn('"build/quality-gates/workspaces/check-"', script)
+        self.assertIn("[Guid]::NewGuid()", script)
+        for name in ("SOULDRIVE_APP_ROOT", "SOULDRIVE_WORKSPACE", "SOULDRIVE_REDIS_ENABLED", "SOULDRIVE_POSTGRES_ENABLED"):
+            self.assertIn(f'"{name}"', script)
+            self.assertIn(f"$env:{name} =", script)
+        self.assertIn('[Environment]::GetEnvironmentVariable($Name, "Process")', script)
+        self.assertIn('[Environment]::SetEnvironmentVariable($Name, $SavedEnvironment[$Name], "Process")', script)
+        self.assertIn('$env:SOULDRIVE_REDIS_ENABLED = "0"', script)
+        self.assertIn('$env:SOULDRIVE_POSTGRES_ENABLED = "0"', script)
+
     def test_audit_script_uses_runtime_dependency_audit(self):
         script = (ROOT / "scripts" / "audit.ps1").read_text(encoding="utf-8")
 

@@ -749,6 +749,15 @@ fn apply_development_workspace_environment(command: &mut Command) {
     }
 }
 
+fn apply_optional_state_backend_environment(command: &mut Command) {
+    for name in ["SOULDRIVE_REDIS_ENABLED", "SOULDRIVE_POSTGRES_ENABLED"] {
+        let explicitly_set = command.get_envs().any(|(key, _)| key == std::ffi::OsStr::new(name));
+        if !explicitly_set && std::env::var_os(name).is_none() {
+            command.env(name, "0");
+        }
+    }
+}
+
 fn spawn_backend<R: Runtime>(
     app: &impl Manager<R>,
     api_token: &str,
@@ -800,15 +809,6 @@ fn spawn_backend<R: Runtime>(
             .env("SOULDRIVE_OLLAMA_MODEL", "qwen3.5:9b")
             .env("SOULDRIVE_EMBEDDING_PROVIDER", "ollama")
             .env("SOULDRIVE_OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:4b")
-            .env("SOULDRIVE_REDIS_ENABLED", "1")
-            .env("SOULDRIVE_REDIS_URL", "redis://127.0.0.1:6379/0")
-            .env("SOULDRIVE_REDIS_MAX_MESSAGES", "32")
-            .env("SOULDRIVE_REDIS_TTL_SECONDS", "604800")
-            .env("SOULDRIVE_POSTGRES_ENABLED", "1")
-            .env(
-                "SOULDRIVE_POSTGRES_URL",
-                "postgresql://souldrive:souldrive@127.0.0.1:5432/souldrive",
-            )
             .env("SOULDRIVE_SESSION_COMPACTION_THRESHOLD", "16")
             .env("SOULDRIVE_MAX_BODY_BYTES", "16777216")
             .stdin(Stdio::null())
@@ -816,6 +816,7 @@ fn spawn_backend<R: Runtime>(
             .stderr(Stdio::null());
 
         apply_development_workspace_environment(&mut command);
+        apply_optional_state_backend_environment(&mut command);
         command.current_dir(&runtime_root);
 
         #[cfg(windows)]
@@ -841,15 +842,6 @@ fn spawn_backend<R: Runtime>(
         .env("SOULDRIVE_OLLAMA_MODEL", "qwen3.5:9b")
         .env("SOULDRIVE_EMBEDDING_PROVIDER", "ollama")
         .env("SOULDRIVE_OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:4b")
-        .env("SOULDRIVE_REDIS_ENABLED", "1")
-        .env("SOULDRIVE_REDIS_URL", "redis://127.0.0.1:6379/0")
-        .env("SOULDRIVE_REDIS_MAX_MESSAGES", "32")
-        .env("SOULDRIVE_REDIS_TTL_SECONDS", "604800")
-        .env("SOULDRIVE_POSTGRES_ENABLED", "1")
-        .env(
-            "SOULDRIVE_POSTGRES_URL",
-            "postgresql://souldrive:souldrive@127.0.0.1:5432/souldrive",
-        )
         .env("SOULDRIVE_SESSION_COMPACTION_THRESHOLD", "16")
         .env("SOULDRIVE_MAX_BODY_BYTES", "16777216")
         .stdin(Stdio::null())
@@ -857,6 +849,7 @@ fn spawn_backend<R: Runtime>(
         .stderr(Stdio::null());
 
     apply_development_workspace_environment(&mut command);
+    apply_optional_state_backend_environment(&mut command);
     command.current_dir(&runtime_root);
 
     #[cfg(windows)]
@@ -1190,7 +1183,7 @@ fn generate_api_token() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::apply_development_workspace_environment;
+    use super::{apply_development_workspace_environment, apply_optional_state_backend_environment};
     use std::process::Command;
 
     #[test]
@@ -1228,5 +1221,30 @@ mod tests {
         let environment = String::from_utf8_lossy(&output.stdout);
         assert!(!environment.contains("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK="));
         assert!(!environment.contains("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE="));
+    }
+
+    #[test]
+    fn optional_state_backends_default_off_without_overriding_parent_configuration() {
+        let mut command = Command::new("cmd.exe");
+        apply_optional_state_backend_environment(&mut command);
+        for name in ["SOULDRIVE_REDIS_ENABLED", "SOULDRIVE_POSTGRES_ENABLED"] {
+            let configured = command.get_envs().find(|(key, _)| *key == std::ffi::OsStr::new(name));
+            if std::env::var_os(name).is_none() {
+                assert_eq!(configured.and_then(|(_, value)| value), Some(std::ffi::OsStr::new("0")));
+            } else {
+                assert!(configured.is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn optional_state_backends_preserve_explicit_command_configuration() {
+        let mut command = Command::new("cmd.exe");
+        command.env("SOULDRIVE_REDIS_ENABLED", "1").env("SOULDRIVE_POSTGRES_ENABLED", "0");
+        apply_optional_state_backend_environment(&mut command);
+        for (name, expected) in [("SOULDRIVE_REDIS_ENABLED", "1"), ("SOULDRIVE_POSTGRES_ENABLED", "0")] {
+            let configured = command.get_envs().find(|(key, _)| *key == std::ffi::OsStr::new(name));
+            assert_eq!(configured.and_then(|(_, value)| value), Some(std::ffi::OsStr::new(expected)));
+        }
     }
 }

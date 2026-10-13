@@ -77,6 +77,7 @@ import {
   securityPanelMode,
 } from "./securityErrors";
 import { formatChatHttpFailure, formatChatTransportFailure } from "./chatErrors";
+import { ExperimentMetricImportPanel } from "./ExperimentMetricImportPanel";
 
 interface Message {
   role: "user" | "ai";
@@ -283,6 +284,18 @@ interface DocumentItem {
 interface ActiveDocumentRef {
   name: string;
   document_id?: string;
+}
+
+function shouldPollPresentationTask(task: PresentationTask, resumeLease: number | undefined, polls: number) {
+  return ["pending", "running"].includes(task.status) || (
+    resumeLease !== undefined && task.lease_epoch === resumeLease && polls < 10 && ["failed", "interrupted"].includes(task.status)
+  );
+}
+
+function isPresentationDocumentInProject(document: DocumentItem, projectId: string | null) {
+  if (!projectId) return false;
+  if (document.scope === "global") return true;
+  return document.scope === "project" && (document.project_id === projectId || Boolean(document.project_ids?.includes(projectId)));
 }
 
 interface DocumentLibrary {
@@ -845,6 +858,7 @@ interface PresentationTask {
   status: "pending" | "running" | "interrupted" | "completed" | "failed" | "cancelled";
   replayed?: boolean;
   worker_started?: boolean;
+  lease_epoch?: number;
   current_step?: string | null;
   error?: string | null;
   recoverable?: boolean;
@@ -1572,6 +1586,10 @@ export default function App() {
   const [presentationStyleSkillId, setPresentationStyleSkillId] = useState("");
   const [presentationRequestId, setPresentationRequestId] = useState("");
   const [presentationTask, setPresentationTask] = useState<PresentationTask | null>(null);
+  const [presentationTasks, setPresentationTasks] = useState<PresentationTask[]>([]);
+  const [presentationTasksRefresh, setPresentationTasksRefresh] = useState(0);
+  const [presentationTasksMessage, setPresentationTasksMessage] = useState("");
+  const [presentationPollRefresh, setPresentationPollRefresh] = useState(0);
   const [presentationMessage, setPresentationMessage] = useState("");
   const [skillOpen, setSkillOpen] = useState(false);
   const [learningSkills, setLearningSkills] = useState<LearningSkill[]>([]);
@@ -1651,8 +1669,9 @@ export default function App() {
   const [workflowSpecs, setWorkflowSpecs] = useState<MultimodalWorkflowSpec[]>([]);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<MultimodalWorkflowId | "">("");
   const [workflowPlan, setWorkflowPlan] = useState<MultimodalWorkflowPlan | null>(null);
-  const [, setWorkflowBusy] = useState(false);
-  const [, setWorkflowMessage] = useState("");
+  const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [workflowMessage, setWorkflowMessage] = useState("");
+  const workflowScopeRef = useRef("");
   const [speechConfirmationPending, setSpeechConfirmationPending] = useState(false);
   const [sessionCreateOpen, setSessionCreateOpen] = useState(false);
   const [sessionCreateName, setSessionCreateName] = useState("");
@@ -1802,6 +1821,7 @@ export default function App() {
 
   const documents = documentLibrary?.documents ?? [];
   const indexedDocuments = useMemo(() => documents.filter((document) => document.indexed), [documents]);
+  const presentationDocuments = useMemo(() => indexedDocuments.filter((document) => isPresentationDocumentInProject(document, activeProjectId)), [indexedDocuments, activeProjectId]);
   const activeDocumentNames = useMemo(
     () => activeDocumentRefs.map((document) => document.name),
     [activeDocumentRefs],
@@ -1812,6 +1832,7 @@ export default function App() {
   );
   const activeDocumentName = activeDocumentRefs[0]?.name || null;
   const locked = runtimeStatus?.locked ?? true;
+  workflowScopeRef.current = JSON.stringify([activeProjectId, activeSessionId, selectedWorkflowId, apiBaseUrl, apiToken, locked]);
   const indexingStatus = runtimeStatus?.indexing?.status || "idle";
   const indexBusy = ["queued", "scanning", "indexing"].includes(indexingStatus);
   useEffect(() => {
@@ -2227,34 +2248,32 @@ export default function App() {
       }
     };
 
-    void refreshRuntimeStatus();
-    void refreshAuditEvents();
-    void refreshProductHealth();
-    void refreshMetrics();
-    void refreshStorageStatus();
-    void refreshProductDiagnostics();
-    void refreshGraphRagDiagnostics();
-    void refreshDocumentLibrary();
-    void refreshProjects();
-    void refreshSecurityStatus();
-    const timer = window.setInterval(() => {
+    const refreshFastStatus = () => {
       void refreshRuntimeStatus();
-      void refreshAuditEvents();
       void refreshProductHealth();
+      void refreshSecurityStatus();
+    };
+    const refreshBackgroundData = () => {
+      if (locked || !apiToken) return;
+      void refreshAuditEvents();
       void refreshMetrics();
       void refreshStorageStatus();
       void refreshProductDiagnostics();
       void refreshGraphRagDiagnostics();
       void refreshDocumentLibrary();
       void refreshProjects();
-      void refreshSecurityStatus();
-    }, 3000);
+    };
+    refreshFastStatus();
+    refreshBackgroundData();
+    const statusTimer = window.setInterval(refreshFastStatus, 3000);
+    const dataTimer = window.setInterval(refreshBackgroundData, 15_000);
 
     return () => {
       isMounted = false;
-      window.clearInterval(timer);
+      window.clearInterval(statusTimer);
+      window.clearInterval(dataTimer);
     };
-  }, [activeProjectId, apiBaseUrl, apiToken, runtimeConfigLoaded]);
+  }, [activeProjectId, apiBaseUrl, apiToken, locked, runtimeConfigLoaded]);
 
   useEffect(() => {
     if (!runtimeConfigLoaded || locked) {
@@ -2276,7 +2295,7 @@ export default function App() {
       }
     };
     void refreshBackupPreflight();
-    const timer = window.setInterval(() => void refreshBackupPreflight(), 3000);
+    const timer = window.setInterval(() => void refreshBackupPreflight(), 15_000);
     return () => {
       isMounted = false;
       window.clearInterval(timer);
@@ -2370,18 +2389,18 @@ export default function App() {
   }, [activeProjectId]);
 
   useEffect(() => {
-    if (!selectedWorkflowId) return;
     // 文件或本轮媒体变化后，旧计划不能继续冒充当前输入状态。
     setWorkflowPlan(null);
     setWorkflowMessage("");
-  }, [activeDocumentRefs, baselineExperimentRunId, currentExperimentRunId, mediaFiles.audio, mediaFiles.image, selectedWorkflowId]);
+    setWorkflowBusy(false);
+  }, [activeDocumentRefs, baselineExperimentRunId, currentExperimentRunId, mediaFiles.audio, mediaFiles.image, selectedWorkflowId, activeSessionId, apiBaseUrl, apiToken, locked]);
 
   useEffect(() => {
     if (!activeProjectId) setDocumentImportScope("global");
   }, [activeProjectId]);
 
   useEffect(() => {
-    if (!runtimeConfigLoaded || !apiToken || !activeProjectId) {
+    if (!runtimeConfigLoaded || !apiToken || !activeProjectId || locked) {
       setProjectSessions([]);
       setActiveSessionId(null);
       setSessionLoading(false);
@@ -2445,7 +2464,7 @@ export default function App() {
       }
     })();
     return () => { active = false; };
-  }, [activeProjectId, apiBaseUrl, apiToken, runtimeConfigLoaded]);
+  }, [activeProjectId, apiBaseUrl, apiToken, locked, runtimeConfigLoaded]);
 
   useEffect(() => {
     if (!runtimeConfigLoaded || !apiToken) {
@@ -2630,6 +2649,8 @@ export default function App() {
       : "";
     let active = true;
     let timer: number | undefined;
+    const resumeLease = presentationTask?.worker_started ? presentationTask.lease_epoch : undefined;
+    let polls = 0;
     const pollTask = async () => {
       try {
         const response = await fetch(`${apiBaseUrl}/presentations/tasks/${taskId}${projectQuery}`, {
@@ -2639,6 +2660,7 @@ export default function App() {
         if (!response.ok) throw new Error("presentation task unavailable");
         const task = await response.json() as PresentationTask;
         if (!active) return;
+        polls += 1;
         setPresentationTask(task);
         if (task.status === "completed" && task.kind === "presentation.plan") {
           setPresentationMessage("实际大纲已生成，请逐页查看并确认后再生成 PPT");
@@ -2654,7 +2676,7 @@ export default function App() {
         if (task.status === "cancelled") {
           setPresentationMessage("任务已停止；如需重新开始，请生成新的大纲请求");
         }
-        if (!["pending", "running"].includes(task.status)) {
+        if (!shouldPollPresentationTask(task, resumeLease, polls)) {
           if (timer !== undefined) window.clearInterval(timer);
         }
       } catch {
@@ -2667,7 +2689,7 @@ export default function App() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [apiBaseUrl, apiToken, presentationTask?.project_id, presentationTask?.task_id]);
+  }, [apiBaseUrl, apiToken, presentationTask?.project_id, presentationTask?.task_id, presentationPollRefresh]);
 
   useEffect(() => {
     if (!presentationOpen) return;
@@ -2687,6 +2709,23 @@ export default function App() {
       .catch(() => { if (active) setPresentationStyleSkills([]); });
     return () => { active = false; };
   }, [activeProjectId, apiBaseUrl, apiToken, presentationOpen]);
+
+  useEffect(() => {
+    setPresentationTasks([]);
+    if (!presentationOpen || !activeProjectId || locked || !apiToken) return;
+    let active = true;
+    setPresentationTasksMessage("正在读取当前项目任务...");
+    void fetch(`${apiBaseUrl}/presentations/tasks?project_id=${encodeURIComponent(activeProjectId)}&limit=30`, {
+      cache: "no-store", headers: authHeaders(),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("任务列表暂时不可用，请刷新重试");
+      const payload = await response.json() as { tasks: PresentationTask[] };
+      if (!active) return;
+      setPresentationTasks(payload.tasks.filter((task) => task.project_id === activeProjectId));
+      setPresentationTasksMessage("");
+    }).catch((error) => { if (active) setPresentationTasksMessage(error instanceof Error ? error.message : "任务列表暂时不可用"); });
+    return () => { active = false; };
+  }, [activeProjectId, apiBaseUrl, apiToken, locked, presentationOpen, presentationTask?.status, presentationTasksRefresh]);
 
   useEffect(() => {
     if (!runtimeConfigLoaded) return;
@@ -2911,6 +2950,7 @@ export default function App() {
     speechText = "",
     textNote = "",
   ): Promise<MultimodalWorkflowPlan | null> => {
+    const scope = workflowScopeRef.current;
     setWorkflowBusy(true);
     setWorkflowMessage("");
     try {
@@ -2936,26 +2976,57 @@ export default function App() {
         }),
       });
       const payload = await response.json() as MultimodalWorkflowPlan & { error?: string };
+      if (scope !== workflowScopeRef.current) return null;
       if (!response.ok) throw new Error(payload.error || "业务任务检查失败");
       setWorkflowPlan(payload);
       if (!payload.ready) setWorkflowMessage(payload.next_action);
       return payload;
     } catch (error) {
+      if (scope !== workflowScopeRef.current) return null;
       setWorkflowPlan(null);
       setWorkflowMessage(error instanceof Error ? error.message : "业务任务检查失败");
       return null;
     } finally {
-      setWorkflowBusy(false);
+      if (scope === workflowScopeRef.current) setWorkflowBusy(false);
+    }
+  };
+
+  const approveCurrentWorkflow = async () => {
+    if (!activeProjectId || !selectedWorkflow || locked || workflowBusy) return;
+    const scope = workflowScopeRef.current;
+    setWorkflowBusy(true);
+    setWorkflowMessage("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/projects/${encodeURIComponent(activeProjectId)}/playbooks/${selectedWorkflow.workflow_id}/approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ playbook_version: selectedWorkflow.playbook_version, approved: true }),
+      });
+      const payload = await response.json() as { approval: MultimodalWorkflowSpec["approval"]; error?: string };
+      if (scope !== workflowScopeRef.current) return;
+      if (!response.ok) throw new Error(payload.error || "模式用途确认失败");
+      if (payload.approval?.status !== "approved" || payload.approval.playbook_version !== selectedWorkflow.playbook_version) {
+        throw new Error("模式版本未确认，请重新加载后审阅");
+      }
+      setWorkflowSpecs((specs) => specs.map((spec) => spec.workflow_id === selectedWorkflow.workflow_id ? { ...spec, approval: payload.approval } : spec));
+      setWorkflowPlan(null);
+      setWorkflowMessage("当前项目的模式用途已确认，请再次发送问题；没有自动执行。");
+    } catch (error) {
+      if (scope === workflowScopeRef.current) setWorkflowMessage(error instanceof Error ? error.message : "模式用途确认失败");
+    } finally {
+      if (scope === workflowScopeRef.current) setWorkflowBusy(false);
     }
   };
 
   const ensureWorkflowReady = async (speechText = "") => {
     if (!selectedWorkflowId) return true;
+    const scope = workflowScopeRef.current;
     const plan = await requestWorkflowPlan(
       selectedWorkflowId,
       speechText,
       selectedWorkflowId === "meeting_actions" && !mediaFiles.audio ? speechText : "",
     );
+    if (scope !== workflowScopeRef.current) return false;
     if (!plan?.ready) {
       setWorkflowMessage(plan?.next_action || "业务任务输入尚未就绪，本次未发送");
       return false;
@@ -4521,10 +4592,10 @@ export default function App() {
       return;
     }
     const selectedDocuments = activeDocumentRefs.length
-      ? indexedDocuments.filter((document) => activeDocumentRefs.some((selected) => document.document_id
+      ? presentationDocuments.filter((document) => activeDocumentRefs.some((selected) => document.document_id
         ? selected.document_id === document.document_id
         : !selected.document_id && selected.name === document.name))
-      : indexedDocuments.slice(0, 3);
+      : presentationDocuments.slice(0, 3);
     setPresentationSources((previous) => previous.length
       ? previous
       : selectedDocuments.slice(0, 12).map((document) => ({
@@ -4541,7 +4612,7 @@ export default function App() {
 
   const selectRecentPresentationSources = () => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recent = indexedDocuments
+    const recent = presentationDocuments
       .filter((document) => document.modified_at * 1000 >= cutoff)
       .slice(0, 12);
     setPresentationSources(recent.map((document) => ({
@@ -4778,6 +4849,15 @@ export default function App() {
     setPresentationMessage("已返回参数编辑；提交后会生成新的大纲请求");
   };
 
+  const selectPresentationTask = (task: PresentationTask) => {
+    if (task.project_id !== activeProjectId) return;
+    setPresentationTask(task);
+    setPresentationSources((task.source_filenames || []).map((name, index) => ({
+      name, ...(task.source_document_ids?.[index] ? { document_id: task.source_document_ids[index] } : {}),
+    })));
+    setPresentationMessage(task.cancellation_pending ? "正在停止，等待当前步骤结束..." : "已找回持久化任务；查看不会自动执行或打开文件。");
+  };
+
   const resumePresentation = async () => {
     if (!presentationTask) return;
     const projectQuery = presentationTask.project_id
@@ -4792,6 +4872,7 @@ export default function App() {
       const payload = await response.json() as PresentationTask & { error?: string };
       if (!response.ok) throw new Error(payload.error || "resume failed");
       setPresentationTask(payload);
+      setPresentationPollRefresh((value) => value + 1);
     } catch (error) {
       setPresentationMessage(error instanceof Error ? error.message : "恢复失败");
     }
@@ -6005,7 +6086,7 @@ export default function App() {
                 {projectOverview.recent_runs.slice(0, 2).map((run) => (
                   <div key={`${run.experiment_name}-${run.performed_at}`}>
                     <strong>{run.experiment_name}</strong>
-                    <span>{formatDocumentTime(Date.parse(run.performed_at))} · {run.dataset_version || "未标注数据集"}</span>
+                    <span>{formatDocumentTime(Date.parse(run.performed_at) / 1000)} · {run.dataset_version || "未标注数据集"}</span>
                   </div>
                 ))}
                 {projectOverview.tasks.length ? <span className="project-task-count">待办 {projectOverview.tasks.length} 项</span> : null}
@@ -6059,7 +6140,7 @@ export default function App() {
                 <button type="button" onClick={() => openDraftBuilder("email")} disabled={locked}>
                   <Mail size={14} /> 邮件与日程
                 </button>
-                <button type="button" onClick={openPresentationBuilder} disabled={locked || indexedDocuments.length === 0}>
+                <button type="button" onClick={openPresentationBuilder} disabled={locked || presentationDocuments.length === 0}>
                   <Presentation size={14} /> PPT 生成
                 </button>
                 <button type="button" onClick={() => setSkillOpen(true)} disabled={locked}>
@@ -6067,6 +6148,17 @@ export default function App() {
                 </button>
               </div>
               {selectedWorkflowId === "experiment_compare" && (
+                <>
+                <ExperimentMetricImportPanel
+                  key={activeProjectId}
+                  projectId={activeProjectId}
+                  documents={documents}
+                  apiBaseUrl={apiBaseUrl}
+                  apiToken={apiToken}
+                  locked={locked || !runtimeConfigLoaded}
+                  onImported={() => setExperimentRunsRefresh((value) => value + 1)}
+                  onOpenDocuments={() => { setDocumentImportScope("project"); setDocumentLibraryOpen(true); }}
+                />
                 <div className="experiment-run-picker" aria-label="实验对比运行选择">
                   <strong>明确选择两次实验运行</strong>
                   <label>
@@ -6075,7 +6167,7 @@ export default function App() {
                       <option value="">请选择基线，不自动取第一条</option>
                       {experimentRuns.map((run) => (
                         <option key={run.run_id} value={run.run_id} disabled={run.run_id === currentExperimentRunId}>
-                          {run.experiment_name} · {formatDocumentTime(Date.parse(run.performed_at))} · {run.config_ref || "未标注配置"} · {run.run_id}
+                          {run.experiment_name} · {formatDocumentTime(Date.parse(run.performed_at) / 1000)} · {run.config_ref || "未标注配置"} · {run.run_id}
                         </option>
                       ))}
                     </select>
@@ -6086,7 +6178,7 @@ export default function App() {
                       <option value="">请选择不同的当前运行</option>
                       {experimentRuns.map((run) => (
                         <option key={run.run_id} value={run.run_id} disabled={run.run_id === baselineExperimentRunId}>
-                          {run.experiment_name} · {formatDocumentTime(Date.parse(run.performed_at))} · {run.config_ref || "未标注配置"} · {run.run_id}
+                          {run.experiment_name} · {formatDocumentTime(Date.parse(run.performed_at) / 1000)} · {run.config_ref || "未标注配置"} · {run.run_id}
                         </option>
                       ))}
                     </select>
@@ -6094,6 +6186,7 @@ export default function App() {
                   <small>{experimentRuns.length ? "只使用已确认入账的运行；单位、数据版本等不兼容时会说明原因。配置差异不代表已证实因果。" : "当前项目尚无已确认运行，需先预览并确认导入指标。"}</small>
                   <button type="button" onClick={() => setExperimentRunsRefresh((value) => value + 1)} disabled={locked}>刷新运行列表</button>
                 </div>
+                </>
               )}
             </div>
           )}
@@ -6592,6 +6685,17 @@ export default function App() {
             </div>
           )}
 
+          {selectedWorkflow && (
+            <details className="workflow-contract-review" open={selectedWorkflow.approval.status !== "approved"}>
+              <summary>{selectedWorkflow.title} · v{selectedWorkflow.playbook_version} · {selectedWorkflow.approval.status === "approved" ? "当前项目已确认" : "需要确认用途"}</summary>
+              <p>{selectedWorkflow.description}</p>
+              <ul>{selectedWorkflow.input_contract.map((item) => <li key={item}>{item}</li>)}</ul>
+              <p>输出：{selectedWorkflow.output}</p>
+              <ul>{selectedWorkflow.side_effects.map((item) => <li key={item}>{item}</li>)}</ul>
+              {selectedWorkflow.approval.status !== "approved" && <button type="button" disabled={locked || workflowBusy} onClick={() => void approveCurrentWorkflow()}>确认当前模式用途</button>}
+            </details>
+          )}
+          {workflowMessage && <div className="workflow-readiness-notice" role="alert">{workflowMessage}</div>}
           <form className="ask-box" onSubmit={handleSubmit}>
             <input
               ref={mediaInputRef}
@@ -6681,7 +6785,7 @@ export default function App() {
             />
             <button
               type="submit"
-              disabled={(!input.trim() && !mediaFiles.audio && !mediaFiles.image) || isGenerating || locked || indexBusy || sessionLoading || !activeSessionId}
+              disabled={(!input.trim() && !mediaFiles.audio && !mediaFiles.image) || isGenerating || workflowBusy || locked || indexBusy || sessionLoading || !activeSessionId}
               title={mediaFiles.audio || mediaFiles.image ? (speechConfirmationPending ? "确认语音并发送当前内容" : "自动融合焦点控件、语音和截图后发送") : "发送文本问题"}
             >
               <Send size={17} />
@@ -7224,14 +7328,14 @@ export default function App() {
 
             <div className="presentation-builder-body">
               <div className="presentation-source-list" aria-label="已索引文档">
-                <button type="button" onClick={selectRecentPresentationSources}>选择最近 7 天文档</button>
+                <button type="button" onClick={selectRecentPresentationSources} disabled={Boolean(presentationTask)}>选择最近 7 天文档</button>
                 <small>按本地导入/保存时间筛选，不代表论文发表时间。</small>
-                {indexedDocuments.map((document) => (
+                {presentationDocuments.map((document) => (
                   <label key={document.document_id || document.relative_path} className={isPresentationSource(document) ? "selected" : ""}>
                     <input
                       type="checkbox"
                       checked={isPresentationSource(document)}
-                      disabled={!isPresentationSource(document) && presentationSources.length >= 12}
+                      disabled={Boolean(presentationTask) || (!isPresentationSource(document) && presentationSources.length >= 12)}
                       onChange={(event) => {
                         setPresentationSources((previous) => {
                           const selected = previous.some((item) => document.document_id
@@ -7254,9 +7358,24 @@ export default function App() {
                     <span title={document.name}>{document.name}</span>
                   </label>
                 ))}
+                <section className="presentation-task-list" aria-label="当前项目 PPT 任务">
+                  <strong>当前项目任务</strong>
+                  <button type="button" onClick={() => setPresentationTasksRefresh((value) => value + 1)}>刷新任务列表</button>
+                  {presentationTasksMessage && <p role="status">{presentationTasksMessage}</p>}
+                  {!presentationTasksMessage && !presentationTasks.length && <small>暂无持久化 PPT 任务</small>}
+                  {presentationTasks.map((task) => (
+                    <button type="button" key={task.task_id} className={presentationTask?.task_id === task.task_id ? "selected" : ""} onClick={() => selectPresentationTask(task)}>
+                      <strong>{task.result?.outline?.title || (task.kind === "presentation.plan" ? "大纲计划" : "PPT 生成")} · {task.status}</strong>
+                      <small>{task.task_id.slice(-16)} · {task.cancellation_pending ? "正在停止，等待步骤结束" : task.current_step || `${task.progress.completed}/${task.progress.total} 步`}</small>
+                    </button>
+                  ))}
+                </section>
               </div>
 
               <div className="presentation-options">
+                {presentationTask ? (
+                  <p role="note">当前查看已保存任务，使用原计划参数。修改需返回参数编辑并生成新大纲。</p>
+                ) : (<>
                 <div className="presentation-skill-strip" aria-label="可参与 PPT 生成的技能">
                   <div className="presentation-skill-strip-head">
                     <span>PPT 可用技能</span>
@@ -7314,6 +7433,7 @@ export default function App() {
                   <input type="checkbox" checked={presentationOpenInWps} onChange={(event) => setPresentationOpenInWps(event.target.checked)} />
                   <span>完成后用 WPS 打开</span>
                 </label>
+                </>)}
                 <div className={`presentation-task-state ${presentationTask?.status || "idle"}`} role="status" aria-live="polite">
                   <strong>{presentationTask?.status?.toUpperCase() || "READY"}</strong>
                   <span>{presentationMessage || `已选择 ${presentationSources.length} 份文档`}</span>
@@ -7371,12 +7491,13 @@ export default function App() {
                   )}
                   {presentationTask?.result?.output_path && (
                     <p title={presentationTask.result.output_path}>
-                      {presentationTask.result.slide_count} 页 · {presentationTask.result.renderer} · {presentationTask.result.outline_source === "local_ollama" ? "Ollama 提纲" : presentationTask.result.outline_source === "extractive" ? "证据提炼" : "自定义提纲"}
+                      {presentationTask.result.slide_count} 页 · {presentationTask.result.renderer} · {presentationTask.result.outline_source === "local_ollama" ? "Ollama 提纲" : presentationTask.result.outline_source === "experiment_ledger_extractive" ? "账本测量提纲" : presentationTask.result.outline_source === "extractive" ? "证据提炼" : "自定义提纲"}
                       {presentationTask.result.evidence_metrics ? <><br />证据页 {Math.round(presentationTask.result.evidence_metrics.evidence_slide_coverage * 100)}% · {formatPresentationEvidenceCoverage(presentationTask.result.evidence_metrics)} · {Math.round(presentationTask.result.elapsed_ms || 0)} ms</> : null}
                       {presentationTask.result.skill_application?.skill_title && <><br />Skill：{presentationTask.result.skill_application.skill_title} · 指令{presentationTask.result.skill_application.instructions_applied ? "已应用" : "未应用"} · 样式{presentationTask.result.skill_application.style_applied ? "已应用" : "未提供"}</>}
                       {presentationTask.result.artifact_id && <><br />项目产物已登记：{presentationTask.result.artifact_id}</>}
                     </p>
                   )}
+                  {presentationTask?.result?.output_path && <button type="button" onClick={() => void invoke("open_path", { path: presentationTask.result?.output_path }).catch(() => setPresentationMessage("无法定位结果文件，请核对本地路径"))}>定位结果文件</button>}
                 </div>
               </div>
             </div>
@@ -7392,13 +7513,15 @@ export default function App() {
                 </>
               ) : presentationTask?.recoverable ? (
                 <button type="button" onClick={() => void resumePresentation()}>继续生成</button>
+              ) : presentationTask ? (
+                <button type="button" onClick={resetPresentationPlan}>新建大纲</button>
               ) : (
                 <button
                   type="button"
-                  disabled={!presentationSources.length || presentationTask?.status === "completed"}
+                  disabled={!presentationSources.length}
                   onClick={() => void generatePresentation()}
                 >
-                  {presentationTask?.status === "cancelled" || presentationTask?.status === "failed" ? "重新生成大纲" : "生成大纲"}
+                  生成大纲
                 </button>
               )}
             </div>

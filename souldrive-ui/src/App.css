@@ -5083,8 +5083,11 @@ button {
 .presentation-options {
   min-height: 0;
   display: grid;
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .presentation-options > label:not(.presentation-toggle) {
@@ -5200,7 +5203,7 @@ button {
 .presentation-task-state {
   min-height: 112px;
   display: grid;
-  align-content: center;
+  align-content: start;
   gap: 8px;
   border: 1px solid #d8d0be;
   border-radius: 8px;
@@ -5787,3 +5790,45 @@ button {
 }
 
 .experiment-run-picker small { line-height: 1.6; }
+
+.experiment-metric-import {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.experiment-metric-import label { display: grid; gap: 4px; min-width: 0; margin-top: 6px; }
+.experiment-metric-import input,
+.experiment-metric-import select {
+  width: 100%; min-width: 0; padding: 6px;
+  color: inherit; background: #f9f7f0;
+  border: 1px solid #cfc8b7; border-radius: 6px;
+}
+.experiment-metric-import small,
+.experiment-metric-import p { overflow-wrap: anywhere; line-height: 1.6; }
+.experiment-metric-import summary { cursor: pointer; }
+.metric-import-preview { padding: 8px; border: 1px solid #cfc8b7; border-radius: 6px; }
+.metric-import-preview > strong,
+.metric-import-preview > small { display: block; }
+.metric-import-preview dl { border-top: 1px solid #cfc8b7; padding-top: 6px; }
+.metric-import-preview dt { color: #625e52; }
+.metric-import-preview dd { margin: 0 0 5px; overflow-wrap: anywhere; }
+
+.workflow-contract-review,
+.workflow-readiness-notice {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  border-top: 1px solid #cfc8b7;
+}
+.workflow-contract-review { max-height: 180px; overflow-y: auto; }
+.workflow-contract-review summary { cursor: pointer; }
+.workflow-contract-review p,
+.workflow-contract-review ul { margin: 6px 0; }
+.workflow-readiness-notice { color: #764714; background: #fff5db; }
+.presentation-task-list { display: grid; gap: 6px; margin-top: 12px; font-size: 12px; }
+.presentation-task-list button { padding: 8px; text-align: left; border: 1px solid #cfc8b7; border-radius: 6px; }
+.presentation-task-list button.selected { background: #e3eee7; }
+.presentation-task-list strong,
+.presentation-task-list small { display: block; overflow-wrap: anywhere; }

@@ -1381,6 +1381,12 @@ class ConversationStoreTests(unittest.TestCase):
         self.assertIn("该摘要只压缩上下文", summary["summary"])
 
     def test_compaction_over_200_messages_keeps_sources_and_summary_versions_after_restart(self):
+        self._check_compaction_sources_and_restart(205)
+
+    def test_compaction_64_messages_keeps_sources_and_summary_versions_after_restart(self):
+        self._check_compaction_sources_and_restart(64)
+
+    def _check_compaction_sources_and_restart(self, message_count):
         with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
             "os.environ",
             {"SOULDRIVE_REDIS_ENABLED": "0", "SOULDRIVE_POSTGRES_ENABLED": "0"},
@@ -1391,7 +1397,7 @@ class ConversationStoreTests(unittest.TestCase):
             store = ProductionSessionStore(archive)
             try:
                 store.create_session("long-session", project_id="project-a", title="长会话")
-                for index in range(1, 206):
+                for index in range(1, message_count + 1):
                     store.append_message(
                         "long-session",
                         "user",
@@ -1412,11 +1418,11 @@ class ConversationStoreTests(unittest.TestCase):
                     threshold=4,
                 )
 
-                self.assertEqual(len(archive._records_for_session("long-session")), 205)
+                self.assertEqual(len(archive._records_for_session("long-session")), message_count)
                 self.assertEqual(first["version"], 1)
-                self.assertEqual(first["input_sequence_start"], 6)
-                self.assertEqual(first["input_sequence_end"], 197)
-                self.assertEqual(first["input_message_count"], 192)
+                self.assertEqual(first["input_sequence_start"], max(1, message_count - 8 - 192 + 1))
+                self.assertEqual(first["input_sequence_end"], message_count - 8)
+                self.assertEqual(first["input_message_count"], min(192, message_count - 8))
                 self.assertEqual(second["version"], 2)
                 self.assertTrue(
                     (archive.archive_root / "long-session" / "summaries" / "summary-1.json.enc").exists()
@@ -1432,7 +1438,7 @@ class ConversationStoreTests(unittest.TestCase):
             try:
                 latest = reopened_archive.latest_summary("long-session")
                 self.assertEqual(latest["version"], 2)
-                self.assertEqual(len(reopened_archive._records_for_session("long-session")), 205)
+                self.assertEqual(len(reopened_archive._records_for_session("long-session")), message_count)
             finally:
                 reopened.close()
 

@@ -4,6 +4,11 @@ $env:PYTHONIOENCODING = "utf-8"
 chcp 65001 | Out-Null
 
 $Root = Split-Path -Parent $PSScriptRoot
+$CheckDataRoot = Join-Path $Root ("build/quality-gates/workspaces/check-" + [Guid]::NewGuid().ToString("N"))
+$SavedEnvironment = @{}
+foreach ($Name in @("SOULDRIVE_APP_ROOT", "SOULDRIVE_WORKSPACE", "SOULDRIVE_REDIS_ENABLED", "SOULDRIVE_POSTGRES_ENABLED")) {
+    $SavedEnvironment[$Name] = [Environment]::GetEnvironmentVariable($Name, "Process")
+}
 
 function Invoke-SoulDrivePython {
     param([Parameter(Mandatory=$true)][string[]]$Arguments)
@@ -27,6 +32,12 @@ function Assert-LastCommandSucceeded {
 
 Push-Location $Root
 try {
+    New-Item -ItemType Directory -Path $CheckDataRoot | Out-Null
+    $env:SOULDRIVE_APP_ROOT = Join-Path $CheckDataRoot "app"
+    $env:SOULDRIVE_WORKSPACE = Join-Path $CheckDataRoot "workspace"
+    $env:SOULDRIVE_REDIS_ENABLED = "0"
+    $env:SOULDRIVE_POSTGRES_ENABLED = "0"
+
     Invoke-SoulDrivePython -Arguments @("-m", "pytest", "-q")
     Assert-LastCommandSucceeded "backend tests"
 
@@ -68,5 +79,8 @@ try {
     }
 }
 finally {
+    foreach ($Name in $SavedEnvironment.Keys) {
+        [Environment]::SetEnvironmentVariable($Name, $SavedEnvironment[$Name], "Process")
+    }
     Pop-Location
 }

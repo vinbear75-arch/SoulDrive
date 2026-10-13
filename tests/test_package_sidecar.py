@@ -42,6 +42,15 @@ class PackageSidecarTests(unittest.TestCase):
         self.assertNotIn('.env("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK", "1")', production_source)
         self.assertNotIn('.env("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE", "88888888")', production_source)
 
+    def test_default_desktop_startup_does_not_force_optional_shared_state_backends(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "souldrive-ui/src-tauri/src/lib.rs").read_text(encoding="utf-8")
+        production_source = content.rsplit("#[cfg(test)]", 1)[0]
+        self.assertNotIn('.env("SOULDRIVE_REDIS_ENABLED", "1")', production_source)
+        self.assertNotIn('.env("SOULDRIVE_POSTGRES_ENABLED", "1")', production_source)
+        self.assertNotIn("postgresql://souldrive:souldrive@127.0.0.1:5432/souldrive", production_source)
+        self.assertEqual(production_source.count("apply_optional_state_backend_environment(&mut command)"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

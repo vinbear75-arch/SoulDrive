@@ -6277,7 +6277,9 @@ class McpServerLearningTests(unittest.TestCase):
             def close(self):
                 return None
 
-        with patch.object(mcp_server, "current_learning_store", return_value=FakeStore()):
+        with patch.object(mcp_server, "current_learning_store", return_value=FakeStore()), patch.object(
+            mcp_server, "current_workspace", return_value=self.workspace
+        ):
             style = mcp_server._presentation_style_skill("skill_anything")
 
         self.assertEqual(style["skill_id"], "skill_anything")

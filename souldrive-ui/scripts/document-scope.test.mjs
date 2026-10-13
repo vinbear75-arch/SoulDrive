@@ -2,9 +2,216 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
+import ts from "typescript";
 
 const app = readFileSync(resolve("src", "App.tsx"), "utf8");
 const css = readFileSync(resolve("src", "App.css"), "utf8");
+
+test("workflow readiness rejection is visible beside the text input", () => {
+  assert.match(app, /const \[workflowMessage, setWorkflowMessage\] = useState\(""\)/);
+  assert.match(app, /className="workflow-readiness-notice" role="alert"[\s\S]*?\{workflowMessage\}/);
+  assert.match(app, /const \[workflowBusy, setWorkflowBusy\] = useState\(false\)/);
+});
+
+test("workflow review explicitly binds one project and the displayed version", () => {
+  const review = app.match(/const approveCurrentWorkflow = async \(\) => \{[\s\S]*?\n  \};/)?.[0] || "";
+  assert.match(review, /if \(!activeProjectId \|\| !selectedWorkflow \|\| locked \|\| workflowBusy\) return/);
+  assert.ok(review.includes("/projects/${encodeURIComponent(activeProjectId)}/playbooks/${selectedWorkflow.workflow_id}/approval"));
+  assert.match(review, /playbook_version: selectedWorkflow\.playbook_version, approved: true/);
+  assert.match(review, /if \(!response\.ok\)/);
+  assert.match(app, /确认当前模式用途/);
+  assert.match(app, /selectedWorkflow\.input_contract\.map/);
+  assert.match(app, /selectedWorkflow\.side_effects\.map/);
+});
+
+test("stale workflow requests cannot update or submit another session", () => {
+  assert.match(app, /workflowScopeRef\.current = JSON\.stringify\(\[activeProjectId, activeSessionId, selectedWorkflowId, apiBaseUrl, apiToken, locked\]\)/);
+  const plan = app.match(/const requestWorkflowPlan = async \([\s\S]*?\n  \};/)?.[0] || "";
+  const ready = app.match(/const ensureWorkflowReady = async \([\s\S]*?\n  \};/)?.[0] || "";
+  const review = app.match(/const approveCurrentWorkflow = async \(\) => \{[\s\S]*?\n  \};/)?.[0] || "";
+  for (const body of [plan, ready, review]) {
+    assert.match(body, /const scope = workflowScopeRef\.current/);
+    assert.match(body, /scope !== workflowScopeRef\.current/);
+  }
+});
+
+function workflowHarness(fetchImpl) {
+  const names = ["requestWorkflowPlan", "approveCurrentWorkflow", "ensureWorkflowReady"];
+  const functions = names.map((name) => app.match(new RegExp(`const ${name} = async \\([\\s\\S]*?\\n  \\};`))?.[0]).join("\n");
+  const js = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+  const calls = [];
+  const scope = { current: "project-a/session-a" };
+  const values = {
+    fetch: fetchImpl, workflowScopeRef: scope, activeProjectId: "a", selectedWorkflowId: "experiment_compare",
+    selectedWorkflow: { workflow_id: "experiment_compare", playbook_version: "1.0" }, locked: false, workflowBusy: false,
+    apiBaseUrl: "http://local-test", activeDocumentNames: [], activeDocumentIds: [], mediaFiles: {},
+    speechDraftRef: { current: "" }, uiAutomationSnapshot: null, baselineExperimentRunId: "baseline-a",
+    currentExperimentRunId: "current-a", authHeaders: () => ({}),
+    ...Object.fromEntries(["setWorkflowBusy", "setWorkflowMessage", "setWorkflowPlan", "setWorkflowSpecs"].map((name) => [name, (value) => calls.push([name, value])])),
+  };
+  const functionsApi = new Function(...Object.keys(values), `${js}\nreturn {${names.join(",")}};`)(...Object.values(values));
+  return { ...functionsApi, calls, scope };
+}
+
+test("workflow preflight rejection keeps the actual reason without submitting chat", async () => {
+  const requests = [];
+  const harness = workflowHarness(async (url, options) => {
+    requests.push([url, JSON.parse(options.body)]);
+    return { ok: true, json: async () => ({ ready: false, next_action: "请先审核通过当前项目的 Playbook" }) };
+  });
+  assert.equal(await harness.ensureWorkflowReady("fixed question"), false);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0][1].project_id, "a");
+  assert.ok(harness.calls.some(([name, value]) => name === "setWorkflowMessage" && value.includes("审核")));
+});
+
+test("explicit approval sends one version-bound request and does not auto-execute", async () => {
+  const requests = [];
+  const harness = workflowHarness(async (url, options) => {
+    requests.push([url, options.method, JSON.parse(options.body)]);
+    return { ok: true, json: async () => ({ approval: { status: "approved", playbook_version: "1.0" } }) };
+  });
+  await harness.approveCurrentWorkflow();
+  assert.deepEqual(requests, [["http://local-test/projects/a/playbooks/experiment_compare/approval", "POST", { playbook_version: "1.0", approved: true }]]);
+  const update = harness.calls.find(([name]) => name === "setWorkflowSpecs")[1];
+  const specs = update([{ workflow_id: "experiment_compare" }, { workflow_id: "paper_review" }]);
+  assert.equal(specs[0].approval.status, "approved");
+  assert.equal(specs[1].approval, undefined);
+});
+
+for (const method of ["approveCurrentWorkflow", "ensureWorkflowReady"]) {
+  test(`pending ${method} cannot change or execute a different session`, async () => {
+    let release;
+    const harness = workflowHarness(() => new Promise((resolve) => { release = resolve; }));
+    const pending = harness[method]("fixed question");
+    harness.calls.length = 0;
+    harness.scope.current = "project-b/session-b";
+    release({ ok: true, json: async () => ({ ready: true, approval: { status: "approved", playbook_version: "1.0" } }) });
+    const result = await pending;
+    assert.equal(result, method === "ensureWorkflowReady" ? false : undefined);
+    assert.deepEqual(harness.calls, []);
+  });
+}
+
+test("stale displayed version is not locally marked approved", async () => {
+  const harness = workflowHarness(async () => ({ ok: false, json: async () => ({ error: "playbook version is stale" }) }));
+  await harness.approveCurrentWorkflow();
+  assert.ok(harness.calls.some(([name, value]) => name === "setWorkflowMessage" && value === "playbook version is stale"));
+  assert.ok(!harness.calls.some(([name]) => name === "setWorkflowSpecs"));
+});
+
+test("PPT source choices exclude another project's same-name file", () => {
+  const source = app.match(/function isPresentationDocumentInProject\([\s\S]*?\n\}/)?.[0];
+  assert.ok(source, "PPT must scope choices before auto-selection, not just reject on the server");
+  const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+  const matches = new Function(`${js}\nreturn isPresentationDocumentInProject;`)();
+  assert.equal(matches({ scope: "project", project_id: "a" }, "a"), true);
+  assert.equal(matches({ scope: "project", project_id: "b" }, "a"), false);
+  assert.equal(matches({ scope: "global" }, "a"), true);
+  assert.equal(matches({ scope: "ambiguous", project_ids: ["a", "b"] }, "a"), false);
+  assert.equal(matches({ scope: "project", project_ids: ["a"] }, "a"), true);
+  assert.equal(matches({}, "a"), false);
+  assert.equal(matches({ scope: "global" }, null), false);
+  assert.match(app, /const presentationDocuments = useMemo/);
+  assert.match(app, /presentationDocuments\.map\(\(document\)/);
+  const builder = app.match(/const openPresentationBuilder = \(\) => \{[\s\S]*?\n  \};/)?.[0] || "";
+  assert.match(builder, /presentationDocuments\.slice\(0, 3\)/);
+  const recent = app.match(/const selectRecentPresentationSources = \(\) => \{[\s\S]*?\n  \};/)?.[0] || "";
+  assert.match(recent, /const recent = presentationDocuments/);
+});
+
+test("PPT dialog can reload project-scoped durable tasks without starting a worker", () => {
+  assert.ok(app.includes('className="presentation-task-list"'), "missing durable task list");
+  assert.ok(app.includes('/presentations/tasks?project_id=${encodeURIComponent(activeProjectId)}&limit=30'));
+  assert.match(app, /payload\.tasks\.filter\(\(task\) => task\.project_id === activeProjectId\)/);
+  assert.match(app, /onClick=\{\(\) => selectPresentationTask\(task\)\}/);
+  const select = app.match(/const selectPresentationTask = \(task: PresentationTask\) => \{[\s\S]*?\n  \};/)?.[0] || "";
+  assert.match(select, /if \(task\.project_id !== activeProjectId\) return/);
+  assert.doesNotMatch(select, /fetch\(|confirmPresentation\(|resumePresentation\(|generatePresentation\(/);
+  assert.match(app, /定位结果文件/);
+});
+
+test("same-task resume restarts bounded polling and waits for a new lease", () => {
+  const source = app.match(/function shouldPollPresentationTask\([\s\S]*?\n\}/)?.[0];
+  assert.ok(source, "same task id must be able to restart polling");
+  const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+  const poll = new Function(`${js}\nreturn shouldPollPresentationTask;`)();
+  assert.equal(poll({ status: "interrupted", lease_epoch: 3 }, 3, 0), true);
+  assert.equal(poll({ status: "interrupted", lease_epoch: 4 }, 3, 1), false);
+  assert.equal(poll({ status: "interrupted", lease_epoch: 3 }, 3, 10), false);
+  assert.equal(poll({ status: "completed", lease_epoch: 4 }, 3, 1), false);
+  assert.equal(poll({ status: "cancelled", lease_epoch: 3 }, 3, 1), false);
+  assert.equal(poll({ status: "running", lease_epoch: 4 }, 3, 11), true);
+  assert.equal(poll({ status: "failed", lease_epoch: 3 }, undefined, 0), false);
+  const resume = app.match(/const resumePresentation = async \(\) => \{[\s\S]*?\n  \};/)?.[0] || "";
+  assert.match(resume, /setPresentationPollRefresh\(\(value\) => value \+ 1\)/);
+  assert.match(app, /presentationTask\?\.task_id, presentationPollRefresh\]/);
+});
+
+test("PPT outline and result remain scrollable without overlapping options", () => {
+  const options = css.match(/\.presentation-options \{[\s\S]*?\n\}/)?.[0] || "";
+  const state = css.match(/\.presentation-task-state \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(options, /overflow-y: auto/);
+  assert.match(options, /grid-auto-rows: max-content/);
+  assert.match(state, /align-content: start/);
+});
+
+test("ledger-grounded PPT is labelled as ledger evidence, not a custom model outline", () => {
+  assert.ok(app.includes('outline_source === "experiment_ledger_extractive" ? "账本测量提纲"'));
+});
+
+test("saved PPT tasks do not show unrelated editable default parameters", () => {
+  const options = app.slice(app.indexOf('<div className="presentation-options">'), app.indexOf('<div className={`presentation-task-state'));
+  assert.match(options, /presentationTask \? \(/);
+  assert.match(options, /当前查看已保存任务，使用原计划参数/);
+  assert.match(options, /\) : \(<>/);
+  assert.match(app, /onClick=\{selectRecentPresentationSources\} disabled=\{Boolean\(presentationTask\)\}/);
+  assert.match(app, /disabled=\{Boolean\(presentationTask\) \|\| \(!isPresentationSource/);
+  assert.match(app, /onClick=\{resetPresentationPlan\}>新建大纲/);
+});
+
+test("desktop background polling leaves the default API budget for user actions", () => {
+  const background = app.match(/const refreshBackgroundData = \(\) => \{([\s\S]*?)\n    \};/);
+  assert.ok(background, "protected data must not share the 3-second public status timer");
+  const names = [...background[1].matchAll(/void (refresh\w+)\(\);/g)].map((match) => match[1]);
+  assert.equal(names.length, 7);
+  const calls = [];
+  const refresh = new Function("locked", "apiToken", ...names, background[1]);
+  const callbacks = names.map((name) => () => calls.push(name));
+  refresh(true, "test-token", ...callbacks);
+  refresh(false, "", ...callbacks);
+  assert.equal(calls.length, 0, "locked or unauthenticated polling must not consume the budget");
+  refresh(false, "test-token", ...callbacks);
+  assert.equal(calls.length, 7);
+  const interval = Number(app.match(/setInterval\(refreshBackgroundData,\s*([\d_]+)\)/)?.[1].replaceAll("_", ""));
+  const backupInterval = Number(app.match(/setInterval\(\(\) => void refreshBackupPreflight\(\),\s*([\d_]+)\)/)?.[1].replaceAll("_", ""));
+  // Include the existing 30-second schedule and 1.2-second active task polls.
+  const requestsPerMinute = names.length * 60_000 / interval + 60_000 / backupInterval + 2 + 50;
+  assert.ok(requestsPerMinute <= 100, `steady polling uses ${requestsPerMinute}/120 requests`);
+  assert.match(app, /setInterval\(refreshFastStatus, 3000\)/);
+});
+
+test("project sessions wait for unlock and reload when lock state changes", () => {
+  const historyIndex = app.indexOf("const loadHistory = async (session: ProjectSession)");
+  const loader = app.slice(app.lastIndexOf("  useEffect(() => {", historyIndex), app.indexOf("\n  useEffect(", historyIndex));
+  assert.match(loader, /if \(!runtimeConfigLoaded \|\| !apiToken \|\| !activeProjectId \|\| locked\)/);
+  assert.match(loader, /\}, \[activeProjectId, apiBaseUrl, apiToken, locked, runtimeConfigLoaded\]\);/);
+});
+
+test("experiment ISO dates are converted to the document formatter's seconds once", () => {
+  const body = app.match(/function formatDocumentTime\(timestamp\?: number\) \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(body);
+  const format = new Function("timestamp", body);
+  const argumentsInUse = [...app.matchAll(/formatDocumentTime\((Date\.parse\(run\.performed_at\)(?:\s*\/\s*1000)?)\)/g)];
+  assert.equal(argumentsInUse.length, 3, "overview and both run choices use the same conversion");
+  for (const match of argumentsInUse) {
+    const timestamp = new Function("run", `return ${match[1]};`);
+    for (const performed_at of ["2026-09-12T02:00:00+00:00", "2026-10-12T02:00:00+00:00"]) {
+      const expected = new Date(performed_at).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+      assert.equal(format(timestamp({ performed_at })), expected);
+    }
+  }
+});
 
 test("experiment windows expose explicit baseline and current run choices", () => {
   assert.match(app, /const \[experimentRuns, setExperimentRuns\]/);

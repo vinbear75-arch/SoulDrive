@@ -302,6 +302,11 @@ def _exercise_experiment_flow(request, workspace: Path, output_dir: Path, result
     assert result["plan"]["result"]["experiment_comparison"] == comparison
     assert result["generation"]["result"]["experiment_comparison"] == comparison
     assert "0.05" in outline_text, "comparison conclusion is missing from the actual presentation outline"
+    outline = result["plan"]["result"]["outline"]
+    assert outline["outline_source"] == "experiment_ledger_extractive", outline
+    assert "环境引用：基线 env-a；当前 env-a" in outline_text, outline
+    assert "配置引用：基线 config-a；当前 config-b" in outline_text, outline
+    assert "硬件环境发生变动" not in outline_text, outline
     result["status"] = "pass"
     step("experiment_flow_complete")
 

@@ -282,6 +282,7 @@ class PresentationService:
             if str(result.get("plan_digest") or "") != str(plan_digest or ""):
                 raise ValueError("PPT 大纲已变化，请重新查看后确认")
             inputs = dict(plan_task["inputs"])
+            self._require_experiment_outline(inputs, result)
             generation_task_id = _stable_presentation_task_id(
                 "presentation.generate",
                 f"{plan_task_id}:{plan_digest}",
@@ -724,6 +725,13 @@ class PresentationService:
         _step_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         records = outputs["collect_evidence"]["records"]
+        if inputs.get("experiment_comparison"):
+            # A source citation does not validate a model's extra claims about
+            # hardware or causality. Keep this bounded workflow extractive.
+            return self._with_experiment_summary({
+                **build_extractable_presentation_plan(records, inputs),
+                "outline_source": "experiment_ledger_extractive",
+            }, inputs)
         if self.outline_generator is not None:
             try:
                 generated = self.outline_generator(records, inputs)
@@ -746,18 +754,35 @@ class PresentationService:
         measurements = build_experiment_evidence(inputs.get("experiment_comparison"))
         if not measurements:
             return outline
-        points = [
-            f"{item['metric']}：{item['baseline_value']:.12g}{item['unit']} → {item['current_value']:.12g}{item['unit']}；"
-            f"绝对变化 {item['absolute_delta']:+.12g}{item['unit']} [{item['id']}]"
-            for item in measurements[:4]
-        ]
-        points.append("配置/环境如有差异，仅为候选因素，不能单独证明因果；需单因素验证。")
-        slide = _content_slide("已确认实验测量对比", points, inputs["source_filenames"], "M# 来自所选运行的可比账本，完整来源与定位随计划保存")
-        slides = list(outline["slides"])
-        slides.insert(1, slide)
+        comparison = inputs["experiment_comparison"]
+        if len(measurements) != len(comparison.get("changes") or []):
+            raise TaskPublicError("所选指标超出当前完整证据预算，请缩小比较范围后重新生成大纲")
+        slides = [outline["slides"][0]]
+        for offset in range(0, len(measurements), 4):
+            points = [
+                f"{item['metric']}：{item['baseline_value']:.12g}{item['unit']} → {item['current_value']:.12g}{item['unit']}；"
+                f"绝对变化 {item['absolute_delta']:+.12g}{item['unit']} [{item['id']}]"
+                for item in measurements[offset:offset + 4]
+            ]
+            points.append("配置/环境如有差异，仅为候选因素，不能单独证明因果；需单因素验证。")
+            slides.append(_content_slide("已确认实验测量对比", points, inputs["source_filenames"],
+                                         "M# 来自所选运行的可比账本，完整来源与定位随计划保存"))
+        baseline, current = comparison["baseline"], comparison["current"]
+        conditions = _content_slide("所选运行的记录条件", [
+            f"{label}：基线 {baseline.get(field) or '未记录'}；当前 {current.get(field) or '未记录'}"
+            for field, label in (("performed_at", "执行时间"), ("dataset_version", "数据集版本"),
+                                 ("evaluation_script_ref", "评测脚本"), ("config_ref", "配置引用"),
+                                 ("environment_ref", "环境引用"))
+        ], inputs["source_filenames"], "仅展示账本引用，不据此推定硬件变化或因果关系")
+        slides.extend([conditions, outline["slides"][-1]])
         if len(slides) > inputs["max_slides"]:
-            slides = slides[: inputs["max_slides"] - 1] + [slides[-1]]
+            raise TaskPublicError("页数上限不足以完整展示所选指标，请提高上限后重新生成大纲")
         return {**outline, "slides": slides}
+
+    @staticmethod
+    def _require_experiment_outline(inputs: dict[str, Any], result: dict[str, Any]) -> None:
+        if inputs.get("baseline_run_id") and (result.get("outline") or {}).get("outline_source") != "experiment_ledger_extractive":
+            raise ValueError("旧实验比较大纲含未经账本约束的内容，请重新生成并确认")
 
     def _load_confirmed_plan_step(
         self,
@@ -775,6 +800,7 @@ class PresentationService:
         plan_result = dict(plan_task.get("result") or {})
         if str(plan_result.get("plan_digest") or "") != str(inputs.get("plan_digest") or ""):
             raise ValueError("PPT 大纲摘要不匹配，请重新确认")
+        self._require_experiment_outline(inputs, plan_result)
         self._load_experiment_comparison(inputs)
         snapshot = dict(plan_result.get("evidence_snapshot") or {})
         records = list(snapshot.get("records") or [])

@@ -228,12 +228,14 @@ def test_workflow_plan_rejects_unknown_project_scope(tmp_path, monkeypatch):
     assert response.json()["error"] == "unknown project"
 
 
-def test_workflow_plan_api_returns_input_gap_without_loading_models(monkeypatch):
+def test_workflow_plan_api_returns_input_gap_without_loading_models(monkeypatch, tmp_path):
     class Audit:
         def append_event(self, *_args, **_kwargs):
             return None
 
     monkeypatch.setattr(mcp_server, "require_software_unlock", lambda: None)
+    workspace = SoulDriveWorkspace.from_drive(str(tmp_path)).ensure()
+    monkeypatch.setattr(mcp_server, "current_workspace", lambda: workspace)
     monkeypatch.setattr(mcp_server, "_project_exists", lambda *_args: True)
     monkeypatch.setattr(mcp_server, "current_audit_logger", lambda: Audit())
     monkeypatch.setattr(

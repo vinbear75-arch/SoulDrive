@@ -8,6 +8,7 @@ import pytest
 from core.mcp_server import PresentationGenerateRequest
 from core.presentation_service import PresentationService
 from core.project_catalog import ProjectCatalog
+from core.task_journal import TaskJournal, TaskPublicError
 from core.workspace import SoulDriveWorkspace
 from core.workspace_crypto import derive_workspace_keys
 
@@ -64,6 +65,25 @@ def test_comparison_slide_preserves_existing_ledger_display_precision():
     assert "0.123456789%" in text and "0.223456789%" in text
 
 
+@pytest.mark.parametrize("max_slides", [4, 5])
+def test_comparison_outline_never_silently_drops_selected_measurements(max_slides):
+    comparison = {"status": "comparable", "compatibility": {"change_computation": "enabled"},
+                  "baseline": {}, "current": {}, "changes": [
+                      {"metric": f"metric-{index}", "unit": "%", "baseline_value": 0.81,
+                       "current_value": 0.86, "absolute_delta": 0.05} for index in range(5)]}
+    inputs = {"experiment_comparison": comparison, "source_filenames": ["baseline.csv", "current.csv"],
+              "max_slides": max_slides}
+    outline = {"slides": [{"kind": "cover"}, {"kind": "sources"}]}
+    if max_slides == 4:
+        with pytest.raises(TaskPublicError, match="页数上限"):
+            PresentationService._with_experiment_summary(outline, inputs)
+    else:
+        planned = PresentationService._with_experiment_summary(outline, inputs)
+        text = json.dumps(planned, ensure_ascii=False)
+        assert len(planned["slides"]) <= max_slides
+        assert all(f"[M{index}]" in text for index in range(1, 6))
+
+
 def test_comparison_plan_contains_server_measurements_and_rejects_ledger_drift(comparison_presentation):
     workspace, service, body, _, metric_id = comparison_presentation
     task = service.create_plan(body)
@@ -85,6 +105,73 @@ def test_comparison_plan_contains_server_measurements_and_rejects_ledger_drift(c
         catalog.close()
     with pytest.raises(ValueError, match="实验.*变化|测量.*变化"):
         service.confirm_plan(task["task_id"], result["plan_digest"])
+
+
+def test_comparison_outline_does_not_retain_model_invented_environment_changes(comparison_presentation):
+    _, service, body, _, _ = comparison_presentation
+    calls = []
+
+    def invented_outline(_records, _inputs):
+        calls.append(True)
+        return {"title": "比较", "outline_source": "local_ollama", "slides": [
+            {"kind": "cover", "title": "比较"},
+            {"kind": "content", "title": "测试环境一致性确认", "points": ["硬件环境发生变动"],
+             "sources": body["source_filenames"]},
+            {"kind": "sources", "title": "来源", "sources": body["source_filenames"]},
+        ]}
+
+    service.outline_generator = invented_outline
+    planned = service.run_task(service.create_plan(body)["task_id"])
+    assert planned["status"] == "completed", planned
+    outline = planned["result"]["outline"]
+    assert "硬件环境发生变动" not in json.dumps(outline, ensure_ascii=False)
+    assert calls == [], "comparison facts must not depend on free-form model claims"
+    assert outline["outline_source"] == "experiment_ledger_extractive"
+    text = json.dumps(outline, ensure_ascii=False)
+    assert "[M1]" in text
+    assert "环境引用：基线 env-a；当前 env-a" in text
+    assert "配置引用：基线 config-a；当前 config-b" in text
+    assert outline["title"] == body["title"]
+
+
+def test_comparison_outline_rejects_an_incomplete_evidence_budget():
+    comparison = {"status": "comparable", "compatibility": {"change_computation": "enabled"},
+                  "baseline": {}, "current": {}, "changes": [
+                      {"metric": f"metric-{index}", "unit": "%", "baseline_value": 0.81,
+                       "current_value": 0.86, "absolute_delta": 0.05} for index in range(9)]}
+    with pytest.raises(TaskPublicError, match="完整证据预算"):
+        PresentationService._with_experiment_summary({"slides": [{"kind": "cover"}, {"kind": "sources"}]},
+            {"experiment_comparison": comparison, "source_filenames": ["baseline.csv", "current.csv"], "max_slides": 16})
+
+
+@pytest.mark.parametrize("stage", ["confirm", "resume"])
+def test_legacy_comparison_outline_requires_new_review(comparison_presentation, monkeypatch, stage):
+    _, service, body, _, _ = comparison_presentation
+    original_builder = service._build_outline_step
+
+    def legacy_builder(inputs, outputs, context=None):
+        outline = original_builder(inputs, outputs, context)
+        return {**outline, "outline_source": "local_ollama"}
+
+    monkeypatch.setattr(service, "_build_outline_step", legacy_builder)
+    planned = service.run_task(service.create_plan(body)["task_id"])
+    assert planned["status"] == "completed", planned
+    if stage == "resume":
+        # Reproduce a task confirmed by the older implementation, not an
+        # unconfirmed artifact which the pre-existing confirmation gate rejects.
+        with monkeypatch.context() as legacy:
+            legacy.setattr(service, "_require_experiment_outline", lambda *_args: None, raising=False)
+            generation = service.confirm_plan(planned["task_id"], planned["result"]["plan_digest"])
+        journal = TaskJournal(service.workspace, service.keys)
+        try:
+            generation_inputs = journal.get_task(generation["task_id"])["inputs"]
+        finally:
+            journal.close()
+    with pytest.raises(ValueError, match="实验比较大纲.*重新"):
+        if stage == "confirm":
+            service.confirm_plan(planned["task_id"], planned["result"]["plan_digest"])
+        else:
+            service._load_confirmed_plan_step(generation_inputs, {})
 
 
 @pytest.mark.parametrize("change", ["missing_pair", "foreign_project", "incompatible"])
