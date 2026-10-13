@@ -1,4 +1,6 @@
+import json
 import unittest
+from decimal import MAX_EMAX, MIN_EMIN, Inexact, localcontext
 
 from core.answer_quality import (
     citation_coverage,
@@ -11,6 +13,14 @@ from core.answer_quality import (
 
 
 class AnswerQualityTests(unittest.TestCase):
+    def test_evidence_gate_rejects_non_finite_scores(self):
+        gate = evaluate_evidence_gate([{"id": "E1", "score": float("nan")}])
+
+        self.assertFalse(gate.allowed)
+        self.assertEqual(gate.decision, "reject")
+        self.assertEqual(gate.max_score, 0.0)
+        self.assertEqual(gate.reason, "evidence confidence below threshold")
+
     def test_evidence_gate_rejects_empty_or_low_confidence_evidence(self):
         empty = evaluate_evidence_gate([])
         low = evaluate_evidence_gate([{"id": "E1", "score": 0.001}])
@@ -150,6 +160,32 @@ class AnswerQualityTests(unittest.TestCase):
         self.assertEqual(gate.decision, "accept")
         self.assertEqual(gate.reason, "evidence accepted by corroboration")
 
+    def test_evidence_gate_accepts_same_named_scoped_corroborating_sources(self):
+        gate = evaluate_evidence_gate(
+            [
+                {
+                    "id": "E1",
+                    "score": 0.070,
+                    "source_filename": "report.pdf",
+                    "project_id": "project-a",
+                    "document_id": "document-a",
+                    "snippet": "模型风险评估采用分级控制，安全审计按月核验。",
+                },
+                {
+                    "id": "E2",
+                    "score": 0.066,
+                    "source_filename": "report.pdf",
+                    "project_id": "project-b",
+                    "document_id": "document-b",
+                    "snippet": "模型风险评估采用动态授权，安全审计按季度验收。",
+                },
+            ],
+            query="比较两个项目在模型风险评估和安全审计上的做法。",
+        )
+
+        self.assertTrue(gate.allowed)
+        self.assertEqual(gate.reason, "evidence accepted by corroboration")
+
     def test_evidence_gate_does_not_treat_one_source_as_corroboration(self):
         gate = evaluate_evidence_gate(
             [
@@ -182,6 +218,35 @@ class AnswerQualityTests(unittest.TestCase):
                 }
             ],
             query="SoulDrive 的创始人是谁？",
+        )
+
+        self.assertFalse(gate.allowed)
+        self.assertEqual(gate.decision, "retry")
+        self.assertEqual(gate.reason, "evidence does not answer query")
+
+    def test_evidence_gate_rejects_generic_overlap_for_weather_request(self):
+        gate = evaluate_evidence_gate(
+            [{
+                "id": "E1",
+                "score": 0.028,
+                "source_filename": "rag-service.pdf",
+                "snippet": "知识服务选择模型时需要考虑业务需求、数据安全、预算限制，并给出模型选择建议。",
+            }],
+            query="请根据当前本地资料给出上海明天的天气和穿衣建议。",
+        )
+
+        self.assertFalse(gate.allowed)
+        self.assertEqual(gate.decision, "retry")
+        self.assertEqual(gate.reason, "evidence does not answer query")
+
+    def test_evidence_gate_requires_named_identifier_for_license_price_request(self):
+        gate = evaluate_evidence_gate(
+            [{
+                "id": "E1",
+                "score": 0.039,
+                "snippet": "BGE 是开源模型，采用 MIT 许可；商业嵌入模型按服务需求收费。",
+            }],
+            query="这些资料是否公布了 SoulDrive 的商业许可证价格？",
         )
 
         self.assertFalse(gate.allowed)
@@ -424,6 +489,147 @@ class AnswerQualityTests(unittest.TestCase):
         self.assertFalse(report["valid"])
         self.assertEqual(report["semantic_support"]["unsupported_claim_count"], 1)
 
+    def test_validate_answer_citations_rejects_changed_numeric_sign_or_exponent(self):
+        for source_value, answer_value in (
+            ("-5%", "+5%"),
+            ("+5%", "-5%"),
+            ("−5%", "5%"),
+            ("1e-3", "1e+3"),
+            ("-2.5 秒", "2500 ms"),
+        ):
+            with self.subTest(source_value=source_value, answer_value=answer_value):
+                report = validate_answer_citations(
+                    f"本轮实验测量值为 {answer_value}。[E1]",
+                    [{"id": "E1", "snippet": f"本轮实验测量值为 {source_value}。"}],
+                    semantic=True,
+                )
+
+                self.assertFalse(report["valid"])
+                self.assertEqual(report["semantic_support"]["unsupported_claim_count"], 1)
+
+    def test_validate_answer_citations_accepts_equivalent_signed_scientific_values(self):
+        for source_value, answer_value in (
+            ("-5%", "−0.05"),
+            ("+5%", "5%"),
+            ("1e-3", "0.001"),
+            ("1e−3", "0.001"),
+            ("1.0E+03 ms", "1 秒"),
+            ("-2.5 秒", "−2500 ms"),
+            ("范围 3-5", "范围 3 至 5"),
+            ("model-8B", "model 8B"),
+        ):
+            with self.subTest(source_value=source_value, answer_value=answer_value):
+                report = validate_answer_citations(
+                    f"本轮实验测量值为 {answer_value}。[E1]",
+                    [{"id": "E1", "snippet": f"本轮实验测量值为 {source_value}。"}],
+                    semantic=True,
+                )
+
+                self.assertTrue(report["valid"], report)
+
+    def test_validate_answer_citations_rejects_distinct_exact_numeric_values(self):
+        for source_value, answer_value in (
+            ("1000000000001", "1000000000002"),
+            ("9007199254740992", "9007199254740993"),
+            ("0.10000000000001", "0.10000000000002"),
+            ("1.00000000000000000000000000001", "1.00000000000000000000000000002"),
+            ("1e-400", "2e-400"),
+            ("1e400", "2e400"),
+            ("1e9999999", "2e9999999"),
+            ("1e9999999999999999999", "2e9999999999999999999"),
+            ("-.5%", "+.5%"),
+            (".5", "5"),
+            ("1.0000000000001 秒", "1000.0000000002 ms"),
+            ("1.0000000000001 KiB", "1024.0000000002048 bytes"),
+        ):
+            with self.subTest(source_value=source_value, answer_value=answer_value):
+                report = validate_answer_citations(
+                    f"本轮实验测量值为 {answer_value}。[E1]",
+                    [{"id": "E1", "snippet": f"本轮实验测量值为 {source_value}。"}],
+                    semantic=True,
+                )
+
+                self.assertFalse(report["valid"], report)
+                self.assertEqual(report["semantic_support"]["unsupported_claim_count"], 1)
+                missing = report["semantic_support"]["claims"][0]["missing_fact_tokens"]
+                self.assertTrue(missing)
+                self.assertTrue(all(isinstance(token, str) and len(token) < 128 for token in missing))
+                json.dumps(report, ensure_ascii=False, allow_nan=False)
+
+    def test_validate_answer_citations_accepts_exact_numeric_equivalents(self):
+        for source_value, answer_value in (
+            ("-.5%", "-0.005"),
+            ("+.5", "0.5"),
+            ("1.000000000000000000000000000010", "1.00000000000000000000000000001"),
+            ("1e-400", "10e-401"),
+            ("1e400", "10e399"),
+            ("1e9999999", "10e9999998"),
+            ("1e-400%", "1e-402"),
+            ("1e400 ms", "1e397 秒"),
+            ("1.0000000000001 秒", "1000.0000000001 ms"),
+            ("1.0000000000001 KiB", "1024.0000000001024 bytes"),
+            ("-0%", "+0.000"),
+        ):
+            with self.subTest(source_value=source_value, answer_value=answer_value):
+                report = validate_answer_citations(
+                    f"本轮实验测量值为 {answer_value}。[E1]",
+                    [{"id": "E1", "snippet": f"本轮实验测量值为 {source_value}。"}],
+                    semantic=True,
+                )
+
+                self.assertTrue(report["valid"], report)
+                json.dumps(report, ensure_ascii=False, allow_nan=False)
+
+    def test_validate_answer_citations_preserves_callers_decimal_context(self):
+        with localcontext() as context:
+            context.prec = 2
+            context.Emax = 2
+            context.Emin = -2
+            context.traps[Inexact] = True
+            context.clear_flags()
+            original_flags = dict(context.flags)
+            for source_value, answer_value in (
+                ("1.00000000000000000000000000001 秒", "1000.00000000000000000000000001 ms"),
+                ("1e400 ms", "1e397 秒"),
+                ("1e9999999999999999999", "1e9999999999999999999"),
+            ):
+                with self.subTest(source_value=source_value, answer_value=answer_value):
+                    report = validate_answer_citations(
+                        f"本轮实验测量值为 {answer_value}。[E1]",
+                        [{"id": "E1", "snippet": f"本轮实验测量值为 {source_value}。"}],
+                        semantic=True,
+                    )
+                    self.assertTrue(report["valid"], report)
+
+            self.assertEqual(context.prec, 2)
+            self.assertEqual(context.Emax, 2)
+            self.assertEqual(context.Emin, -2)
+            self.assertTrue(context.traps[Inexact])
+            self.assertEqual(dict(context.flags), original_flags)
+
+        with localcontext() as context:
+            for signal in context.traps:
+                context.traps[signal] = False
+            context.clear_flags()
+            original_flags = dict(context.flags)
+            original_traps = dict(context.traps)
+            for source_value, answer_value in (
+                ("1e9999999999999999999", "2e9999999999999999999"),
+                (f"1e{MAX_EMAX} 秒", f"2e{MAX_EMAX} 秒"),
+                (f"1e{MIN_EMIN}%", f"2e{MIN_EMIN}%"),
+            ):
+                with self.subTest(source_value=source_value, answer_value=answer_value):
+                    report = validate_answer_citations(
+                        f"本轮实验测量值为 {answer_value}。[E1]",
+                        [{"id": "E1", "snippet": f"本轮实验测量值为 {source_value}。"}],
+                        semantic=True,
+                    )
+                    self.assertFalse(report["valid"], report)
+                    json.dumps(report, ensure_ascii=False, allow_nan=False)
+
+            self.assertEqual(dict(context.flags), original_flags)
+            self.assertEqual(dict(context.traps), original_traps)
+
     def test_validate_answer_citations_accepts_equivalent_time_units(self):
         report = validate_answer_citations(
             "完整链路 P95 延迟为 2.5 秒。[E1]",
@@ -487,6 +693,73 @@ class AnswerQualityTests(unittest.TestCase):
 
         self.assertTrue(report["valid"])
         self.assertEqual(report["semantic_support"]["unsupported_claim_count"], 0)
+
+    def test_validate_answer_citations_can_require_multiple_source_documents(self):
+        report = validate_answer_citations(
+            "跨资料综合结论。[E1]",
+            [
+                {"id": "E1", "document_id": "doc-a", "snippet": "资料A支持综合结论。"},
+                {"id": "E2", "document_id": "doc-b", "snippet": "资料B也提供相关证据。"},
+            ],
+            required_source_count=2,
+        )
+
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["reason"], "answer citation source diversity insufficient")
+        self.assertEqual(report["cited_source_count"], 1)
+        self.assertEqual(report["required_source_count"], 2)
+
+    def test_validate_answer_citations_can_require_source_diversity_per_global_claim(self):
+        report = validate_answer_citations(
+            "跨资料共同结论只引用资料A。[E1]\n\n资料B的独立补充。[E1][E2]",
+            [
+                {"id": "E1", "document_id": "doc-a", "snippet": "资料A支持共同结论。"},
+                {"id": "E2", "document_id": "doc-b", "snippet": "资料B提供独立补充。"},
+            ],
+            required_source_count=2,
+            require_source_count_per_claim=True,
+        )
+
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["reason"], "answer claim source diversity insufficient")
+        self.assertEqual(report["cited_source_count"], 2)
+        self.assertEqual(report["insufficient_claim_count"], 1)
+
+    def test_validate_answer_citations_counts_distinct_documents_not_citation_ids(self):
+        same_source = validate_answer_citations(
+            "结论一。[E1]\n结论二。[E2]",
+            [
+                {"id": "E1", "document_id": "doc-a", "snippet": "资料支持结论一。"},
+                {"id": "E2", "document_id": "doc-a", "snippet": "同一资料支持结论二。"},
+            ],
+            required_source_count=2,
+        )
+        distinct_sources = validate_answer_citations(
+            "结论一。[E1]\n结论二。[E2]",
+            [
+                {"id": "E1", "document_id": "doc-a", "snippet": "资料A支持结论一。"},
+                {"id": "E2", "document_id": "doc-b", "snippet": "资料B支持结论二。"},
+            ],
+            required_source_count=2,
+        )
+
+        self.assertFalse(same_source["valid"])
+        self.assertEqual(same_source["cited_source_count"], 1)
+        self.assertTrue(distinct_sources["valid"])
+        self.assertEqual(distinct_sources["cited_source_count"], 2)
+
+    def test_validate_answer_citations_does_not_count_visual_evidence_as_document_source(self):
+        report = validate_answer_citations(
+            "文档结论。[E1]\n本轮画面状态。[V1]",
+            [
+                {"id": "E1", "document_id": "doc-a", "snippet": "文档支持结论。"},
+                {"id": "V1", "modality": "image", "source_filename": "screen-1", "snippet": "画面状态。"},
+            ],
+            required_source_count=2,
+        )
+
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["cited_source_count"], 1)
 
     def test_validate_answer_citations_semantic_support_ignores_page_and_chunk_markers(self):
         report = validate_answer_citations(

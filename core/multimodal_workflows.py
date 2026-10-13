@@ -51,6 +51,14 @@ WORKFLOW_CATALOG: dict[str, dict[str, Any]] = {
                 "missing_evidence_marker": "待确认",
                 "session_instruction": "这是持续绑定到当前会话的论文精读模式。普通文本可以直接作为论文问题或追问；只使用当前项目与用户选中文档的证据，无法证明的内容标记为待确认。",
             },
+        "retrieval_policy": {
+            "profile": "paper_review",
+            "requires_source_diversity": False,
+            "query_focuses": [
+                "研究问题 研究目标 研究假设 核心方法 方法流程",
+                "实验结果 数据集 评测指标 局限 复现",
+            ],
+        },
         "suggested_query": "请精读当前选中的论文，按研究问题、核心方法、实验结果、局限与可复现实验整理，并为每个事实标注证据。",
     },
     "experiment_compare": {
@@ -86,6 +94,14 @@ WORKFLOW_CATALOG: dict[str, dict[str, Any]] = {
                 "missing_evidence_marker": "待确认",
                 "session_instruction": "这是持续绑定到当前会话的实验对比模式。普通文本可以直接作为分析问题；只有显式可比的测量才能写成已证实变化，原因必须区分候选因素、待验证假设和最小验证实验。",
             },
+        "retrieval_policy": {
+            "profile": "experiment_compare",
+            "requires_source_diversity": True,
+            "query_focuses": [
+                "指标 数值 单位 数据集 评测脚本",
+                "版本 配置 环境 变化 候选原因 验证实验",
+            ],
+        },
         "suggested_query": "请对比当前实验材料，先列出可直接由证据证明的变化，再区分高可信候选原因和待验证假设，最后给出最小验证实验。",
     },
     "meeting_actions": {
@@ -93,13 +109,13 @@ WORKFLOW_CATALOG: dict[str, dict[str, Any]] = {
         "playbook_version": "1.0",
         "title": "语音/阅读记录 → 行动项",
         "audience": "课题组会议与企业项目协作",
-        "description": "把用户主动提供的语音或转写内容整理成决策、待办、负责人、截止时间和草稿产物。",
+        "description": "把用户主动提供的语音、转写或直接记录文本整理成决策、待办、负责人、截止时间和草稿产物。",
         "input_contract": [
             "当前项目空间（必需）",
-            "语音录音或已确认转写（必需）",
+            "语音录音、已确认转写，或在本会话中直接输入的会议/阅读记录（至少一种）",
             "会议材料或当前屏幕（可选）",
         ],
-        "input_labels": ["语音录音或已确认转写", "可选：会议材料/当前屏幕", "外发邮件和写入日历必须二次确认"],
+        "input_labels": ["语音、确认转写或直接记录文本", "可选：会议材料/当前屏幕", "外发邮件和写入日历必须二次确认"],
         "output": "结构化会议纪要、待办清单、邮件/日程草稿",
         "evidence_plan": ["本轮用户确认的语音转写", "当前项目内相关文档与会话上下文"],
         "side_effects": ["默认只生成本地草稿", "外发邮件或写入日历必须二次确认"],
@@ -120,6 +136,14 @@ WORKFLOW_CATALOG: dict[str, dict[str, Any]] = {
                 "missing_evidence_marker": "待确认",
                 "session_instruction": "这是持续绑定到当前会话的会议纪要模式。普通文字消息按用户提供的会议记录文本处理，不得伪装成语音转写；负责人、截止时间和决定不明确时标记为待确认，外发邮件或写入日历仍需单独确认。",
             },
+        "retrieval_policy": {
+            "profile": "meeting_record_first",
+            "requires_source_diversity": False,
+            "query_focuses": [
+                "会议结论 决策",
+                "行动项 负责人 截止时间 待确认",
+            ],
+        },
         "suggested_query": "请把本轮语音或阅读记录整理为会议纪要、明确的行动项、负责人和截止时间；不确定的信息标记为待确认。",
     },
 }
@@ -156,11 +180,65 @@ def workflow_response_contract(workflow_id: str | None) -> dict[str, Any] | None
     return deepcopy(contract) if isinstance(contract, dict) else None
 
 
+def workflow_retrieval_policy(workflow_id: str | None) -> dict[str, Any]:
+    """Return the deterministic retrieval policy for a bound Playbook."""
+    workflow_key = str(workflow_id or "").strip()
+    if not workflow_key:
+        return {
+            "profile": "default",
+            "requires_source_diversity": False,
+        }
+    spec = get_workflow_spec(workflow_key)
+    policy = spec.get("retrieval_policy")
+    if not isinstance(policy, dict):
+        return {
+            "profile": "default",
+            "requires_source_diversity": False,
+        }
+    return deepcopy(policy)
+
+
+def workflow_retrieval_variants(
+    workflow_id: str | None,
+    user_query: str,
+    *,
+    limit: int = 2,
+) -> list[str]:
+    """Build bounded, deterministic retrieval focuses for a bound Playbook.
+
+    The focus terms are a small local equivalent of a research workflow's
+    question plan.  They influence candidate recall only; the original user
+    query remains the evidence-gate and answer contract.
+    """
+    query = " ".join(str(user_query or "").split())[:6000]
+    if not query:
+        return []
+    policy = workflow_retrieval_policy(workflow_id)
+    focuses = policy.get("query_focuses")
+    if not isinstance(focuses, list):
+        return []
+    variants: list[str] = []
+    seen = {query}
+    bounded_limit = max(0, min(int(limit), 3))
+    for raw_focus in focuses:
+        focus = " ".join(str(raw_focus or "").split())[:320]
+        if not focus:
+            continue
+        variant = f"{query}\n检索重点：{focus}"[:6000]
+        if variant in seen:
+            continue
+        seen.add(variant)
+        variants.append(variant)
+        if len(variants) >= bounded_limit:
+            break
+    return variants
+
+
 def evaluate_workflow_output_contract(
     workflow_id: str | None,
     answer: str,
 ) -> dict[str, Any]:
-    """Check the visible section skeleton without judging factual correctness."""
+    """Check required sections have visible content without judging facts."""
     contract = workflow_response_contract(workflow_id)
     if not contract:
         return {
@@ -175,17 +253,49 @@ def evaluate_workflow_output_contract(
         if str(item).strip()
     ]
     observed: set[str] = set()
+    section_content: dict[str, list[str]] = {title: [] for title in required}
+    current_section: str | None = None
     for raw_line in str(answer or "").splitlines():
         line = re.sub(r"^\s*(?:#{1,6}\s*|[-*+]\s+|\d+[.)、．]?\s*)", "", raw_line).strip()
+        matched_section: str | None = None
+        inline_content = ""
         for title in required:
-            if line == title or line.startswith(f"{title}：") or line.startswith(f"{title}:"):
-                observed.add(title)
-    missing = [title for title in required if title not in observed]
+            if line == title:
+                matched_section = title
+                break
+            for separator in ("：", ":"):
+                prefix = f"{title}{separator}"
+                if line.startswith(prefix):
+                    matched_section = title
+                    inline_content = line[len(prefix):].strip()
+                    break
+            if matched_section:
+                break
+        if matched_section:
+            observed.add(matched_section)
+            current_section = matched_section
+            if inline_content:
+                section_content[matched_section].append(inline_content)
+            continue
+        if current_section and line:
+            section_content[current_section].append(line)
+
+    empty_sections = [
+        title
+        for title in required
+        if title in observed and not section_content[title]
+    ]
+    missing = [
+        title
+        for title in required
+        if title not in observed or title in empty_sections
+    ]
     return {
         "status": "pass" if not missing else "incomplete",
         "required_sections": required,
         "observed_sections": [title for title in required if title in observed],
         "missing_sections": missing,
+        "empty_sections": empty_sections,
         "missing_evidence_marker": str(contract.get("missing_evidence_marker") or "待确认"),
     }
 
@@ -259,9 +369,11 @@ def plan_workflow(
     *,
     project_id: str | None = None,
     document_names: list[str] | None = None,
+    document_ids: list[str] | None = None,
     has_audio: bool = False,
     has_image: bool = False,
     speech_text: str = "",
+    text_note: str = "",
     selected_text: str = "",
     baseline_run_id: str | None = None,
     current_run_id: str | None = None,
@@ -274,7 +386,16 @@ def plan_workflow(
     approval_state = playbook_approval_state(workflow_key, approval)
 
     documents = _unique_names(document_names or [])
+    selected_document_ids = []
+    for item in document_ids or []:
+        document_id = " ".join(str(item or "").strip().split())[:256]
+        if document_id and document_id not in selected_document_ids:
+            selected_document_ids.append(document_id)
+        if len(selected_document_ids) >= 12:
+            break
+    selected_document_count = max(len(documents), len(selected_document_ids))
     has_transcript = bool(str(speech_text or "").strip())
+    has_text_note = bool(str(text_note or "").strip())
     has_selected_text = bool(str(selected_text or "").strip())
     has_experiment_comparison = bool(str(baseline_run_id or "").strip() and str(current_run_id or "").strip())
     has_partial_experiment_selection = bool(str(baseline_run_id or "").strip()) != bool(str(current_run_id or "").strip())
@@ -284,15 +405,15 @@ def plan_workflow(
     elif require_approval and approval_state["status"] != "approved":
         missing.append("请先审核通过当前项目的 Playbook")
 
-    if workflow_key == "paper_review" and not documents:
+    if workflow_key == "paper_review" and not selected_document_count:
         missing.append("至少选择一篇已索引论文")
     if workflow_key == "experiment_compare":
         if has_partial_experiment_selection:
             missing.append("请同时选择基线运行和当前运行")
-        elif len(documents) < 2 and not (has_image or has_selected_text or has_experiment_comparison):
+        elif selected_document_count < 2 and not (has_image or has_selected_text or has_experiment_comparison):
             missing.append("至少选择两份实验材料、授权一张包含两组数据的屏幕选区，或选择两次实验运行")
-    if workflow_key == "meeting_actions" and not (has_audio or has_transcript):
-        missing.append("请提供语音录音，或先确认一段语音转写")
+    if workflow_key == "meeting_actions" and not (has_audio or has_transcript or has_text_note):
+        missing.append("请提供语音录音、确认转写，或直接输入会议/阅读记录")
 
     if workflow_key == "paper_review":
         route = "auto" if has_image else "none"
@@ -306,6 +427,8 @@ def plan_workflow(
         evidence_scope.append("本轮授权屏幕选区")
     if has_audio or has_transcript:
         evidence_scope.append("本轮确认语音/转写")
+    if has_text_note:
+        evidence_scope.append("本轮用户提供的会议/阅读记录文本")
     if has_experiment_comparison:
         evidence_scope.append("结构化实验对比（M#）")
 
@@ -319,16 +442,18 @@ def plan_workflow(
         "input_contract": list(spec["input_contract"]),
         "input_state": {
             "project_selected": bool(str(project_id or "").strip()),
-            "document_count": len(documents),
+            "document_count": selected_document_count,
+            "document_id_count": len(selected_document_ids),
             "has_audio": bool(has_audio),
             "has_image": bool(has_image),
             "has_transcript": has_transcript,
+            "has_text_note": has_text_note,
             "has_selected_text": has_selected_text,
             "has_experiment_comparison": has_experiment_comparison,
         },
         "routing": {
             "visual_mode": route,
-            "needs_rag": workflow_key != "meeting_actions" or bool(documents),
+            "needs_rag": workflow_key != "meeting_actions" or bool(selected_document_count),
             "needs_confirmation": True,
         },
         "approval": approval_state,

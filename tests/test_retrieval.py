@@ -1,9 +1,12 @@
 import unittest
+import math
 from unittest.mock import patch
 
 from core.knowledge_base import LocalKnowledgeBase
+from core.knowledge_base import _retrieval_quality_signals
 from core.retrieval import (
     SearchCandidate,
+    _bounded_score,
     _query_source_hints,
     _select_diverse_sources,
     _select_source_covered_candidates,
@@ -17,6 +20,113 @@ from core.retrieval import (
 
 
 class RetrievalTests(unittest.TestCase):
+    def test_bounded_score_rejects_non_finite_values(self):
+        self.assertEqual(_bounded_score(float("nan")), 0.0)
+        self.assertEqual(_bounded_score(float("inf")), 0.0)
+        self.assertEqual(_bounded_score(float("-inf")), 0.0)
+
+    def test_hybrid_rank_keeps_non_finite_candidate_scores_out_of_diagnostics(self):
+        candidates = [
+            SearchCandidate(
+                id="bad-score",
+                content="RAG evidence",
+                metadata={"source_filename": "bad.pdf", "_knowledge_weight": float("nan")},
+                dense_rank=1,
+                graph_score=float("nan"),
+                vector_distance=float("nan"),
+                rerank_score=float("inf"),
+            ),
+            SearchCandidate(
+                id="good-score",
+                content="RAG evidence",
+                metadata={"source_filename": "good.pdf"},
+                dense_rank=2,
+                graph_score=1.0,
+                rerank_score=0.2,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates("RAG evidence", candidates, top_k=2)
+
+        self.assertTrue(all(math.isfinite(candidate.final_score) for candidate in ranked))
+        self.assertTrue(all(math.isfinite(candidate.score_breakdown["final"]) for candidate in ranked))
+        self.assertIsNone(candidates[0].vector_distance)
+
+    def test_quality_signals_do_not_publish_infinite_scores(self):
+        signals = _retrieval_quality_signals(
+            "方案证据",
+            [SearchCandidate(
+                id="infinite",
+                content="方案证据",
+                metadata={"source_filename": "infinite.pdf"},
+                final_score=float("inf"),
+            )],
+        )
+
+        self.assertEqual(signals["max_final_score"], 0.0)
+        self.assertEqual(signals["mean_final_score"], 0.0)
+
+    def test_quality_signals_count_same_named_scoped_sources_by_identity(self):
+        candidates = [
+            SearchCandidate(
+                id="chunk-a",
+                content="项目 A 的方案证据。",
+                metadata={
+                    "source_filename": "report.pdf",
+                    "project_id": "project-a",
+                    "document_id": "document-a",
+                },
+                final_score=0.8,
+            ),
+            SearchCandidate(
+                id="chunk-b",
+                content="项目 B 的方案证据。",
+                metadata={
+                    "source_filename": "report.pdf",
+                    "project_id": "project-b",
+                    "document_id": "document-b",
+                },
+                final_score=0.7,
+            ),
+        ]
+
+        signals = _retrieval_quality_signals("方案证据", candidates)
+
+        self.assertEqual(signals["evidence_source_count"], 2)
+
+    def test_hybrid_selection_diagnostics_count_same_named_scoped_sources(self):
+        candidates = [
+            SearchCandidate(
+                id="project-a-child",
+                content="项目 A 方案证据",
+                metadata={
+                    "source_filename": "report.pdf",
+                    "project_id": "project-a",
+                },
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="project-b-child",
+                content="项目 B 方案证据",
+                metadata={
+                    "source_filename": "report.pdf",
+                    "project_id": "project-b",
+                },
+                dense_rank=2,
+            ),
+        ]
+        diagnostics = {}
+
+        rank_hybrid_candidates(
+            "请比较两个项目的方案证据",
+            candidates,
+            top_k=2,
+            diagnostics=diagnostics,
+            source_query_groups=[],
+        )
+
+        self.assertEqual(diagnostics["selected_source_count"], 2)
+
     def test_query_intent_distinguishes_formal_document_question_types(self):
         clause_intent = classify_query_intent("《数据安全管理办法》第三条规定了什么？")
         table_intent = classify_query_intent("验收指标值、完成比例和期限分别是多少？")
@@ -311,6 +421,32 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(merged[1].keyword_score, 3.5)
         self.assertEqual(merged[1].metadata["child_excerpt"], "keyword child excerpt")
 
+    def test_merge_candidates_does_not_merge_same_child_id_across_projects(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+
+        merged = kb._merge_candidates(
+            [
+                SearchCandidate(
+                    id="shared-child",
+                    content="project A evidence",
+                    metadata={"child_id": "shared-child", "project_id": "project-a"},
+                )
+            ],
+            [
+                SearchCandidate(
+                    id="shared-child",
+                    content="project B evidence",
+                    metadata={"child_id": "shared-child", "project_id": "project-b"},
+                )
+            ],
+        )
+
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(
+            {candidate.metadata["project_id"] for candidate in merged},
+            {"project-a", "project-b"},
+        )
+
     def test_source_title_candidates_are_created_from_metadata_matches(self):
         kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
         kb.collection = _FakeCollection(
@@ -358,6 +494,39 @@ class RetrievalTests(unittest.TestCase):
                 "基于大模型和RAG的知识库问答系统.pdf",
                 "Retrieval-Augmented Generation for Large Language Models - A Survey.pdf",
             },
+        )
+
+    def test_source_title_candidates_keep_same_named_sources_separate_across_projects(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.collection = _FakeCollection(
+            {
+                "ids": ["project-a-child", "project-b-child"],
+                "documents": ["project A report", "project B report"],
+                "metadatas": [
+                    {
+                        "source_filename": "report.pdf",
+                        "project_id": "project-a",
+                        "parent_id": "project-a-parent",
+                    },
+                    {
+                        "source_filename": "report.pdf",
+                        "project_id": "project-b",
+                        "parent_id": "project-b-parent",
+                    },
+                ],
+            }
+        )
+        kb._source_candidate_cache = None
+
+        candidates = kb._source_title_candidates(
+            "请比较《report》在两个项目中的方案证据",
+            limit=4,
+        )
+
+        self.assertEqual(len(candidates), 2)
+        self.assertEqual(
+            {candidate.metadata["project_id"] for candidate in candidates},
+            {"project-a", "project-b"},
         )
 
     def test_hybrid_rank_promotes_explicit_source_title_match(self):
@@ -496,6 +665,56 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(ranked[0].id, "section-hit")
         self.assertEqual(ranked[0].score_breakdown["structure"], 1.0)
 
+    def test_hybrid_rank_does_not_treat_same_section_number_as_title_match(self):
+        candidates = [
+            SearchCandidate(
+                id="same-number-wrong-title",
+                content="RAG 的原理及技术框架，介绍向量化、检索和生成三个阶段。",
+                metadata={
+                    "source_filename": "other-paper.pdf",
+                    "section_path": ["2 RAG", "2.1 RAG的原理及技术框架"],
+                    "section": "2.1 RAG的原理及技术框架",
+                },
+                dense_rank=1,
+                rerank_score=1.0,
+            ),
+            SearchCandidate(
+                id="quoted-section-hit",
+                content="2.1 RAG 范式：RAG 通过检索外部知识辅助生成。",
+                metadata={
+                    "source_filename": "target-paper.pdf",
+                    "section_path": ["2 基本原理与系统架构"],
+                    "child_excerpt": "2.1 RAG 范式\nRAG 通过检索外部知识辅助生成。",
+                },
+                dense_rank=5,
+                rerank_score=0.9,
+            ),
+        ]
+
+        intent = classify_query_intent(
+            "请梳理资料中“2.1 RAG 范式”对应的背景、方法或结论结构。"
+        )
+        self.assertGreater(
+            _structure_match_score(
+                "请梳理资料中“2.1 RAG 范式”对应的背景、方法或结论结构。",
+                intent,
+                candidates[1],
+            ),
+            _structure_match_score(
+                "请梳理资料中“2.1 RAG 范式”对应的背景、方法或结论结构。",
+                intent,
+                candidates[0],
+            ),
+        )
+
+        ranked = rank_hybrid_candidates(
+            "请梳理资料中“2.1 RAG 范式”对应的背景、方法或结论结构。",
+            candidates,
+            top_k=1,
+        )
+
+        self.assertEqual(ranked[0].id, "quoted-section-hit")
+
     def test_structure_match_rewards_multi_topic_coverage(self):
         query = "请比较“检索”和“生成”的核心差异"
         intent = classify_query_intent(query)
@@ -531,6 +750,93 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(exact["coverage"], 1.0)
         self.assertEqual(fallback["mode"], "heading_fallback")
         self.assertEqual(fallback["coverage"], 1.0)
+
+    def test_section_route_keeps_single_high_confidence_source_cohesive(self):
+        query = "请梳理资料中“2.1 RAG 范式”对应的背景、方法或结论结构。"
+        candidates = [
+            SearchCandidate(
+                id="section-target",
+                content="2.1 RAG 范式的章节证据。",
+                metadata={
+                    "source_filename": "target.pdf",
+                    "document_id": "target-doc",
+                    "_section_route_mode": "heading_fallback",
+                    "_section_route_coverage": 1.0,
+                    "_section_route_exact_coverage": 0.0,
+                },
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="target-context-1",
+                content="同一资料中的背景与方法证据。",
+                metadata={
+                    "source_filename": "target.pdf",
+                    "document_id": "target-doc",
+                },
+                dense_rank=4,
+            ),
+            SearchCandidate(
+                id="target-context-2",
+                content="同一资料中的结论证据。",
+                metadata={
+                    "source_filename": "target.pdf",
+                    "document_id": "target-doc",
+                },
+                dense_rank=5,
+            ),
+            SearchCandidate(
+                id="cross-document-noise",
+                content="其他资料中的 RAG 通用介绍。",
+                metadata={
+                    "source_filename": "noise.pdf",
+                    "document_id": "noise-doc",
+                },
+                dense_rank=2,
+                rerank_score=0.95,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(query, candidates, top_k=3)
+
+        self.assertEqual(
+            [candidate.metadata["source_filename"] for candidate in ranked],
+            ["target.pdf", "target.pdf", "target.pdf"],
+        )
+
+    def test_section_route_promotes_exact_node_before_same_source_context(self):
+        query = "请定位资料中关于“1. 检索器（Retriever）：高效的知识筛选工具”的关键原文证据。"
+        candidates = [
+            SearchCandidate(
+                id="generic-noise",
+                content="检索器是通用的知识筛选工具。",
+                metadata={"source_filename": "noise.pdf", "document_id": "noise-doc"},
+                dense_rank=1,
+                rerank_score=1.0,
+            ),
+            SearchCandidate(
+                id="exact-route",
+                content="1. 检索器（Retriever）：高效的知识筛选工具。",
+                metadata={
+                    "source_filename": "target.pdf",
+                    "document_id": "target-doc",
+                    "_section_route_mode": "exact_node",
+                    "_section_route_coverage": 1.0,
+                    "_section_route_exact_coverage": 1.0,
+                },
+                dense_rank=5,
+                rerank_score=0.1,
+            ),
+            SearchCandidate(
+                id="target-context",
+                content="同一资料的检索器流程证据。",
+                metadata={"source_filename": "target.pdf", "document_id": "target-doc"},
+                dense_rank=6,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(query, candidates, top_k=2)
+
+        self.assertEqual([candidate.id for candidate in ranked], ["exact-route", "target-context"])
 
     def test_hybrid_rank_promotes_table_for_metric_lookup(self):
         candidates = [
@@ -662,6 +968,87 @@ class RetrievalTests(unittest.TestCase):
             "local_parent_window",
         )
 
+    def test_parent_expansion_rejects_parent_from_another_project(self):
+        class _CrossProjectParentStore:
+            def get_parent(self, _parent_id):
+                return {
+                    "content": "project B secret evidence",
+                    "metadata": {"project_id": "project-b"},
+                }
+
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _CrossProjectParentStore()
+        candidate = SearchCandidate(
+            id="project-a-child",
+            content="project A child evidence",
+            metadata={
+                "project_id": "project-a",
+                "parent_id": "shared-parent-id",
+                "child_start_char": 0,
+                "child_end_char": len("project A child evidence"),
+            },
+        )
+
+        expanded = kb._expand_parent_context(
+            [candidate],
+            top_k=1,
+            query="项目证据是什么？",
+        )
+
+        self.assertEqual(expanded[0].content, "project A child evidence")
+        self.assertEqual(
+            expanded[0].metadata["context_expansion_mode"],
+            "parent_scope_mismatch",
+        )
+
+    def test_parent_expansion_does_not_skip_scoped_candidates_with_same_parent_id(self):
+        class _ProjectParentStore:
+            def get_parent(self, _parent_id):
+                return {
+                    "content": "project A parent evidence",
+                    "metadata": {"project_id": "project-a"},
+                }
+
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _ProjectParentStore()
+        candidates = [
+            SearchCandidate(
+                id="project-a-child",
+                content="project A child evidence",
+                metadata={
+                    "project_id": "project-a",
+                    "parent_id": "shared-parent-id",
+                    "child_start_char": 0,
+                    "child_end_char": 10,
+                },
+            ),
+            SearchCandidate(
+                id="project-b-child",
+                content="project B child evidence",
+                metadata={
+                    "project_id": "project-b",
+                    "parent_id": "shared-parent-id",
+                    "child_start_char": 0,
+                    "child_end_char": 10,
+                },
+            ),
+        ]
+
+        expanded = kb._expand_parent_context(
+            candidates,
+            top_k=2,
+            query="项目证据是什么？",
+        )
+
+        self.assertEqual(
+            {candidate.id for candidate in expanded},
+            {"project-a-child", "project-b-child"},
+        )
+        project_b = next(candidate for candidate in expanded if candidate.id == "project-b-child")
+        self.assertEqual(project_b.content, "project B child evidence")
+
     def test_parent_expansion_orders_reserved_comparison_sources_by_score(self):
         kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
         kb.secure_store = None
@@ -677,6 +1064,31 @@ class RetrievalTests(unittest.TestCase):
             content="Beta 证据。",
             metadata={"source_filename": "beta.pdf", "parent_id": "beta-parent"},
             final_score=0.75,
+        )
+
+        expanded = kb._expand_parent_context(
+            [alpha, beta],
+            top_k=2,
+            query="请比较Alpha与Beta两类资料的差异",
+        )
+
+        self.assertEqual([candidate.id for candidate in expanded], ["beta", "alpha"])
+
+    def test_parent_expansion_uses_stable_candidate_id_for_equal_scores(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.secure_store = None
+        kb.parent_store = _FakeParentStore("比较证据正文。")
+        alpha = SearchCandidate(
+            id="alpha",
+            content="Alpha 证据。",
+            metadata={"source_filename": "alpha.pdf", "parent_id": "alpha-parent"},
+            final_score=0.5,
+        )
+        beta = SearchCandidate(
+            id="beta",
+            content="Beta 证据。",
+            metadata={"source_filename": "beta.pdf", "parent_id": "beta-parent"},
+            final_score=0.5,
         )
 
         expanded = kb._expand_parent_context(
@@ -841,6 +1253,45 @@ class RetrievalTests(unittest.TestCase):
             candidates,
             top_k=2,
             query_variants=[query, "Alpha主题 Beta主题 核心证据"],
+            source_query_groups=[
+                ["Alpha主题 核心证据"],
+                ["Beta主题 核心证据"],
+            ],
+        )
+
+        self.assertEqual(
+            {candidate.metadata["source_filename"] for candidate in ranked},
+            {"a.pdf", "b.pdf"},
+        )
+
+    def test_hybrid_rank_does_not_fill_comparison_context_with_uncovered_sources(self):
+        query = "请比较Alpha主题与Beta主题两类资料的核心差异"
+        candidates = [
+            SearchCandidate(
+                id="alpha",
+                content="Alpha主题的核心证据。",
+                metadata={"source_filename": "a.pdf"},
+                dense_rank=1,
+            ),
+            SearchCandidate(
+                id="beta",
+                content="Beta主题的核心证据。",
+                metadata={"source_filename": "b.pdf"},
+                dense_rank=2,
+            ),
+            SearchCandidate(
+                id="uncovered",
+                content="另一份资料提到差异，但不属于任一比较侧。",
+                metadata={"source_filename": "uncovered.pdf"},
+                dense_rank=3,
+            ),
+        ]
+
+        ranked = rank_hybrid_candidates(
+            query,
+            candidates,
+            top_k=3,
+            query_variants=[query, "Alpha主题 核心证据", "Beta主题 核心证据"],
             source_query_groups=[
                 ["Alpha主题 核心证据"],
                 ["Beta主题 核心证据"],

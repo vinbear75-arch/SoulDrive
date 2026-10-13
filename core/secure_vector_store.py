@@ -6,7 +6,9 @@ import math
 import os
 import re
 import sqlite3
+import threading
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,15 @@ KEYWORD_POSTING_AAD = b"SoulDrive secure keyword posting v1"
 MAX_KEYWORD_TOKENS = 4096
 
 
+def _synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 def _document_name_matches(metadata: dict[str, Any], document_names: list[str]) -> bool:
     if not document_names:
         return True
@@ -41,6 +52,27 @@ def _document_name_matches(metadata: dict[str, Any], document_names: list[str]) 
             identities.add(value.casefold())
             identities.add(value.replace("\\", "/").rsplit("/", 1)[-1].casefold())
     return bool(identities & expected)
+
+
+def _document_id_candidates(document_id: str) -> set[str]:
+    normalized = str(document_id or "").strip()
+    if not normalized:
+        return set()
+    if normalized.startswith("secure_"):
+        return {normalized, normalized.removeprefix("secure_")}
+    return {normalized, f"secure_{normalized}"}
+
+
+def _document_id_matches(metadata: dict[str, Any], document_ids: list[str]) -> bool:
+    if not document_ids:
+        return True
+    metadata_id = str((metadata or {}).get("document_id") or "").strip()
+    if not metadata_id:
+        return False
+    expected = set()
+    for document_id in document_ids:
+        expected.update(_document_id_candidates(document_id))
+    return bool(_document_id_candidates(metadata_id) & expected)
 
 
 @dataclass(frozen=True)
@@ -64,7 +96,8 @@ class SecureVectorStore:
         self.db_path = db_path
         self.keys = keys
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._lock = threading.RLock()
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self.collection = _SecureCollectionAdapter(self)
         self._init_schema()
 
@@ -108,6 +141,7 @@ class SecureVectorStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def upsert_parent(self, parent_id: str, content: str, metadata: dict[str, Any]):
         document_hash = str(metadata.get("document_hash") or "")
         content_nonce, content_ciphertext = self._encrypt_bytes(
@@ -138,6 +172,7 @@ class SecureVectorStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def get_parent(self, parent_id: str):
         row = self.conn.execute(
             """
@@ -164,6 +199,7 @@ class SecureVectorStore:
             ),
         }
 
+    @_synchronized
     def get_adjacent_parent(self, parent_id: str, offset: int = 1):
         match = re.match(r"^(.*)_parent_(\d+)$", str(parent_id or ""))
         if not match:
@@ -171,6 +207,7 @@ class SecureVectorStore:
         target_id = f"{match.group(1)}_parent_{int(match.group(2)) + int(offset)}"
         return self.get_parent(target_id)
 
+    @_synchronized
     def add_chunks(self, ids: list[str], documents: list[str], metadatas: list[dict[str, Any]], embeddings: list[list[float]]):
         cursor = self.conn.cursor()
         for child_id, content, metadata, embedding in zip(ids, documents, metadatas, embeddings):
@@ -216,6 +253,7 @@ class SecureVectorStore:
             self._upsert_keyword_postings(child_id, content)
         self.conn.commit()
 
+    @_synchronized
     def query(self, query_embeddings: list[list[float]], n_results: int, include: list[str]):
         if not query_embeddings:
             return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
@@ -244,9 +282,11 @@ class SecureVectorStore:
             "distances": [distances],
         }
 
+    @_synchronized
     def count(self) -> int:
         return int(self.conn.execute("SELECT COUNT(*) FROM child_chunks").fetchone()[0])
 
+    @_synchronized
     def dense_candidates(
         self,
         query_embedding: list[float],
@@ -254,6 +294,7 @@ class SecureVectorStore:
         project_id: str | None = None,
         global_only: bool = False,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[SecureCandidate]:
         rows = self.conn.execute(
             """
@@ -266,7 +307,7 @@ class SecureVectorStore:
         ranked = []
         for row in rows:
             child_id = row[0]
-            if project_id is not None or global_only or document_names:
+            if project_id is not None or global_only or document_names or document_ids:
                 metadata = self._decrypt_json(
                     self.keys.metadata_key,
                     row[3],
@@ -280,6 +321,8 @@ class SecureVectorStore:
                     continue
                 if document_names and not _document_name_matches(metadata, document_names):
                     continue
+                if document_ids and not _document_id_matches(metadata, document_ids):
+                    continue
             embedding = self._decrypt_json(
                 self.keys.index_key,
                 row[1],
@@ -290,6 +333,7 @@ class SecureVectorStore:
         ranked.sort(key=lambda item: item.score, reverse=True)
         return ranked[:limit]
 
+    @_synchronized
     def load_candidates(self, chunk_ids: list[str]) -> list[SecureCandidate]:
         if not chunk_ids:
             return []
@@ -327,6 +371,7 @@ class SecureVectorStore:
             )
         return loaded
 
+    @_synchronized
     def keyword_candidates(
         self,
         query: str,
@@ -334,6 +379,7 @@ class SecureVectorStore:
         project_id: str | None = None,
         global_only: bool = False,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[SecureCandidate]:
         scores: dict[str, float] = {}
         total_documents = max(
@@ -367,7 +413,7 @@ class SecureVectorStore:
                 scores[chunk_id] = scores.get(chunk_id, 0.0) + (
                     inverse_frequency * (1.0 + math.log(max(1.0, float(count))))
                 )
-        if project_id is not None or global_only or document_names:
+        if project_id is not None or global_only or document_names or document_ids:
             metadata_by_id = self._metadata_for_child_ids(scores)
             if project_id is not None:
                 scores = {
@@ -388,10 +434,17 @@ class SecureVectorStore:
                     for chunk_id, score in scores.items()
                     if _document_name_matches(metadata_by_id.get(chunk_id) or {}, document_names)
                 }
+            if document_ids:
+                scores = {
+                    chunk_id: score
+                    for chunk_id, score in scores.items()
+                    if _document_id_matches(metadata_by_id.get(chunk_id) or {}, document_ids)
+                }
         ranked = [SecureCandidate(chunk_id=chunk_id, score=score) for chunk_id, score in scores.items()]
         ranked.sort(key=lambda item: (-item.score, item.chunk_id))
         return ranked[:limit]
 
+    @_synchronized
     def get(self, where: dict[str, Any] | None = None, include: list[str] | None = None, ids: list[str] | None = None):
         include = include or []
         records = self._all_child_records()
@@ -408,6 +461,7 @@ class SecureVectorStore:
             payload["metadatas"] = [record.metadata for record in records]
         return payload
 
+    @_synchronized
     def delete(self, ids: list[str]):
         if not ids:
             return
@@ -416,6 +470,7 @@ class SecureVectorStore:
         self.conn.execute(f"DELETE FROM child_chunks WHERE child_id IN ({placeholders})", tuple(ids))
         self.conn.commit()
 
+    @_synchronized
     def delete_parent_ids(self, parent_ids: list[str]):
         if not parent_ids:
             return
@@ -426,6 +481,7 @@ class SecureVectorStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def keyword_search(self, query: str, limit: int = 12) -> list[KeywordSearchResult]:
         records = self._all_child_records()
         if not records:
@@ -452,6 +508,7 @@ class SecureVectorStore:
                 break
         return results
 
+    @_synchronized
     def delete_by_document_hash(self, document_hash: str):
         rows = self.conn.execute(
             "SELECT child_id FROM child_chunks WHERE document_hash = ?",
@@ -463,6 +520,7 @@ class SecureVectorStore:
         self.conn.execute("DELETE FROM parent_documents WHERE document_hash = ?", (document_hash,))
         self.conn.commit()
 
+    @_synchronized
     def close(self):
         self.conn.close()
 

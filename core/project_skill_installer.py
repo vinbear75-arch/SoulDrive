@@ -21,6 +21,8 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
+from core.atomic_file import atomic_write_text
+
 
 MAX_FILES = 64
 MAX_FILE_BYTES = 512 * 1024
@@ -67,7 +69,27 @@ def install_skill_to_inbox(
     root.mkdir(parents=True, exist_ok=True)
     inbox.mkdir(parents=True, exist_ok=True)
     if target_path.exists():
-        raise SkillInstallError(f"Skill inbox entry already exists: {name}")
+        if _inbox_entry_matches(
+            target_path,
+            source=str(source).strip(),
+            target=skill_target,
+            files=files,
+            skill_rel=skill_rel,
+        ):
+            return _install_result(
+                status="pending_review",
+                replayed=True,
+                name=name,
+                title=metadata["name"],
+                description=metadata["description"],
+                source=str(source).strip(),
+                target=skill_target,
+                path=target_path,
+                files=files,
+            )
+        raise SkillInstallError(
+            f"Skill inbox entry already exists with different content: {name}"
+        )
 
     temporary = inbox / f".{name}.{uuid.uuid4().hex}.tmp"
     try:
@@ -91,21 +113,103 @@ def install_skill_to_inbox(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        temporary.replace(target_path)
+        try:
+            temporary.replace(target_path)
+        except FileExistsError:
+            if _inbox_entry_matches(
+                target_path,
+                source=str(source).strip(),
+                target=skill_target,
+                files=files,
+                skill_rel=skill_rel,
+            ):
+                replay = _install_result(
+                    status="pending_review",
+                    replayed=True,
+                    name=name,
+                    title=metadata["name"],
+                    description=metadata["description"],
+                    source=str(source).strip(),
+                    target=skill_target,
+                    path=target_path,
+                    files=files,
+                )
+                shutil.rmtree(temporary, ignore_errors=True)
+                return replay
+            raise SkillInstallError(
+                f"Skill inbox entry was created concurrently with different content: {name}"
+            )
     except Exception:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
 
+    return _install_result(
+        status="pending_review",
+        replayed=False,
+        name=name,
+        title=metadata["name"],
+        description=metadata["description"],
+        source=str(source).strip(),
+        target=skill_target,
+        path=target_path,
+        files=files,
+    )
+
+
+def _install_result(
+    *,
+    status: str,
+    replayed: bool,
+    name: str,
+    title: str,
+    description: str,
+    source: str,
+    target: str,
+    path: Path,
+    files: dict[str, bytes],
+) -> dict[str, Any]:
     return {
-        "status": "pending_review",
+        "status": status,
+        "replayed": bool(replayed),
         "skill_name": name,
-        "skill_title": metadata["name"],
-        "description": metadata["description"],
-        "source": str(source).strip(),
-        "target": skill_target,
-        "path": str(target_path),
+        "skill_title": title,
+        "description": description,
+        "source": source,
+        "target": target,
+        "path": str(path),
         "files": sorted(files),
     }
+
+
+def _inbox_entry_matches(
+    target_path: Path,
+    *,
+    source: str,
+    target: str,
+    files: dict[str, bytes],
+    skill_rel: str,
+) -> bool:
+    """Recognize a completed inbox write without trusting the display name alone."""
+    manifest_path = target_path / "install_manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            return False
+        if str(manifest.get("source") or "").strip() != source:
+            return False
+        if _skill_target(str(manifest.get("target") or "conversation")) != target:
+            return False
+        if sorted(str(item) for item in manifest.get("files") or []) != sorted(files):
+            return False
+        if str(manifest.get("sha256") or "") != hashlib.sha256(files[skill_rel]).hexdigest():
+            return False
+        for relative, payload in files.items():
+            candidate = _safe_child(target_path, relative)
+            if not candidate.is_file() or candidate.read_bytes() != payload:
+                return False
+    except (OSError, UnicodeError, json.JSONDecodeError, SkillInstallError, ValueError):
+        return False
+    return True
 
 
 def list_skill_inbox(skills_path: str) -> list[dict[str, Any]]:
@@ -139,7 +243,12 @@ def list_skill_inbox(skills_path: str) -> list[dict[str, Any]]:
     return entries
 
 
-def approve_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, Any]:
+def approve_skill_from_inbox(
+    skills_path: str,
+    skill_name: str,
+    *,
+    mark_review: bool = True,
+) -> dict[str, Any]:
     root = Path(skills_path).resolve()
     name = _safe_name(skill_name)
     source = _safe_child(root / ".inbox", name)
@@ -156,6 +265,7 @@ def approve_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, Any
         manifest = {}
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise SkillInstallError("Skill install manifest is invalid") from exc
+    previously_reviewed = str(manifest.get("review_status") or "") == "adapter_ready"
     requested_target = str(manifest.get("target") or "").strip() or None
     from core.project_skills import compile_local_skill_adapter
 
@@ -164,8 +274,11 @@ def approve_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, Any
         raise SkillInstallError("待审核 Skill 必须包含且只能包含一个 SKILL.md")
     adapter = compile_local_skill_adapter(skill_file, target=requested_target)
     target = adapter["target"]
+    if mark_review and manifest:
+        _mark_review_ready(source, manifest)
     return {
         "status": "pending_review",
+        "replayed": previously_reviewed,
         "skill_name": name,
         "path": str(source),
         "target": target,
@@ -174,6 +287,21 @@ def approve_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, Any
         "adapter": adapter,
         "presentation_adapter_created": False,
     }
+
+
+def _mark_review_ready(source: Path, manifest: dict[str, Any]) -> None:
+    if str(manifest.get("review_status") or "") == "adapter_ready":
+        return
+    manifest_path = source / "install_manifest.json"
+    updated = {
+        **manifest,
+        "review_status": "adapter_ready",
+        "reviewed_at": time.time(),
+    }
+    atomic_write_text(
+        manifest_path,
+        json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
+    )
 
 
 def activate_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, Any]:
@@ -185,6 +313,9 @@ def activate_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, An
     source = _safe_child(root / ".inbox", name)
     destination = _safe_child(root, name)
     if not source.is_dir():
+        replay = _active_skill_replay(destination, name)
+        if replay is not None:
+            return replay
         raise SkillInstallError("Skill inbox entry was not found")
     if destination.exists():
         raise SkillInstallError("A project Skill with this name already exists")
@@ -197,17 +328,58 @@ def activate_skill_from_inbox(skills_path: str, skill_name: str) -> dict[str, An
         manifest = {}
     adapter = compile_local_skill_adapter(skill_file, target=str(manifest.get("target") or "") or None)
     adapter["compatibility_status"] = "verified"
-    (skill_file.parent / "souldrive_skill.json").write_text(
-        json.dumps(adapter, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    atomic_write_text(
+        skill_file.parent / "souldrive_skill.json",
+        json.dumps(adapter, ensure_ascii=False, indent=2) + "\n",
     )
-    source.replace(destination)
+    try:
+        source.replace(destination)
+    except FileExistsError:
+        replay = _active_skill_replay(destination, name)
+        if replay is not None:
+            return replay
+        raise SkillInstallError(
+            f"A project Skill with this name was created concurrently: {name}"
+        )
     return {
         "status": "active",
+        "replayed": False,
         "skill_name": name,
         "path": str(destination),
         "target": adapter["target"],
         "compatibility_status": adapter["compatibility_status"],
         "adapter_path": str(destination / "souldrive_skill.json"),
+    }
+
+
+def _active_skill_replay(destination: Path, name: str) -> dict[str, Any] | None:
+    """Return a durable activation result only for a verified moved inbox entry."""
+    if not destination.is_dir():
+        return None
+    try:
+        manifest = json.loads(
+            (destination / "install_manifest.json").read_text(encoding="utf-8")
+        )
+        if not isinstance(manifest, dict) or str(manifest.get("skill_name") or "") != name:
+            return None
+        skill_file = _find_local_skill_file(destination)
+        adapter_path = skill_file.parent / "souldrive_skill.json" if skill_file else None
+        if skill_file is None or adapter_path is None or not adapter_path.is_file():
+            return None
+        adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+        if not isinstance(adapter, dict) or adapter.get("compatibility_status") != "verified":
+            return None
+        target = _skill_target(str(adapter.get("target") or manifest.get("target") or "conversation"))
+    except (OSError, UnicodeError, json.JSONDecodeError, SkillInstallError):
+        return None
+    return {
+        "status": "active",
+        "replayed": True,
+        "skill_name": name,
+        "path": str(destination),
+        "target": target,
+        "compatibility_status": "verified",
+        "adapter_path": str(adapter_path),
     }
 
 
@@ -275,9 +447,9 @@ def ensure_project_skill_presentation_adapter(skills_path: str, source_path: str
         if not isinstance(payload, dict):
             raise SkillInstallError("existing presentation_style.json must contain an object")
     else:
-        adapter.write_text(
+        atomic_write_text(
+            adapter,
             json.dumps(_default_presentation_style(), ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
         )
         created = True
     return {
@@ -363,7 +535,7 @@ def _ensure_presentation_adapter(skill_directory: Path) -> bool:
         "font_family": "Arial",
     }
     try:
-        adapter.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        atomic_write_text(adapter, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
     except OSError:
         return False
     return True

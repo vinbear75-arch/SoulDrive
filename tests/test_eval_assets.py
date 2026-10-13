@@ -461,6 +461,211 @@ class EvalAssetsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "project_id"):
                 eval_rag.load_results(result_path, records)
 
+    def test_workflow_scoped_results_require_matching_workflow_id(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="WORKFLOW-01",
+                question="论文方法是什么？",
+                expected_sources=["paper.pdf"],
+                type="single_doc",
+                rubric=[],
+                expected_keywords=[],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+                workflow_id="paper_review",
+            )
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result_path = Path(temp_dir) / "results.jsonl"
+            result_path.write_text(
+                json.dumps(
+                    {
+                        "id": "WORKFLOW-01",
+                        "evidence": [],
+                        "workflow_id": "experiment_compare",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "workflow_id"):
+                eval_rag.load_results(result_path, records)
+
+    def test_eval_results_reject_dataset_fingerprint_mismatch(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="FINGERPRINT-01",
+                question="评测标签是否稳定？",
+                expected_sources=["eval.pdf"],
+                type="single_doc",
+                rubric=["稳定"],
+                expected_keywords=["稳定"],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+            )
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result_path = Path(temp_dir) / "results.jsonl"
+            result_path.write_text(
+                json.dumps(
+                    {
+                        "id": "FINGERPRINT-01",
+                        "evidence": [],
+                        "dataset_fingerprint": "sha256:not-the-current-dataset",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "dataset_fingerprint"):
+                eval_rag.load_results(result_path, records)
+
+    def test_eval_results_round_trip_dataset_fingerprint(self):
+        record = eval_rag.EvalRecord(
+            id="FINGERPRINT-ROUNDTRIP-01",
+            question="评测版本是什么？",
+            expected_sources=["eval.pdf"],
+            type="single_doc",
+            rubric=["版本"],
+            expected_keywords=["版本"],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="评测版本已绑定。",
+            evidence=[],
+            elapsed_ms=10,
+            dataset_fingerprint=eval_rag.evaluation_dataset_fingerprint([record]),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result_path = Path(temp_dir) / "results.jsonl"
+            eval_rag.save_results(result_path, [result])
+            loaded = eval_rag.load_results(result_path, [record])
+
+        self.assertEqual(loaded[0].dataset_fingerprint, result.dataset_fingerprint)
+
+    def test_eval_run_manifest_records_dataset_and_execution_lineage(self):
+        record = eval_rag.EvalRecord(
+            id="MANIFEST-01",
+            question="本次评测使用什么数据？",
+            expected_sources=["eval.pdf"],
+            type="single_doc",
+            rubric=["数据"],
+            expected_keywords=["数据"],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="已绑定评测数据。",
+            evidence=[],
+            elapsed_ms=10,
+            model_name="test-model",
+            dataset_fingerprint=eval_rag.evaluation_dataset_fingerprint([record]),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = Path(temp_dir) / "dataset.jsonl"
+            dataset_path.write_text(
+                json.dumps(
+                    {
+                        "id": record.id,
+                        "question": record.question,
+                        "expected_sources": record.expected_sources,
+                        "type": record.type,
+                        "rubric": record.rubric,
+                        "expected_keywords": record.expected_keywords,
+                        "should_refuse": record.should_refuse,
+                        "requires_multi_doc": record.requires_multi_doc,
+                        "graph_relevant": record.graph_relevant,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            manifest_path = Path(temp_dir) / "run_manifest.json"
+            workspace_root = Path(temp_dir) / "SoulDrive"
+            for relative_path, payload in (
+                ("index/keyword_index.sqlite", b"keyword-index-v1"),
+                ("index/knowledge_graph.sqlite", b"graph-index-v1"),
+            ):
+                artifact_path = workspace_root / relative_path
+                artifact_path.parent.mkdir(parents=True, exist_ok=True)
+                artifact_path.write_bytes(payload)
+
+            manifest = eval_rag.save_run_manifest(
+                manifest_path,
+                dataset_path=dataset_path,
+                records=[record],
+                results=[result],
+                mode="答案生成评测",
+                top_k=6,
+                baseline_level="CANDIDATE",
+                run_id="manifest-test-01",
+                retrieval_options={"rerank_candidate_limit": 12},
+                source_results_path=None,
+                output_results_path=None,
+                workspace_path=str(workspace_root),
+                summary={"overall_reliability_rate": 1.0},
+            )
+            self.assertTrue(manifest_path.exists())
+
+        self.assertEqual(manifest["schema_version"], "souldrive_run_manifest_v0.1")
+        self.assertEqual(manifest["run_id"], "manifest-test-01")
+        self.assertEqual(manifest["baseline_level"], "CANDIDATE")
+        self.assertEqual(
+            manifest["components"]["dataset_fingerprint"],
+            result.dataset_fingerprint,
+        )
+        self.assertEqual(manifest["components"]["retrieval_options"]["rerank_candidate_limit"], 12)
+        self.assertEqual(manifest["components"]["model_names"], ["test-model"])
+        self.assertEqual(manifest["components"]["workspace_index_snapshot"]["status"], "captured")
+        self.assertEqual(
+            len(manifest["components"]["workspace_index_snapshot"]["artifacts"]),
+            2,
+        )
+        self.assertTrue(
+            manifest["components"]["workspace_index_snapshot"]["artifact_fingerprint"].startswith(
+                "sha256:"
+            )
+        )
+        self.assertEqual(manifest["outputs"]["manifest"], "run_manifest.json")
+
+    def test_eval_dataset_rejects_unknown_workflow_id(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = Path(temp_dir) / "dataset.jsonl"
+            dataset_path.write_text(
+                json.dumps(
+                    {
+                        "id": "WORKFLOW-UNKNOWN-01",
+                        "question": "问题",
+                        "expected_sources": [],
+                        "type": "negative",
+                        "rubric": [],
+                        "expected_keywords": [],
+                        "should_refuse": True,
+                        "requires_multi_doc": False,
+                        "graph_relevant": False,
+                        "workflow_id": "unbounded_agent",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "workflow_id"):
+                eval_rag.load_dataset(dataset_path)
+
     def test_live_retrieval_propagates_record_project_scope(self):
         records = [
             eval_rag.EvalRecord(
@@ -482,8 +687,8 @@ class EvalAssetsTests(unittest.TestCase):
             def __init__(self, **kwargs):
                 self.kwargs = kwargs
 
-            def search_with_evidence(self, query, *, top_k, project_id=None):
-                captured.append((query, top_k, project_id))
+            def search_with_evidence(self, query, *, top_k, project_id=None, global_only=False):
+                captured.append((query, top_k, project_id, global_only))
                 return {"evidence": []}
 
             def close(self):
@@ -492,8 +697,315 @@ class EvalAssetsTests(unittest.TestCase):
         with patch("core.knowledge_base.LocalKnowledgeBase", FakeKnowledgeBase):
             results = eval_rag.run_retrieval(records, workspace="unused", top_k=3)
 
-        self.assertEqual(captured, [("项目内问题", 3, "project-a")])
+        self.assertEqual(captured, [("项目内问题", 3, "project-a", False)])
         self.assertEqual(results[0].project_id, "project-a")
+
+    def test_live_retrieval_propagates_workflow_focus_variants(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="WORKFLOW-RETRIEVAL-01",
+                question="总结这篇论文",
+                expected_sources=["paper.pdf"],
+                type="single_doc",
+                rubric=[],
+                expected_keywords=[],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+                workflow_id="paper_review",
+            )
+        ]
+        captured = []
+
+        class FakeKnowledgeBase:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+            def search_with_evidence(
+                self,
+                query,
+                *,
+                top_k,
+                extra_query_variants=None,
+                global_only=False,
+            ):
+                captured.append((query, top_k, extra_query_variants, global_only))
+                return {"evidence": []}
+
+            def close(self):
+                pass
+
+        with patch("core.knowledge_base.LocalKnowledgeBase", FakeKnowledgeBase):
+            results = eval_rag.run_retrieval(records, workspace="unused", top_k=3)
+
+        self.assertEqual(captured[0][0], "总结这篇论文")
+        self.assertEqual(captured[0][1], 3)
+        self.assertTrue(captured[0][2])
+        self.assertTrue(any("研究问题" in item for item in captured[0][2]))
+        self.assertTrue(captured[0][3])
+        self.assertEqual(results[0].workflow_id, "paper_review")
+        self.assertEqual(
+            results[0].dataset_fingerprint,
+            eval_rag.evaluation_dataset_fingerprint(records),
+        )
+
+    def test_live_retrieval_enables_graph_store_for_graph_relevant_records(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="GRAPH-01",
+                question="图谱关系问题",
+                expected_sources=["graph.pdf"],
+                type="graph",
+                rubric=[],
+                expected_keywords=[],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=True,
+            )
+        ]
+        graph_store = object()
+        captured = []
+
+        class FakeKnowledgeBase:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+            def search_with_evidence(
+                self,
+                query,
+                *,
+                top_k,
+                project_id=None,
+                graph_db=None,
+                global_only=False,
+            ):
+                captured.append((query, top_k, project_id, graph_db, global_only))
+                return {"evidence": []}
+
+            def close(self):
+                pass
+
+        with patch("core.knowledge_base.LocalKnowledgeBase", FakeKnowledgeBase), patch.object(
+            eval_rag,
+            "_open_retrieval_graph_store",
+            return_value=graph_store,
+        ) as open_graph:
+            results = eval_rag.run_retrieval(records, workspace="unused", top_k=3)
+
+        open_graph.assert_called_once_with("unused")
+        self.assertEqual(captured, [("图谱关系问题", 3, None, graph_store, True)])
+        self.assertEqual(results[0].project_id, None)
+
+    def test_graph_eval_keeps_route_execution_separate_from_source_hit(self):
+        record = eval_rag.EvalRecord(
+            id="GRAPH-ROUTE-01",
+            question="普通事实问题",
+            expected_sources=["answer.pdf"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=True,
+        )
+
+        class FakeKnowledgeBase:
+            def __init__(self, **kwargs):
+                pass
+
+            def search_with_evidence(self, query, *, top_k, graph_db=None, global_only=False):
+                _ = global_only
+                return {
+                    "evidence": [{"source_filename": "answer.pdf"}],
+                    "observability": {
+                        "schema_version": "retrieval_observability_v1",
+                        "graph_route": {"use_graph": False, "mode": "hybrid"},
+                        "graph_recall_enabled": False,
+                        "graph_context_count": 0,
+                    },
+                }
+
+            def close(self):
+                pass
+
+        with patch("core.knowledge_base.LocalKnowledgeBase", FakeKnowledgeBase), patch.object(
+            eval_rag,
+            "_open_retrieval_graph_store",
+            return_value=object(),
+        ):
+            results = eval_rag.run_retrieval([record], workspace="unused", top_k=3)
+
+        self.assertFalse(results[0].retrieval_observability["graph_route"]["use_graph"])
+        report = eval_rag.summarize([record], results, top_k=3)
+        self.assertEqual(report["graph_source_hit_rate"], 1.0)
+        self.assertEqual(report["graph_route_selected_rate"], 0.0)
+        self.assertEqual(report["graph_stage_executed_rate"], 0.0)
+        self.assertEqual(report["graph_context_nonempty_rate"], 0.0)
+
+    def test_eval_results_round_trip_retrieval_observability(self):
+        record = eval_rag.EvalRecord(
+            id="OBS-ROUNDTRIP-01",
+            question="图谱路由是否执行？",
+            expected_sources=["graph.pdf"],
+            type="graph",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=True,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="",
+            evidence=[],
+            elapsed_ms=12,
+            retrieval_observability={
+                "graph_route": {"use_graph": True, "mode": "local"},
+                "graph_recall_enabled": True,
+                "graph_context_count": 2,
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result_path = Path(temp_dir) / "results.jsonl"
+            eval_rag.save_results(result_path, [result])
+            loaded = eval_rag.load_results(result_path, [record])
+
+        self.assertEqual(
+            loaded[0].retrieval_observability,
+            result.retrieval_observability,
+        )
+
+    def test_answer_fallback_propagates_workflow_context(self):
+        captured = {}
+
+        class FakeKB:
+            def search_with_evidence(self, **kwargs):
+                raise AssertionError("generation should not fall back")
+
+        class FakeRag:
+            kb = FakeKB()
+            graph_db = object()
+
+            def generate_response_stream(self, *args, **kwargs):
+                captured["interaction_context"] = kwargs.get("interaction_context")
+                return iter(
+                    [
+                        "## 研究问题\n问题说明 [E1]\n\n"
+                        "## 核心方法\n方法说明 [E1]\n\n"
+                        "## 实验结果\n结果说明 [E1]\n\n"
+                        "## 局限与复现\n局限说明 [E1]\n\n"
+                        "## 汇报提纲\n提纲说明 [E1]\n\n"
+                        "```souldrive-evidence\n"
+                        '[{"id":"E1","source_filename":"paper.pdf",'
+                        '"context":"论文证据"}]\n'
+                        "```"
+                    ]
+                )
+
+        answer, evidence = eval_rag.generate_answer_with_fallback(
+            FakeRag(),
+            "总结这篇论文",
+            project_id="project-a",
+            workflow_id="paper_review",
+            top_k=3,
+        )
+
+        self.assertEqual(
+            captured["interaction_context"],
+            {
+                "active_context": {"project_id": "project-a"},
+                "workflow_id": "paper_review",
+            },
+        )
+        self.assertIn("## 汇报提纲", answer)
+        self.assertEqual(evidence[0]["id"], "E1")
+
+    def test_answer_fallback_can_capture_retrieval_trace(self):
+        captured = {}
+
+        class FakeKB:
+            def search_with_evidence(self, **kwargs):
+                raise AssertionError("generation should not fall back")
+
+        class FakeRag:
+            kb = FakeKB()
+            graph_db = object()
+
+            def generate_response_stream(self, *args, **kwargs):
+                kwargs["on_retrieval_completed"]({
+                    "schema_version": "agentic_retrieval_trace_v1",
+                    "status": "pass",
+                    "agentic_decision": "generate",
+                    "stop_reason": "accepted_for_generation",
+                    "evidence_count": 1,
+                })
+                return iter([
+                    "结论来自证据。[E1]\n\n"
+                    "```souldrive-evidence\n"
+                    '[{"id":"E1","source_filename":"paper.pdf",'
+                    '"context":"论文证据"}]\n'
+                    "```"
+                ])
+
+        answer, evidence = eval_rag.generate_answer_with_fallback(
+            FakeRag(),
+            "总结这篇论文",
+            project_id=None,
+            workflow_id=None,
+            top_k=3,
+            on_retrieval_completed=captured.update,
+        )
+
+        self.assertIn("[E1]", answer)
+        self.assertEqual(evidence[0]["id"], "E1")
+        self.assertEqual(captured["status"], "pass")
+        self.assertEqual(captured["evidence_count"], 1)
+
+    def test_workflow_output_contract_is_scored_separately(self):
+        record = eval_rag.EvalRecord(
+            id="WORKFLOW-CONTRACT-01",
+            question="总结这篇论文",
+            expected_sources=["paper.pdf"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+            workflow_id="paper_review",
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer=(
+                "## 研究问题\n问题 [E1]\n\n"
+                "## 核心方法\n方法 [E1]\n\n"
+                "## 实验结果\n结果 [E1]\n\n"
+                "## 局限与复现\n局限 [E1]\n\n"
+                "## 汇报提纲\n提纲 [E1]"
+            ),
+            evidence=[
+                {
+                    "id": "E1",
+                    "source_filename": "paper.pdf",
+                    "context": "论文证据。",
+                }
+            ],
+            elapsed_ms=100,
+            workflow_id="paper_review",
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+        report = eval_rag.summarize([record], [result], top_k=3, mode="答案生成评测")
+
+        self.assertTrue(row["workflow_contract_valid"])
+        self.assertEqual(report["workflow_sample_count"], 1)
+        self.assertEqual(report["workflow_output_contract_pass_rate"], 1.0)
+        self.assertEqual(report["workflow_breakdown"]["paper_review"]["sample_count"], 1)
 
     def test_project_scoped_score_rejects_foreign_project_evidence(self):
         record = eval_rag.EvalRecord(
@@ -530,6 +1042,161 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertTrue(row["wrong_project"])
         self.assertFalse(row["scope_ok"])
         self.assertFalse(row["answerable_pass"])
+
+    def test_multi_doc_answer_requires_every_expected_source(self):
+        record = eval_rag.EvalRecord(
+            id="MULTI-PARTIAL-01",
+            question="请比较 alpha 与 beta。",
+            expected_sources=["alpha", "beta"],
+            type="cross_doc",
+            rubric=["必须同时使用两个来源"],
+            expected_keywords=["alpha"],
+            should_refuse=False,
+            requires_multi_doc=True,
+            graph_relevant=False,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="alpha 方案说明。[E1]",
+            evidence=[{
+                "id": "E1",
+                "source_filename": "alpha.pdf",
+                "context": "alpha 方案说明。",
+            }],
+            elapsed_ms=100,
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+
+        self.assertTrue(row["source_any_hit"])
+        self.assertFalse(row["source_all_hit"])
+        self.assertFalse(row["answerable_pass"])
+
+    def test_multi_doc_answer_must_cite_every_expected_source(self):
+        record = eval_rag.EvalRecord(
+            id="MULTI-CITATION-01",
+            question="请比较 alpha 与 beta。",
+            expected_sources=["alpha", "beta"],
+            type="cross_doc",
+            rubric=["答案必须分别引用两个来源"],
+            expected_keywords=["alpha", "beta"],
+            should_refuse=False,
+            requires_multi_doc=True,
+            graph_relevant=False,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="alpha 与 beta 均有记录。[E1]",
+            evidence=[
+                {
+                    "id": "E1",
+                    "source_filename": "alpha.pdf",
+                    "context": "alpha 与 beta 均有记录。",
+                },
+                {
+                    "id": "E2",
+                    "source_filename": "beta.pdf",
+                    "context": "alpha 与 beta 均有记录。",
+                },
+            ],
+            elapsed_ms=100,
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+
+        self.assertTrue(row["source_all_hit"])
+        self.assertFalse(row["expected_source_citation_all"])
+        self.assertFalse(row["answerable_pass"])
+
+        report = eval_rag.summarize([record], [result], top_k=3)
+
+        self.assertEqual(report["answer_expected_source_all_hit_rate"], 0.0)
+        self.assertEqual(report["answer_expected_source_coverage"], 0.5)
+
+    def test_context_precision_is_position_sensitive_and_excludes_unanswerable_rows(self):
+        record = eval_rag.EvalRecord(
+            id="CONTEXT-PRECISION-01",
+            question="请比较 alpha 与 beta。",
+            expected_sources=["alpha", "beta"],
+            type="cross_doc",
+            rubric=["期望来源应尽量排在前面"],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=True,
+            graph_relevant=False,
+        )
+        refusal = eval_rag.EvalRecord(
+            id="CONTEXT-PRECISION-NEG",
+            question="资料中没有答案的问题。",
+            expected_sources=[],
+            type="negative",
+            rubric=["应拒答"],
+            expected_keywords=[],
+            should_refuse=True,
+            requires_multi_doc=False,
+            graph_relevant=False,
+        )
+        results = [
+            eval_rag.EvalResult(
+                id=record.id,
+                question=record.question,
+                expected_sources=record.expected_sources,
+                answer="",
+                evidence=[
+                    {"id": "N1", "source_filename": "noise.pdf"},
+                    {"id": "E1", "source_filename": "alpha.pdf"},
+                    {"id": "E2", "source_filename": "beta.pdf"},
+                ],
+                elapsed_ms=10,
+            ),
+            eval_rag.EvalResult(
+                id=refusal.id,
+                question=refusal.question,
+                expected_sources=[],
+                answer="未找到足够可靠的相关证据，因此不能回答。",
+                evidence=[],
+                elapsed_ms=10,
+            ),
+        ]
+
+        report = eval_rag.summarize([record, refusal], results, top_k=3)
+
+        row = report["rows"][0]
+        self.assertAlmostEqual(row["context_precision"], (0.5 + (2 / 3)) / 2)
+        self.assertEqual(report["context_precision_sample_count"], 1)
+        self.assertAlmostEqual(report["average_context_precision"], (0.5 + (2 / 3)) / 2)
+
+    def test_context_precision_is_perfect_when_relevant_contexts_are_first(self):
+        record = eval_rag.EvalRecord(
+            id="CONTEXT-PRECISION-02",
+            question="alpha 的结论是什么？",
+            expected_sources=["alpha"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="",
+            evidence=[
+                {"id": "E1", "source_filename": "alpha.pdf"},
+                {"id": "N1", "source_filename": "noise.pdf"},
+            ],
+            elapsed_ms=10,
+        )
+
+        row = eval_rag.score_record(record, result, top_k=2)
+
+        self.assertEqual(row["context_precision"], 1.0)
 
     def test_miss_analyzer_groups_unhit_sources_and_partial_multi_doc_records(self):
         from scripts import analyze_rag_eval_misses
@@ -606,6 +1273,41 @@ class EvalAssetsTests(unittest.TestCase):
         sample_by_id = {sample["id"]: sample for sample in report["miss_samples"]}
         self.assertEqual(sample_by_id["MISS-01"]["top_sources"], ["beta.pdf", "gamma.pdf"])
         self.assertEqual(sample_by_id["PARTIAL-01"]["hit_sources"], ["alpha"])
+
+    def test_miss_analyzer_uses_the_same_corpus_identity_rule_as_scoring(self):
+        from scripts import analyze_rag_eval_misses
+
+        record = {
+            "id": "MISS-ID-01",
+            "question": "只允许当前语料来源。",
+            "expected_sources": ["安全治理标准"],
+            "doc_ids": ["SDOC-001"],
+            "type": "single_doc",
+            "rubric": [],
+            "expected_keywords": [],
+        }
+        result = {
+            "id": "MISS-ID-01",
+            "evidence": [
+                {
+                    "source_filename": "安全治理标准-旧版.pdf",
+                    "document_id": "asset-runtime-old",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = Path(temp_dir) / "dataset.jsonl"
+            results_path = Path(temp_dir) / "results.jsonl"
+            dataset_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            results_path.write_text(json.dumps(result, ensure_ascii=False) + "\n", encoding="utf-8")
+
+            report = analyze_rag_eval_misses.analyze_result_files(dataset_path, results_path, top_k=3)
+
+        self.assertEqual(report["miss_count"], 1)
+        sample = report["miss_samples"][0]
+        self.assertTrue(sample["document_identity_required"])
+        self.assertEqual(sample["expected_document_ids"], ["SDOC-001"])
+        self.assertEqual(sample["top_document_ids"], ["asset-runtime-old"])
 
     def test_eval_script_can_run_optional_answer_generation_with_model_override(self):
         fixture = [
@@ -801,6 +1503,52 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertEqual(report["claim_support_unsupported_claim_count"], 1)
         self.assertEqual(report["answerable_pass_rate"], 0.0)
 
+    def test_answer_quality_counts_empty_generated_answers_in_denominators(self):
+        records = [
+            eval_rag.EvalRecord(
+                id="EMPTY-ANSWER",
+                question="系统有什么优势？",
+                expected_sources=["system"],
+                type="single_doc",
+                rubric=["必须回答"],
+                expected_keywords=["优势"],
+                should_refuse=False,
+                requires_multi_doc=False,
+                graph_relevant=False,
+            ),
+            eval_rag.EvalRecord(
+                id="EMPTY-REFUSAL",
+                question="系统是否获得某项未公开大奖？",
+                expected_sources=[],
+                type="negative",
+                rubric=["应拒答"],
+                expected_keywords=[],
+                should_refuse=True,
+                requires_multi_doc=False,
+                graph_relevant=False,
+            ),
+        ]
+        results = [
+            eval_rag.EvalResult(
+                id=record.id,
+                question=record.question,
+                expected_sources=record.expected_sources,
+                answer="",
+                evidence=[],
+                elapsed_ms=100,
+                model_name="qwen-test",
+            )
+            for record in records
+        ]
+
+        report = eval_rag.summarize(records, results, top_k=3, mode="答案生成评测")
+
+        self.assertEqual(report["answer_sample_count"], 2)
+        self.assertEqual(report["answerable_pass_rate"], 0.0)
+        self.assertEqual(report["refusal_accuracy"], 0.0)
+        self.assertEqual(report["overall_reliability_rate"], 0.0)
+        self.assertEqual(report["answer_keyword_coverage"], 0.0)
+
     def test_evidence_gap_language_counts_as_a_refusal(self):
         self.assertTrue(eval_rag.answer_refuses("资料中未包含该产品的价格信息，无法依据现有文档回答。"))
 
@@ -872,6 +1620,7 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertEqual(return_code, 0)
         self.assertIn("对比报告: 3B -> 7B", output)
         self.assertIn("答案关键词覆盖率", output)
+        self.assertIn("答案必需来源引用全命中率", output)
         self.assertIn("+50.0百分点", output)
 
     def test_paired_retrieval_comparison_uses_exact_mcnemar_test(self):
@@ -1013,6 +1762,137 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertTrue(eval_rag.source_matches("“城市+AI”应用场景清单（第五批）.pdf", "城市+AI应用场景清单"))
         self.assertTrue(eval_rag.source_matches("综合交通运输大模型智能体创新应用.pdf", "综合交通运输大模型智能体创新应用典型案例"))
         self.assertTrue(eval_rag.source_matches("基于大模型和RAG的知识库问答系统.pdf", "MaxKB"))
+
+    def test_corpus_doc_id_ground_truth_does_not_accept_same_named_wrong_document(self):
+        record = eval_rag.EvalRecord(
+            id="DOC-ID-01",
+            question="只允许命中文档身份一致的证据。",
+            expected_sources=["安全治理标准"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+            expected_document_ids=["doc-expected"],
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="错误版本的证据 [E1]。",
+            evidence=[
+                {
+                    "id": "E1",
+                    "source_filename": "安全治理标准-旧版.pdf",
+                    "document_id": "doc-other",
+                    "context": "错误版本。",
+                }
+            ],
+            elapsed_ms=10,
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+
+        self.assertTrue(row["document_identity_required"])
+        self.assertFalse(row["source_any_hit"])
+        self.assertFalse(row["answerable_pass"])
+
+    def test_corpus_doc_id_does_not_compare_runtime_asset_id(self):
+        record = eval_rag.EvalRecord(
+            id="DOC-ID-02",
+            question="语料库身份应通过来源标签匹配。",
+            expected_sources=["安全治理标准"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+            expected_document_ids=["SDOC-001"],
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="正确版本的证据 [E1]。",
+            evidence=[
+                {
+                    "id": "E1",
+                    "source_filename": "安全治理标准.pdf",
+                    "document_id": "asset-runtime-123",
+                    "context": "正确版本。",
+                }
+            ],
+            elapsed_ms=10,
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+
+        self.assertTrue(row["document_identity_required"])
+        self.assertTrue(row["source_any_hit"])
+        self.assertTrue(row["answerable_pass"])
+
+    def test_explicit_corpus_identity_in_metadata_overrides_source_display_name(self):
+        record = eval_rag.EvalRecord(
+            id="DOC-ID-03",
+            question="显式评测身份应优先。",
+            expected_sources=["安全治理标准"],
+            type="single_doc",
+            rubric=[],
+            expected_keywords=[],
+            should_refuse=False,
+            requires_multi_doc=False,
+            graph_relevant=False,
+            expected_document_ids=["SDOC-001"],
+        )
+        result = eval_rag.EvalResult(
+            id=record.id,
+            question=record.question,
+            expected_sources=record.expected_sources,
+            answer="已绑定评测身份 [E1]。",
+            evidence=[
+                {
+                    "id": "E1",
+                    "source_filename": "规范化显示标题.pdf",
+                    "document_id": "asset-runtime-123",
+                    "metadata": {"evaluation_doc_id": "SDOC-001"},
+                    "context": "带显式语料标签。",
+                }
+            ],
+            elapsed_ms=10,
+        )
+
+        row = eval_rag.score_record(record, result, top_k=3)
+
+        self.assertTrue(row["source_any_hit"])
+
+    def test_eval_dataset_preserves_document_identity_ids(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = Path(temp_dir) / "identity.jsonl"
+            dataset_path.write_text(
+                json.dumps(
+                    {
+                        "id": "DOC-ID-LOAD-01",
+                        "question": "身份字段应保留。",
+                        "expected_sources": ["安全治理标准"],
+                        "doc_ids": ["doc-expected"],
+                        "type": "single_doc",
+                        "rubric": [],
+                        "expected_keywords": [],
+                        "should_refuse": False,
+                        "requires_multi_doc": False,
+                        "graph_relevant": False,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            records = eval_rag.load_dataset(dataset_path)
+
+        self.assertEqual(records[0].expected_document_ids, ["doc-expected"])
 
     def test_all_known_local_document_names_match_dataset_sources(self):
         local_names = [
@@ -1165,6 +2045,34 @@ class EvalAssetsTests(unittest.TestCase):
         self.assertTrue(answer)
         self.assertEqual(evidence[0]["id"], "E1")
         self.assertIn("[E1]", answer)
+
+    def test_eval_script_does_not_replace_completed_refusal_with_fallback(self):
+        class FakeKB:
+            def search_with_evidence(self, **kwargs):
+                return {
+                    "evidence": [{
+                        "id": "E1",
+                        "snippet": "作者联系方式和论文内容。",
+                        "context": "作者联系方式和论文内容。",
+                    }]
+                }
+
+        class FakeRag:
+            kb = FakeKB()
+            graph_db = object()
+
+            def generate_response_stream(self, *args, **kwargs):
+                return iter(["为保护个人隐私，无法提供或推断私人住址、电话、身份证号码等敏感个人信息。"])
+
+        answer, evidence = eval_rag.generate_answer_with_fallback(
+            FakeRag(),
+            "请列出论文作者的私人手机号。",
+            project_id=None,
+            top_k=3,
+        )
+
+        self.assertIn("无法提供或推断", answer)
+        self.assertEqual(evidence, [])
 
 
 def _load_dataset():

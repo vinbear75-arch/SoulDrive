@@ -28,8 +28,10 @@ from core.retrieval import (
     _source_match_score,
     build_citations,
     classify_query_intent,
+    _finite_score,
     lexical_rerank_score,
     rank_hybrid_candidates,
+    source_diversity_key,
     source_identity,
     source_key,
     tokenize,
@@ -39,7 +41,7 @@ from core.reranker import LocalReranker
 from core.security_context import get_workspace_keys
 from core.secure_graph_store import SecureGraphStore
 from core.secure_vector_store import SecureVectorStore
-from core.query_expansion import expand_query_variants
+from core.query_expansion import comparison_query_groups, expand_query_variants
 from core.document_tree import (
     SECTION_TREE_VERSION,
     build_section_tree,
@@ -73,6 +75,28 @@ def _normalize_document_names(value: Any) -> list[str]:
     return names
 
 
+def _document_id_candidates(document_id: Any) -> set[str]:
+    normalized = str(document_id or "").strip()
+    if not normalized:
+        return set()
+    if normalized.startswith("secure_"):
+        return {normalized, normalized.removeprefix("secure_")}
+    return {normalized, f"secure_{normalized}"}
+
+
+def _normalize_document_ids(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    document_ids: list[str] = []
+    for item in value:
+        document_id = " ".join(str(item or "").strip().split())[:256]
+        if document_id and document_id not in document_ids:
+            document_ids.append(document_id)
+        if len(document_ids) >= 12:
+            break
+    return document_ids
+
+
 def _document_name_matches(metadata: dict[str, Any] | None, document_names: list[str]) -> bool:
     if not document_names:
         return True
@@ -92,16 +116,32 @@ def _document_name_matches(metadata: dict[str, Any] | None, document_names: list
     return bool(identities & expected)
 
 
+def _document_id_matches(metadata: dict[str, Any] | None, document_ids: list[str]) -> bool:
+    if not document_ids:
+        return True
+    metadata_id = str((metadata or {}).get("document_id") or "").strip()
+    if not metadata_id:
+        return False
+    expected: set[str] = set()
+    for document_id in document_ids:
+        expected.update(_document_id_candidates(document_id))
+    return bool(_document_id_candidates(metadata_id) & expected)
+
+
 def _filter_document_candidates(
     candidates: list[SearchCandidate],
     document_names: list[str],
+    document_ids: list[str] | None = None,
 ) -> list[SearchCandidate]:
-    if not document_names:
+    if not document_names and not document_ids:
         return candidates
     return [
         candidate
         for candidate in candidates
-        if _document_name_matches(candidate.metadata, document_names)
+        if (
+            _document_name_matches(candidate.metadata, document_names)
+            and _document_id_matches(candidate.metadata, document_ids or [])
+        )
     ]
 
 # The profile stage is deliberately opt-in until it clears a matched
@@ -110,7 +150,7 @@ def _filter_document_candidates(
 SOURCE_PROFILE_MIN_SIMILARITY = 0.34
 
 
-def _retrieval_stage_budget(query: str, query_intent: QueryIntent, top_k: int) -> dict[str, int | bool]:
+def _retrieval_stage_budget(query: str, query_intent: QueryIntent, top_k: int) -> dict[str, Any]:
     graph_route = route_graph_query(query)
     if query_intent.requires_source_diversity or query_intent.broad_scope:
         dense_pool_size = max(top_k * 8, 24)
@@ -139,6 +179,7 @@ def _retrieval_stage_budget(query: str, query_intent: QueryIntent, top_k: int) -
         "aux_limit": aux_limit,
         "graph_limit": graph_limit,
         "use_graph": graph_route.use_graph,
+        "graph_route": graph_route.public_dict(),
     }
 
 
@@ -453,6 +494,33 @@ def _select_parent_context(
     child_text = _candidate_child_text(candidate)
     parent_length = len(parent_text)
     content_kind = str((candidate.metadata or {}).get("content_kind") or "").lower()
+    section_route_mode = str(
+        (candidate.metadata or {}).get("_section_route_mode") or ""
+    ).strip()
+    try:
+        section_route_coverage = float(
+            (candidate.metadata or {}).get("_section_route_coverage") or 0.0
+        )
+    except (TypeError, ValueError):
+        section_route_coverage = 0.0
+
+    if section_route_mode in {"exact_node", "heading_fallback"} and (
+        section_route_coverage >= 0.99
+        and child_text
+    ):
+        return child_text, {
+            "context_expansion_mode": "section_route_child_window",
+            "context_start_char": _safe_int(
+                candidate.metadata.get("child_start_char"),
+                0,
+            ),
+            "context_end_char": _safe_int(
+                candidate.metadata.get("child_end_char"),
+                parent_length,
+            ),
+            "context_char_count": len(child_text),
+            "parent_char_count": parent_length,
+        }
 
     boundary_overlap_chars = _safe_int(
         (candidate.metadata or {}).get("boundary_overlap_chars"),
@@ -609,6 +677,25 @@ def _candidate_parent_span(
     return None
 
 
+def _parent_context_identity_matches(
+    candidate_metadata: dict[str, Any] | None,
+    parent_metadata: dict[str, Any] | None,
+) -> bool:
+    """Require the parent projection to stay in the candidate's scope."""
+    candidate_metadata = candidate_metadata or {}
+    parent_metadata = parent_metadata or {}
+    candidate_project = str(candidate_metadata.get("project_id") or "").strip()
+    parent_project = str(parent_metadata.get("project_id") or "").strip()
+    if candidate_project != parent_project:
+        return False
+
+    for field in ("document_hash", "document_id", "asset_version_id", "asset_id"):
+        candidate_identity = str(candidate_metadata.get(field) or "").strip()
+        parent_identity = str(parent_metadata.get(field) or "").strip()
+        if candidate_identity and parent_identity and candidate_identity != parent_identity:
+            return False
+    return True
+
 def _join_blocks(
     blocks: list[tuple[int, int, str]],
     selected_indices: set[int],
@@ -665,7 +752,7 @@ def _retrieval_quality_signals(
     query: str,
     candidates: list[SearchCandidate],
 ) -> dict:
-    scores = [max(0.0, float(candidate.final_score)) for candidate in candidates]
+    scores = [max(0.0, _finite_score(candidate.final_score)) for candidate in candidates]
     query_tokens = set(tokenize(query))
     evidence_tokens = set()
     sources = set()
@@ -685,7 +772,7 @@ def _retrieval_quality_signals(
                 )
             )
         )
-        source = source_identity(metadata)
+        source = source_diversity_key(metadata)
         if source:
             sources.add(source)
 
@@ -703,6 +790,10 @@ def _retrieval_quality_signals(
 # CRAG-style corrective retrieval: a project hit must cover a meaningful part
 # of the query before it is allowed to suppress the shared global corpus.
 PROJECT_RELEVANCE_FLOOR = 0.34
+# A bounded recovery path for dense hits that have multiple explicit anchors
+# but a low absolute score on a small project corpus.
+PROJECT_RELEVANCE_RECOVERY_FLOOR = PROJECT_RELEVANCE_FLOOR * 0.6
+PROJECT_RELEVANCE_RECOVERY_MARGIN = PROJECT_RELEVANCE_FLOOR * 0.25
 PROJECT_FOCUS_WEIGHT = 1.12
 _PROJECT_SCOPE_NOISE_TERMS = {
     "当前", "项目", "方案", "系统", "资料", "文档", "内容", "主要", "概述",
@@ -737,7 +828,12 @@ def _reranker_passage(candidate: SearchCandidate) -> str:
 
 def _project_query_signal_tokens(query: str) -> set[str]:
     """Extract scope-independent anchors for the corrective project check."""
-    normalized = str(query or "")
+    normalized = re.sub(
+        r"(?:^|\s)当前项目标识\s*[:：]\s*\S+",
+        " ",
+        str(query or ""),
+        flags=re.IGNORECASE,
+    )
     for noise_term in sorted(_PROJECT_SCOPE_NOISE_TERMS, key=len, reverse=True):
         normalized = re.sub(re.escape(noise_term), " ", normalized, flags=re.IGNORECASE)
     return {
@@ -752,10 +848,9 @@ def _project_query_signal_tokens(query: str) -> set[str]:
     }
 
 
-def _project_candidate_relevance(query: str, candidate: SearchCandidate) -> float:
-    """CRAG 风格的轻量召回质量评估，不额外调用模型。"""
+def _project_candidate_content(candidate: SearchCandidate) -> str:
     metadata = candidate.metadata or {}
-    content = "\n".join(
+    return "\n".join(
         part
         for part in (
             str(candidate.content or "").strip(),
@@ -765,6 +860,18 @@ def _project_candidate_relevance(query: str, candidate: SearchCandidate) -> floa
         )
         if part
     )
+
+
+def _project_candidate_signal_overlap(query: str, candidate: SearchCandidate) -> set[str]:
+    return _project_query_signal_tokens(query) & set(
+        tokenize(_project_candidate_content(candidate))
+    )
+
+
+def _project_candidate_relevance(query: str, candidate: SearchCandidate) -> float:
+    """CRAG 风格的轻量召回质量评估，不额外调用模型。"""
+    metadata = candidate.metadata or {}
+    content = _project_candidate_content(candidate)
     if not content:
         return 0.0
 
@@ -774,14 +881,28 @@ def _project_candidate_relevance(query: str, candidate: SearchCandidate) -> floa
 
     content_tokens = set(tokenize(content))
     lexical = lexical_rerank_score(query, content)
-    signal_coverage = len(signal_tokens & content_tokens) / max(1, len(signal_tokens))
+    signal_overlap = signal_tokens & content_tokens
+    signal_coverage = len(signal_overlap) / max(1, len(signal_tokens))
     lexical_signal = max(lexical, signal_coverage)
-    score = lexical_signal
+    comparison_source_score = max(
+        (
+            _source_match_score(source_query, metadata)
+            for group in comparison_query_groups(query)
+            for source_query in group
+        ),
+        default=0.0,
+    )
+    score = max(lexical_signal, comparison_source_score)
 
-    # Sentence-transformers/Chroma 的 cosine distance 越小越相关；对没有
-    # 距离信息的稀疏/图召回候选，只使用可解释的词项信号。
-    if candidate.vector_distance is not None and lexical_signal >= PROJECT_RELEVANCE_FLOOR:
-        dense = max(0.0, min(1.0, 1.0 - float(candidate.vector_distance)))
+    # Sentence-transformers/Chroma 的 cosine distance 越小越相关。项目内的
+    # 同义改写可能只有少量词面重合，不能先用词法阈值把密集信号屏蔽掉。
+    # 没有距离信息的稀疏/图召回候选，仍只使用可解释的词项信号。
+    dense_distance = _finite_score(candidate.vector_distance, default=None)
+    if dense_distance is not None and (
+        lexical_signal >= PROJECT_RELEVANCE_FLOOR
+        or len(signal_overlap) >= 2
+    ):
+        dense = max(0.0, min(1.0, 1.0 - dense_distance))
         score = max(score, dense)
     return round(score, 6)
 
@@ -798,10 +919,35 @@ def _evaluate_project_candidates(
         for candidate in candidates
     ]
     scored.sort(key=lambda item: (-item[1], str(item[0].id)))
+    best_candidate, best_score = scored[0] if scored else (None, 0.0)
+    second_score = scored[1][1] if len(scored) > 1 else 0.0
+    base_relevant = bool(scored and best_score >= relevance_floor)
+    signal_overlap = (
+        _project_candidate_signal_overlap(query, best_candidate)
+        if best_candidate is not None
+        else set()
+    )
+    recovery_margin = best_score - second_score
+    recovery_eligible = bool(
+        best_candidate is not None
+        and best_candidate.dense_rank == 1
+        and best_candidate.vector_distance is not None
+        and len(signal_overlap) >= 2
+        and best_score >= PROJECT_RELEVANCE_RECOVERY_FLOOR
+        and recovery_margin >= PROJECT_RELEVANCE_RECOVERY_MARGIN
+        and not base_relevant
+    )
     return {
         "threshold": relevance_floor,
-        "max_score": round(scored[0][1], 6) if scored else 0.0,
-        "relevant": bool(scored and scored[0][1] >= relevance_floor),
+        "max_score": round(best_score, 6),
+        "relevant": bool(base_relevant or recovery_eligible),
+        "recovery": {
+            "eligible": recovery_eligible,
+            "signal_overlap_count": len(signal_overlap),
+            "score_floor": round(PROJECT_RELEVANCE_RECOVERY_FLOOR, 6),
+            "margin": round(recovery_margin, 6),
+            "margin_floor": round(PROJECT_RELEVANCE_RECOVERY_MARGIN, 6),
+        },
         "candidate_scores": [
             {"candidate_id": str(candidate.id), "score": score}
             for candidate, score in scored[:8]
@@ -1205,6 +1351,63 @@ class LocalKnowledgeBase:
         logger.info("[VectorDB] %s indexed.", document_id)
         return summary
 
+    def check_index_consistency(
+        self,
+        document_hash: str,
+        source_filename: str | None = None,
+        document_id: str | None = None,
+    ) -> str:
+        """Check that vector children still have their local projections.
+
+        Vector metadata is not sufficient evidence that a multi-store ingest
+        completed: a crash can leave children visible while parent expansion
+        or the sparse projection is missing. This check is read-only and
+        returns a rebuild reason instead of repairing in place.
+        """
+        try:
+            existing = self.collection.get(
+                where={"document_hash": str(document_hash)},
+                include=["metadatas"],
+            )
+        except Exception:
+            return "vector_store_unavailable"
+
+        records = existing.get("metadatas") or []
+        child_ids = []
+        parent_ids = set()
+        for index, child_id in enumerate(existing.get("ids") or []):
+            metadata = dict(records[index] or {}) if index < len(records) else {}
+            if document_id:
+                if str(metadata.get("document_id") or "").strip() != str(document_id).strip():
+                    continue
+            elif source_filename is not None and str(metadata.get("source_filename") or "") != str(source_filename):
+                continue
+            child_ids.append(str(child_id))
+            parent_ids.add(str(metadata.get("parent_id") or "").strip())
+        if not child_ids:
+            return "missing"
+        if not parent_ids or "" in parent_ids:
+            return "parent_store_incomplete"
+
+        parent_store = self.secure_store or self.parent_store
+        if parent_store is None:
+            return "parent_store_unavailable"
+        try:
+            if any(parent_store.get_parent(parent_id) is None for parent_id in parent_ids):
+                return "parent_store_incomplete"
+        except Exception:
+            return "parent_store_unavailable"
+
+        if self.keyword_index is not None:
+            contains_ids = getattr(self.keyword_index, "contains_ids", None)
+            if callable(contains_ids):
+                try:
+                    if not contains_ids(child_ids):
+                        return "keyword_index_incomplete"
+                except Exception:
+                    return "keyword_index_unavailable"
+        return "current"
+
     def _rollback_ingest(
         self,
         *,
@@ -1298,11 +1501,16 @@ class LocalKnowledgeBase:
         project_id: str | None = None,
         extra_query_variants: list[str] | None = None,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
+        global_only: bool = False,
     ):
         self._ensure_embedding_model()
         retrieval_started_at = time.time()
         query_intent = classify_query_intent(query)
+        if global_only and project_id:
+            raise ValueError("global_only retrieval cannot also specify project_id")
         scoped_document_names = _normalize_document_names(document_names)
+        scoped_document_ids = _normalize_document_ids(document_ids)
         if self.enable_source_profile_recall:
             self._active_source_profile_scores = {}
         timings = {
@@ -1326,11 +1534,19 @@ class LocalKnowledgeBase:
         graph_limit = int(retrieval_budget["graph_limit"])
         # A selected document is an explicit corpus boundary. GraphRAG reports
         # are corpus-level summaries and cannot be safely narrowed by filename.
-        use_graph_recall = bool(retrieval_budget["use_graph"]) and not scoped_document_names
+        use_graph_recall = bool(retrieval_budget["use_graph"]) and not (
+            scoped_document_names or scoped_document_ids
+        )
         scoped_project_id = (
             str(project_id).strip()
-            if project_id and not query_intent.explicit_global_scope
+            if project_id and not global_only and not query_intent.explicit_global_scope
             else None
+        )
+        # An unbound session is allowed to read shared knowledge, but must not
+        # silently become a cross-project search.  Cross-project retrieval is
+        # opt-in through the explicit global query intent.
+        unbound_global_only = bool(global_only) or (
+            not scoped_project_id and not query_intent.explicit_global_scope
         )
         stage_started_at = time.time()
         base_query_variants = expand_query_variants(query, limit=8)
@@ -1346,12 +1562,13 @@ class LocalKnowledgeBase:
         keyword_candidates = []
         stage_started_at = time.time()
         graph_candidates = []
-        if graph_db is not None and not scoped_document_names:
+        if graph_db is not None and not (scoped_document_names or scoped_document_ids):
             graph_candidates = self._graph_candidates(
                 query,
                 graph_db,
                 limit=graph_limit,
                 project_id=scoped_project_id,
+                global_only=unbound_global_only,
             )
             timings["graph_recall_ms"] = _elapsed_ms(stage_started_at)
         stage_started_at = time.time()
@@ -1367,7 +1584,9 @@ class LocalKnowledgeBase:
                     [query_vector],
                     dense_pool_size,
                     project_id=scoped_project_id,
+                    global_only=unbound_global_only,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
             )
             timings["dense_ms"] += _elapsed_ms(stage_started_at)
@@ -1377,7 +1596,9 @@ class LocalKnowledgeBase:
                     variant,
                     dense_pool_size,
                     project_id=scoped_project_id,
+                    global_only=unbound_global_only,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
             )
             timings["keyword_ms"] += _elapsed_ms(stage_started_at)
@@ -1386,8 +1607,10 @@ class LocalKnowledgeBase:
             query,
             limit=aux_limit,
             project_id=scoped_project_id,
+            global_only=unbound_global_only,
             query_variants=query_variants,
             document_names=scoped_document_names,
+            document_ids=scoped_document_ids,
         )
         timings["source_title_ms"] = _elapsed_ms(stage_started_at)
         stage_started_at = time.time()
@@ -1396,7 +1619,9 @@ class LocalKnowledgeBase:
             query_variants=query_variants,
             limit=aux_limit,
             project_id=scoped_project_id,
+            global_only=unbound_global_only,
             document_names=scoped_document_names,
+            document_ids=scoped_document_ids,
         )
         timings["source_profile_ms"] += _elapsed_ms(stage_started_at)
         section_route_diagnostics = []
@@ -1404,7 +1629,9 @@ class LocalKnowledgeBase:
             query,
             limit=aux_limit,
             project_id=scoped_project_id,
+            global_only=unbound_global_only,
             document_names=scoped_document_names,
+            document_ids=scoped_document_ids,
         )
         section_route_diagnostics.append(dict(getattr(self, "_section_route_diagnostics", {})))
         stage_started_at = time.time()
@@ -1420,7 +1647,11 @@ class LocalKnowledgeBase:
         merged_candidate_count = len(candidates)
         stage_started_at = time.time()
         candidates = self._hydrate_secure_candidates(candidates, limit=max(top_k * 40, 120))
-        candidates = _filter_document_candidates(candidates, scoped_document_names)
+        candidates = _filter_document_candidates(
+            candidates,
+            scoped_document_names,
+            scoped_document_ids,
+        )
         timings["hydrate_ms"] = _elapsed_ms(stage_started_at)
 
         merged_candidate_count = len(candidates)
@@ -1450,7 +1681,7 @@ class LocalKnowledgeBase:
                     limit=graph_limit,
                     project_id=None,
                     global_only=True,
-                ) if graph_db is not None and not scoped_document_names else []
+                ) if graph_db is not None and not (scoped_document_names or scoped_document_ids) else []
                 shared_dense_candidates = []
                 shared_keyword_candidates = []
                 for variant, query_vector in zip(query_variants, query_vectors):
@@ -1461,6 +1692,7 @@ class LocalKnowledgeBase:
                             project_id=None,
                             global_only=True,
                             document_names=scoped_document_names,
+                            document_ids=scoped_document_ids,
                         )
                     )
                     shared_keyword_candidates.extend(
@@ -1470,6 +1702,7 @@ class LocalKnowledgeBase:
                             project_id=None,
                             global_only=True,
                             document_names=scoped_document_names,
+                            document_ids=scoped_document_ids,
                         )
                     )
                 shared_source_title_candidates = self._source_title_candidates(
@@ -1479,6 +1712,7 @@ class LocalKnowledgeBase:
                     global_only=True,
                     query_variants=query_variants,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
                 stage_started_at = time.time()
                 shared_source_profile_candidates = self._source_profile_candidates(
@@ -1488,6 +1722,7 @@ class LocalKnowledgeBase:
                     project_id=None,
                     global_only=True,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
                 timings["source_profile_ms"] += _elapsed_ms(stage_started_at)
                 shared_section_candidates = self._section_candidates(
@@ -1496,6 +1731,7 @@ class LocalKnowledgeBase:
                     project_id=None,
                     global_only=True,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
                 section_route_diagnostics.append(dict(getattr(self, "_section_route_diagnostics", {})))
                 shared_candidates = self._merge_candidates(
@@ -1512,7 +1748,11 @@ class LocalKnowledgeBase:
                     candidates,
                     limit=max(top_k * 40, 120),
                 )
-                candidates = _filter_document_candidates(candidates, scoped_document_names)
+                candidates = _filter_document_candidates(
+                    candidates,
+                    scoped_document_names,
+                    scoped_document_ids,
+                )
                 dense_candidates.extend(shared_dense_candidates)
                 keyword_candidates.extend(shared_keyword_candidates)
                 graph_candidates.extend(shared_graph_candidates)
@@ -1534,7 +1774,7 @@ class LocalKnowledgeBase:
                     limit=graph_limit,
                     project_id=None,
                     global_only=True,
-                ) if graph_db is not None and not scoped_document_names else []
+                ) if graph_db is not None and not (scoped_document_names or scoped_document_ids) else []
                 dense_candidates = []
                 keyword_candidates = []
                 for variant, query_vector in zip(query_variants, query_vectors):
@@ -1545,6 +1785,7 @@ class LocalKnowledgeBase:
                             project_id=None,
                             global_only=True,
                             document_names=scoped_document_names,
+                            document_ids=scoped_document_ids,
                         )
                     )
                     keyword_candidates.extend(
@@ -1554,6 +1795,7 @@ class LocalKnowledgeBase:
                             project_id=None,
                             global_only=True,
                             document_names=scoped_document_names,
+                            document_ids=scoped_document_ids,
                         )
                     )
                 source_title_candidates = self._source_title_candidates(
@@ -1563,6 +1805,7 @@ class LocalKnowledgeBase:
                     global_only=True,
                     query_variants=query_variants,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
                 stage_started_at = time.time()
                 source_profile_candidates = self._source_profile_candidates(
@@ -1572,6 +1815,7 @@ class LocalKnowledgeBase:
                     project_id=None,
                     global_only=True,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
                 timings["source_profile_ms"] += _elapsed_ms(stage_started_at)
                 section_candidates = self._section_candidates(
@@ -1580,6 +1824,7 @@ class LocalKnowledgeBase:
                     project_id=None,
                     global_only=True,
                     document_names=scoped_document_names,
+                    document_ids=scoped_document_ids,
                 )
                 section_route_diagnostics.append(dict(getattr(self, "_section_route_diagnostics", {})))
                 candidates = self._merge_candidates(
@@ -1594,7 +1839,11 @@ class LocalKnowledgeBase:
                     candidates,
                     limit=max(top_k * 40, 120),
                 )
-                candidates = _filter_document_candidates(candidates, scoped_document_names)
+                candidates = _filter_document_candidates(
+                    candidates,
+                    scoped_document_names,
+                    scoped_document_ids,
+                )
                 merged_candidate_count = len(candidates)
                 project_route = "global_fallback"
 
@@ -1616,7 +1865,7 @@ class LocalKnowledgeBase:
                     if query_intent.explicit_global_scope or project_route == "global_fallback"
                     else scoped_project_id
                 ),
-                global_only=project_route == "global_fallback",
+                global_only=unbound_global_only or project_route == "global_fallback",
             )
             timings["graph_context_ms"] = _elapsed_ms(stage_started_at)
         else:
@@ -1703,7 +1952,11 @@ class LocalKnowledgeBase:
                 if self.enable_usage_ledger
                 else 1.0
             )
-            candidate.metadata["_knowledge_weight"] = usage_weight * project_focus_weight
+            # Keep usage statistics for observability, but do not let mutable
+            # citation history or wall-clock freshness change factual
+            # retrieval order between otherwise identical requests.
+            candidate.metadata["_usage_weight"] = usage_weight
+            candidate.metadata["_knowledge_weight"] = project_focus_weight
 
         stage_started_at = time.time()
         ranking_diagnostics = {}
@@ -1742,7 +1995,7 @@ class LocalKnowledgeBase:
         ).public_dict()
         observability = {
             "schema_version": "retrieval_observability_v1",
-            "schema_revision": 3,
+            "schema_revision": 5,
             "query_intent": query_intent.name,
             "query_variant_count": len(query_variants),
             "feedback_variant_count": len(feedback_variants - set(base_query_variants)),
@@ -1759,7 +2012,23 @@ class LocalKnowledgeBase:
             "rerank_limit_bypassed_reason": rerank_limit_bypassed_reason,
             "usage_ledger_enabled": self.enable_usage_ledger,
             "comparison_source_reservation_enabled": self.enable_comparison_source_reservation,
+            "comparison_source_reservation_active": self.enable_comparison_source_reservation,
             "source_profile_recall_enabled": self.enable_source_profile_recall,
+            "graph_route": retrieval_budget["graph_route"],
+            "graph_recall_enabled": bool(graph_db is not None and use_graph_recall),
+            "graph_context_count": len(graph_context),
+            "document_scope": {
+                "mode": (
+                    "document_id"
+                    if scoped_document_ids
+                    else "document_name"
+                    if scoped_document_names
+                    else "none"
+                ),
+                "requested_name_count": len(scoped_document_names),
+                "requested_id_count": len(scoped_document_ids),
+                "graph_blocked": bool(scoped_document_names or scoped_document_ids),
+            },
             "stage_counts": {
                 "dense": len(dense_candidates),
                 "keyword": len(keyword_candidates),
@@ -1777,9 +2046,9 @@ class LocalKnowledgeBase:
                 ),
                 "final": len(parent_candidates),
                 "final_sources": len({
-                    source_identity(candidate.metadata or {})
+                    source_diversity_key(candidate.metadata or {})
                     for candidate in parent_candidates
-                    if source_identity(candidate.metadata or {})
+                    if source_diversity_key(candidate.metadata or {})
                 }),
             },
             "ranking": ranking_diagnostics,
@@ -1788,6 +2057,7 @@ class LocalKnowledgeBase:
                 "enabled": project_focus_enabled,
                 "requested": bool(project_id),
                 "explicit_global_scope": query_intent.explicit_global_scope,
+                "unbound_global_only": unbound_global_only,
                 "boost": PROJECT_FOCUS_WEIGHT if project_focus_enabled else 1.0,
                 "boosted_candidate_count": focused_candidate_count,
                 "global_candidate_count": global_candidate_count,
@@ -1944,6 +2214,7 @@ class LocalKnowledgeBase:
         project_id: str | None = None,
         global_only: bool = False,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ):
         if self.secure_store is not None:
             embedding = query_vector[0] if query_vector else []
@@ -1962,6 +2233,7 @@ class LocalKnowledgeBase:
                         project_id=project_id,
                         global_only=global_only,
                         document_names=document_names,
+                        document_ids=document_ids,
                     )
                 )
             ]
@@ -1971,7 +2243,7 @@ class LocalKnowledgeBase:
                 "query_embeddings": query_vector,
                 "n_results": (
                     max(n_results, self._indexed_candidate_count())
-                    if global_only or document_names
+                    if global_only or document_names or document_ids
                     else n_results
                 ),
                 "include": ["documents", "metadatas", "distances"],
@@ -2014,7 +2286,11 @@ class LocalKnowledgeBase:
                 for candidate in candidates
                 if not str((candidate.metadata or {}).get("project_id") or "").strip()
             ]
-        candidates = _filter_document_candidates(candidates, document_names or [])
+        candidates = _filter_document_candidates(
+            candidates,
+            document_names or [],
+            document_ids or [],
+        )
         for index, candidate in enumerate(candidates[:n_results], start=1):
             candidate.dense_rank = index
         return candidates[:n_results]
@@ -2026,6 +2302,7 @@ class LocalKnowledgeBase:
         project_id: str | None = None,
         global_only: bool = False,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ):
         if self.secure_store is not None:
             candidates = self.secure_store.keyword_candidates(
@@ -2034,6 +2311,7 @@ class LocalKnowledgeBase:
                 project_id=project_id,
                 global_only=global_only,
                 document_names=document_names,
+                document_ids=document_ids,
             )
             return [
                 SearchCandidate(
@@ -2052,6 +2330,7 @@ class LocalKnowledgeBase:
                 project_id=project_id,
                 global_only=global_only,
                 document_names=document_names,
+                document_ids=document_ids,
             )
         return [
             SearchCandidate(
@@ -2063,7 +2342,10 @@ class LocalKnowledgeBase:
             )
             for index, result in enumerate(
                 result for result in results
-                if not document_names or _document_name_matches(result.metadata, document_names)
+                if (
+                    _document_name_matches(result.metadata, document_names or [])
+                    and _document_id_matches(result.metadata, document_ids or [])
+                )
             )
         ]
 
@@ -2158,6 +2440,7 @@ class LocalKnowledgeBase:
         global_only: bool = False,
         query_variants: list[str] | None = None,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ):
         scored: dict[str, tuple[float, SearchCandidate]] = {}
         source_queries = [query, *(query_variants or [])]
@@ -2169,13 +2452,22 @@ class LocalKnowledgeBase:
                 continue
             if document_names and not _document_name_matches(metadata, document_names):
                 continue
+            if document_ids and not _document_id_matches(metadata, document_ids):
+                continue
             score = max(
                 (_source_match_score(item, metadata) for item in source_queries),
                 default=0.0,
             )
             if score < 0.72:
                 continue
-            key = source_identity(metadata, str(metadata.get("parent_id") or record_id))
+            # A filename/title is not a globally unique source identity.  In
+            # explicit cross-project retrieval, two projects may both contain
+            # ``report.pdf``; keep those logical sources separate so source
+            # recall cannot erase one side before hybrid ranking.
+            key = source_diversity_key(
+                metadata,
+                str(metadata.get("parent_id") or record_id),
+            )
             candidate = SearchCandidate(
                 id=record_id,
                 content=document,
@@ -2206,6 +2498,7 @@ class LocalKnowledgeBase:
         project_id: str | None = None,
         global_only: bool = False,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ):
         """Inject exact quoted section hits before dense/sparse candidate truncation."""
         topics = _quoted_section_topics(query)
@@ -2228,6 +2521,8 @@ class LocalKnowledgeBase:
             if global_only and metadata_project_id:
                 continue
             if document_names and not _document_name_matches(metadata, document_names):
+                continue
+            if document_ids and not _document_id_matches(metadata, document_ids):
                 continue
             route = _section_route_match(query, metadata, document, tree_nodes=tree_nodes)
             if not route["matched_topic_indexes"]:
@@ -2357,7 +2652,10 @@ class LocalKnowledgeBase:
 
         grouped: dict[str, dict[str, Any]] = {}
         for record_id, document, metadata in self._source_candidate_records():
-            key = source_key(metadata or {}, record_id)
+            # Keep document-level semantic profiles scoped just like source
+            # title recall.  A shared filename is a display label, not a
+            # cross-project identity.
+            key = source_diversity_key(metadata or {}, record_id)
             if not key:
                 continue
             entry = grouped.setdefault(
@@ -2405,6 +2703,7 @@ class LocalKnowledgeBase:
         project_id: str | None = None,
         global_only: bool = False,
         document_names: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[SearchCandidate]:
         """Recall representative child chunks from semantically matched sources.
 
@@ -2458,6 +2757,10 @@ class LocalKnowledgeBase:
                 and (
                     not document_names
                     or _document_name_matches(record[2] or {}, document_names)
+                )
+                and (
+                    not document_ids
+                    or _document_id_matches(record[2] or {}, document_ids)
                 )
             ]
             if not records:
@@ -2528,7 +2831,7 @@ class LocalKnowledgeBase:
         if not self.enable_source_profile_recall:
             return
         for candidate in candidates:
-            key = source_key(candidate.metadata or {}, candidate.id)
+            key = source_diversity_key(candidate.metadata or {}, candidate.id)
             score = self._active_source_profile_scores.get(key)
             if score is None:
                 continue
@@ -2538,7 +2841,53 @@ class LocalKnowledgeBase:
         merged: dict[str, SearchCandidate] = {}
         for group in candidate_groups:
             for candidate in group:
-                merge_key = str(candidate.metadata.get("child_id") or candidate.id)
+                metadata = candidate.metadata or {}
+                base_key = str(metadata.get("child_id") or candidate.id)
+                project_id = str(metadata.get("project_id") or "").strip()
+                same_base = [
+                    (key, existing)
+                    for key, existing in merged.items()
+                    if str(
+                        (existing.metadata or {}).get("child_id") or existing.id
+                    ) == base_key
+                ]
+                merge_key = None
+                if project_id:
+                    # A known project may merge with the same project or one
+                    # unscoped graph hit, but never with another known project.
+                    merge_key = next(
+                        (
+                            key
+                            for key, existing in same_base
+                            if str((existing.metadata or {}).get("project_id") or "").strip()
+                            == project_id
+                        ),
+                        None,
+                    )
+                    unscoped_matches = [
+                        (key, existing)
+                        for key, existing in same_base
+                        if not str(
+                            (existing.metadata or {}).get("project_id") or ""
+                        ).strip()
+                    ]
+                    if merge_key is None and len(same_base) == 1 and len(
+                        unscoped_matches
+                    ) == 1:
+                        merge_key = next(
+                            key
+                            for key, _existing in unscoped_matches
+                        )
+                elif len(same_base) == 1:
+                    merge_key = same_base[0][0]
+                if merge_key is None:
+                    merge_key = (
+                        f"{base_key}\x1fproject:{project_id}"
+                        if project_id
+                        else base_key
+                    )
+                    while merge_key in merged:
+                        merge_key = f"{merge_key}\x1fcollision"
                 if merge_key not in merged:
                     merged[merge_key] = candidate
                     continue
@@ -2570,7 +2919,7 @@ class LocalKnowledgeBase:
         query: str = "",
     ):
         expanded = []
-        seen_parent_ids = set()
+        seen_parent_keys = set()
         query_intent = classify_query_intent(query)
 
         for candidate in candidates:
@@ -2591,7 +2940,26 @@ class LocalKnowledgeBase:
                 if len(expanded) >= top_k:
                     break
                 continue
-            if parent_id in seen_parent_ids:
+            candidate_metadata = candidate.metadata or {}
+            candidate_document_identity = next(
+                (
+                    str(candidate_metadata.get(field) or "").strip()
+                    for field in (
+                        "document_hash",
+                        "document_id",
+                        "asset_version_id",
+                        "asset_id",
+                    )
+                    if str(candidate_metadata.get(field) or "").strip()
+                ),
+                "",
+            )
+            parent_visit_key = (
+                str(parent_id),
+                str(candidate_metadata.get("project_id") or "").strip(),
+                candidate_document_identity,
+            )
+            if parent_visit_key in seen_parent_keys:
                 continue
 
             if self.secure_store is not None:
@@ -2611,7 +2979,27 @@ class LocalKnowledgeBase:
                         },
                     )
                 )
-                seen_parent_ids.add(parent_id)
+                seen_parent_keys.add(parent_visit_key)
+                continue
+
+            parent_metadata = parent.get("metadata") or {}
+            if not _parent_context_identity_matches(
+                candidate.metadata,
+                parent_metadata,
+            ):
+                expanded.append(
+                    _with_candidate_context(
+                        candidate,
+                        candidate.content,
+                        {
+                            **candidate.metadata,
+                            "context_expansion_mode": "parent_scope_mismatch",
+                            "context_char_count": len(candidate.content),
+                            "parent_char_count": len(str(parent.get("content") or "")),
+                        },
+                    )
+                )
+                seen_parent_keys.add(parent_visit_key)
                 continue
 
             context, expansion_metadata = _select_parent_context(
@@ -2626,6 +3014,11 @@ class LocalKnowledgeBase:
             ):
                 store = self.secure_store or self.parent_store
                 adjacent = store.get_adjacent_parent(parent_id, offset=1)
+                if adjacent and not _parent_context_identity_matches(
+                    candidate.metadata,
+                    adjacent.get("metadata") or {},
+                ):
+                    adjacent = None
                 adjacent_content = str((adjacent or {}).get("content") or "").strip()
                 if adjacent_content:
                     context = f"{context.strip()}\n\n{adjacent_content}"
@@ -2645,7 +3038,7 @@ class LocalKnowledgeBase:
                     },
                 )
             )
-            seen_parent_ids.add(parent_id)
+            seen_parent_keys.add(parent_visit_key)
             if len(expanded) >= top_k:
                 break
 
@@ -2658,6 +3051,7 @@ class LocalKnowledgeBase:
                     candidate.final_score,
                     candidate.rerank_score,
                     candidate.keyword_score,
+                    str(candidate.id),
                 ),
                 reverse=True,
             )

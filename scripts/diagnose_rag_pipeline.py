@@ -181,6 +181,12 @@ def diagnose_record(
     started_at = time.time()
     question = str(record.get("question") or "")
     expected_sources = [str(item) for item in record.get("expected_sources", [])]
+    expected_document_ids = [
+        str(item)
+        for item in (record.get("doc_ids") or record.get("expected_document_ids") or [])
+    ]
+    if expected_document_ids and len(expected_document_ids) != len(expected_sources):
+        raise ValueError(f"评测样本 {record.get('id', '')} 的 doc_ids 数量必须与 expected_sources 一致")
     dense_pool_size = max(top_k * 6, 18)
     recall_depths = sorted({depth for depth in (recall_depths or []) if depth > 0})
     final_k_values = sorted({value for value in (final_k_values or []) if value > 0})
@@ -212,10 +218,30 @@ def diagnose_record(
     )
     merged_candidates = kb._merge_candidates(dense_candidates, keyword_candidates, source_title_candidates)
     stages = {
-        "dense": build_stage_result(expected_sources, dense_candidates, top_limit=stage_top_limit),
-        "keyword": build_stage_result(expected_sources, keyword_candidates, top_limit=stage_top_limit),
-        "source_title": build_stage_result(expected_sources, source_title_candidates, top_limit=stage_top_limit),
-        "merged": build_stage_result(expected_sources, merged_candidates, top_limit=stage_top_limit),
+        "dense": build_stage_result(
+            expected_sources,
+            dense_candidates,
+            top_limit=stage_top_limit,
+            expected_document_ids=expected_document_ids,
+        ),
+        "keyword": build_stage_result(
+            expected_sources,
+            keyword_candidates,
+            top_limit=stage_top_limit,
+            expected_document_ids=expected_document_ids,
+        ),
+        "source_title": build_stage_result(
+            expected_sources,
+            source_title_candidates,
+            top_limit=stage_top_limit,
+            expected_document_ids=expected_document_ids,
+        ),
+        "merged": build_stage_result(
+            expected_sources,
+            merged_candidates,
+            top_limit=stage_top_limit,
+            expected_document_ids=expected_document_ids,
+        ),
     }
 
     graph_context, matched_entities = kb._build_graph_context(
@@ -235,6 +261,7 @@ def diagnose_record(
         expected_sources,
         graph_boosted_candidates,
         top_limit=stage_top_limit,
+        expected_document_ids=expected_document_ids,
     )
     if merged_candidates and getattr(kb.reranker, "ready", False):
         scores = kb.reranker.score(question, [candidate.content for candidate in merged_candidates])
@@ -248,13 +275,25 @@ def diagnose_record(
         query_variants=query_variants,
     )
     final_candidates = kb._expand_parent_context(reranked_candidates, top_k=top_k)
-    stages["reranked_pool"] = build_stage_result(expected_sources, reranked_candidates, top_limit=stage_top_limit)
-    stages["final"] = build_stage_result(expected_sources, final_candidates, top_limit=stage_top_limit)
+    stages["reranked_pool"] = build_stage_result(
+        expected_sources,
+        reranked_candidates,
+        top_limit=stage_top_limit,
+        expected_document_ids=expected_document_ids,
+    )
+    stages["final"] = build_stage_result(
+        expected_sources,
+        final_candidates,
+        top_limit=stage_top_limit,
+        expected_document_ids=expected_document_ids,
+    )
     sample = {
         "id": str(record.get("id") or ""),
         "question": question,
         "type": str(record.get("type") or ""),
         "expected_sources": expected_sources,
+        "expected_document_ids": expected_document_ids,
+        "document_identity_required": bool(expected_document_ids),
         "requires_multi_doc": bool(record.get("requires_multi_doc", False)),
         "graph_relevant": bool(record.get("graph_relevant", False)),
         "allows_title_reference": allows_title_reference(record),
@@ -266,8 +305,18 @@ def diagnose_record(
     }
     if recall_depths:
         sample["recall_depth_scan"] = {
-            "dense": build_stage_depth_scan(expected_sources, dense_candidate_groups, recall_depths),
-            "keyword": build_stage_depth_scan(expected_sources, keyword_candidate_groups, recall_depths),
+            "dense": build_stage_depth_scan(
+                expected_sources,
+                dense_candidate_groups,
+                recall_depths,
+                expected_document_ids=expected_document_ids,
+            ),
+            "keyword": build_stage_depth_scan(
+                expected_sources,
+                keyword_candidate_groups,
+                recall_depths,
+                expected_document_ids=expected_document_ids,
+            ),
             "merged_pool": build_merged_pool_depth_scan(
                 kb,
                 expected_sources,
@@ -275,6 +324,7 @@ def diagnose_record(
                 keyword_candidate_groups,
                 source_title_candidates,
                 recall_depths,
+                expected_document_ids=expected_document_ids,
             ),
         }
     if final_k_values:
@@ -285,6 +335,7 @@ def diagnose_record(
             merged_candidates=merged_candidates,
             final_k_values=final_k_values,
             stage_top_limit=stage_top_limit,
+            expected_document_ids=expected_document_ids,
         )
     sample["failure_buckets"] = classify_failure_buckets(sample)
     return sample
@@ -301,10 +352,15 @@ def build_stage_depth_scan(
     expected_sources: list[str],
     candidate_groups: list[list[Any]],
     depths: list[int],
+    expected_document_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         str(depth): compact_stage_result(
-            build_stage_result(expected_sources, flatten_candidate_groups(candidate_groups, depth))
+            build_stage_result(
+                expected_sources,
+                flatten_candidate_groups(candidate_groups, depth),
+                expected_document_ids=expected_document_ids,
+            )
         )
         for depth in depths
     }
@@ -317,6 +373,7 @@ def build_merged_pool_depth_scan(
     keyword_candidate_groups: list[list[Any]],
     source_title_candidates: list[Any],
     depths: list[int],
+    expected_document_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     scan = {}
     for depth in depths:
@@ -325,7 +382,13 @@ def build_merged_pool_depth_scan(
             clone_candidates(flatten_candidate_groups(keyword_candidate_groups, depth)),
             clone_candidates(source_title_candidates),
         )
-        scan[str(depth)] = compact_stage_result(build_stage_result(expected_sources, merged_candidates))
+        scan[str(depth)] = compact_stage_result(
+            build_stage_result(
+                expected_sources,
+                merged_candidates,
+                expected_document_ids=expected_document_ids,
+            )
+        )
     return scan
 
 
@@ -336,6 +399,7 @@ def build_final_k_scan(
     merged_candidates: list[SearchCandidate],
     final_k_values: list[int],
     stage_top_limit: int = 10,
+    expected_document_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     scan = {}
     for final_k in final_k_values:
@@ -347,7 +411,12 @@ def build_final_k_scan(
         )
         final_candidates = kb._expand_parent_context(reranked_candidates, top_k=final_k)
         scan[str(final_k)] = compact_stage_result(
-            build_stage_result(expected_sources, final_candidates, top_limit=stage_top_limit)
+            build_stage_result(
+                expected_sources,
+                final_candidates,
+                top_limit=stage_top_limit,
+                expected_document_ids=expected_document_ids,
+            )
         )
     return scan
 
@@ -356,21 +425,35 @@ def build_stage_result(
     expected_sources: list[str],
     candidates: list[Any],
     top_limit: int = 10,
+    expected_document_ids: list[str] | None = None,
 ) -> dict[str, Any]:
+    expected_document_ids = [str(item) for item in (expected_document_ids or [])]
+    if expected_document_ids and len(expected_document_ids) != len(expected_sources):
+        raise ValueError("doc_ids 数量必须与 expected_sources 一致")
     candidate_snapshots = [candidate_snapshot(candidate) for candidate in candidates]
     hit_sources = [
         expected
-        for expected in expected_sources
-        if any(eval_rag.source_matches(candidate.get("source_filename"), expected) for candidate in candidate_snapshots)
+        for index, expected in enumerate(expected_sources)
+        if any(
+            eval_rag.evidence_matches_expected_source(
+                candidate,
+                expected,
+                expected_document_ids[index] if expected_document_ids else None,
+            )
+            for candidate in candidate_snapshots
+        )
     ]
     missing_sources = [source for source in expected_sources if source not in hit_sources]
     source_coverage = len(hit_sources) / len(expected_sources) if expected_sources else 0.0
     return {
         "candidate_count": len(candidate_snapshots),
+        "expected_document_ids": expected_document_ids,
+        "document_identity_required": bool(expected_document_ids),
         "top_sources": [
             candidate.get("source_filename") or candidate.get("candidate_id") or ""
             for candidate in candidate_snapshots[:top_limit]
         ],
+        "top_document_ids": [candidate.get("document_id", "") for candidate in candidate_snapshots[:top_limit]],
         "top_candidates": candidate_snapshots[:top_limit],
         "hit_sources": hit_sources,
         "missing_sources": missing_sources,
@@ -391,9 +474,19 @@ def candidate_snapshot(candidate: Any) -> dict[str, Any]:
             or metadata.get("source_path")
             or ""
         )
+        identity = {
+            key: str(candidate.get(key) or metadata.get(key) or "")
+            for key in (
+                "document_id",
+                "evaluation_doc_id",
+                "corpus_doc_id",
+                "gold_document_id",
+            )
+        }
         return {
             "candidate_id": str(candidate.get("candidate_id") or candidate.get("id") or ""),
             "source_filename": str(source_filename),
+            **identity,
             "parent_id": str(candidate.get("parent_id") or metadata.get("parent_id") or ""),
             "dense_rank": candidate.get("dense_rank"),
             "sparse_rank": candidate.get("sparse_rank"),
@@ -413,9 +506,19 @@ def candidate_snapshot(candidate: Any) -> dict[str, Any]:
         or metadata.get("source_path")
         or ""
     )
+    identity = {
+        key: str(metadata.get(key) or "")
+        for key in (
+            "document_id",
+            "evaluation_doc_id",
+            "corpus_doc_id",
+            "gold_document_id",
+        )
+    }
     return {
         "candidate_id": str(getattr(candidate, "id", "")),
         "source_filename": str(source_filename),
+        **identity,
         "parent_id": str(metadata.get("parent_id") or ""),
         "dense_rank": getattr(candidate, "dense_rank", None),
         "sparse_rank": getattr(candidate, "sparse_rank", None),
@@ -451,14 +554,18 @@ def clone_candidates(candidates: list[Any]) -> list[SearchCandidate]:
             continue
 
         snapshot = candidate_snapshot(candidate)
+        metadata = {
+            "source_filename": snapshot["source_filename"],
+            "parent_id": snapshot["parent_id"],
+        }
+        for key in ("document_id", "evaluation_doc_id", "corpus_doc_id", "gold_document_id"):
+            if snapshot.get(key):
+                metadata[key] = snapshot[key]
         cloned.append(
             SearchCandidate(
                 id=snapshot["candidate_id"],
                 content=str(candidate.get("content") or "") if isinstance(candidate, dict) else "",
-                metadata={
-                    "source_filename": snapshot["source_filename"],
-                    "parent_id": snapshot["parent_id"],
-                },
+                metadata=metadata,
                 dense_rank=snapshot["dense_rank"],
                 sparse_rank=snapshot["sparse_rank"],
                 graph_score=float(snapshot["graph_score"] or 0.0),
@@ -475,7 +582,10 @@ def clone_candidates(candidates: list[Any]) -> list[SearchCandidate]:
 def compact_stage_result(stage_result: dict[str, Any]) -> dict[str, Any]:
     return {
         "candidate_count": stage_result["candidate_count"],
+        "expected_document_ids": stage_result.get("expected_document_ids", []),
+        "document_identity_required": stage_result.get("document_identity_required", False),
         "top_sources": stage_result["top_sources"],
+        "top_document_ids": stage_result.get("top_document_ids", []),
         "hit_sources": stage_result["hit_sources"],
         "missing_sources": stage_result["missing_sources"],
         "any_hit": stage_result["any_hit"],

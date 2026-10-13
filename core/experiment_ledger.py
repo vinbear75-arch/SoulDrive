@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from xml.etree import ElementTree
 
 from core.project_catalog import ProjectCatalog
+from core.paper_importer import file_md5, file_sha256
 
 
 METRIC_ALIASES = ("metric", "metric_name", "name", "指标", "指标名")
@@ -389,6 +390,10 @@ def import_metric_source(
         raise ValueError("evidence version does not exist")
     if str(evidence["project_id"]) != project_id:
         raise ValueError("evidence version belongs to another project")
+    expected_hash = str(evidence["content_hash"] or "").lower()
+    actual_hash = file_md5(path) if len(expected_hash) == 32 else file_sha256(path) if len(expected_hash) == 64 else ""
+    if not actual_hash or actual_hash != expected_hash:
+        raise ValueError("metrics source bytes do not match the evidence version")
     experiment_row = catalog.conn.execute(
         "SELECT experiment_id FROM experiments WHERE project_id = ? AND name = ? LIMIT 1",
         (project_id, plan["experiment_name"]),
@@ -494,32 +499,141 @@ def summarize_experiment_repeats(
     *,
     project_id: str | None = None,
 ) -> dict[str, Any]:
-    """Summarize explicitly selected repeats without mixing experiments."""
-    normalized_ids = list(dict.fromkeys(str(run_id or "").strip() for run_id in run_ids if str(run_id or "").strip()))[:32]
+    """Summarize only explicitly selected, same-condition repeated runs.
+
+    Comparison runs may legitimately differ in configuration or environment;
+    those differences are handled by :func:`compare_experiment_runs` and are
+    never silently pooled here.
+    """
+    normalized_ids = [
+        str(run_id or "").strip()
+        for run_id in run_ids
+        if str(run_id or "").strip()
+    ][:32]
+    duplicate_run_ids = sorted({run_id for run_id in normalized_ids if normalized_ids.count(run_id) > 1})
+    if not normalized_ids:
+        return {
+            "schema_version": "souldrive_experiment_repeat_summary_v0.1",
+            "status": "not_comparable",
+            "reason": "no_run_ids",
+            "run_ids": [],
+            "metrics": [],
+        }
+    if duplicate_run_ids:
+        return {
+            "schema_version": "souldrive_experiment_repeat_summary_v0.1",
+            "status": "not_comparable",
+            "reason": "duplicate_run_ids",
+            "duplicate_run_ids": duplicate_run_ids,
+            "run_ids": normalized_ids,
+            "metrics": [],
+        }
+
     runs = [catalog.get_experiment_run(run_id) for run_id in normalized_ids]
     missing = [run_id for run_id, run in zip(normalized_ids, runs) if run is None]
     if missing:
-        return {"status": "missing", "missing_run_ids": missing, "run_ids": normalized_ids}
+        return {
+            "schema_version": "souldrive_experiment_repeat_summary_v0.1",
+            "status": "missing",
+            "reason": "missing_run",
+            "missing_run_ids": missing,
+            "run_ids": normalized_ids,
+            "metrics": [],
+        }
     loaded = [run for run in runs if run is not None]
-    projects = {str(run["project_id"]) for run in loaded}
-    experiments = {str(run["experiment_id"]) for run in loaded}
-    if project_id and projects != {str(project_id)}:
-        return {"status": "rejected", "reason": "cross_project", "run_ids": normalized_ids}
-    if len(projects) != 1:
-        return {"status": "rejected", "reason": "cross_project", "run_ids": normalized_ids}
-    if len(experiments) != 1:
-        return {"status": "rejected", "reason": "mixed_experiment", "run_ids": normalized_ids}
+    projects = {str(run.get("project_id") or "") for run in loaded}
+    experiments = {str(run.get("experiment_id") or "") for run in loaded}
+    compatibility: dict[str, bool] = {
+        "same_project": len(projects) == 1 and (not project_id or projects == {str(project_id)}),
+        "same_experiment": len(experiments) == 1,
+    }
+    incompatibilities: list[dict[str, Any]] = []
+    if not compatibility["same_project"]:
+        incompatibilities.append({"field": "project_id", "reason": "missing_or_mismatch", "values": sorted(projects)})
+    if not compatibility["same_experiment"]:
+        incompatibilities.append({"field": "experiment_id", "reason": "missing_or_mismatch", "values": sorted(experiments)})
 
-    grouped: dict[tuple[str, str, str, str], list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+    condition_fields = (
+        "dataset_version",
+        "evaluation_script_ref",
+        "config_ref",
+        "environment_ref",
+    )
+    condition: dict[str, str | None] = {}
+    for field in condition_fields:
+        values = [str(run.get(field) or "").strip() for run in loaded]
+        known_equal = bool(values) and all(values) and len(set(values)) == 1
+        compatibility[field] = known_equal
+        condition[field] = values[0] if known_equal else None
+        if not known_equal:
+            reason = "missing" if not all(values) else "mismatch"
+            incompatibilities.append({"field": field, "reason": reason, "values": values})
+
+    metric_sets: dict[str, set[tuple[str, str, str, str]]] = {}
+    metric_items: dict[str, dict[tuple[str, str, str, str], list[dict[str, Any]]]] = {}
+    duplicate_metric_keys: list[dict[str, Any]] = []
+    direction_conflicts: list[dict[str, Any]] = []
     for run in loaded:
-        for measurement in run["measurements"]:
-            grouped.setdefault(_metric_key(measurement), []).append((run, measurement))
+        run_id = str(run["run_id"])
+        by_key: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+        for measurement in run.get("measurements") or []:
+            key = _metric_key(measurement)
+            by_key.setdefault(key, []).append(measurement)
+        metric_sets[run_id] = set(by_key)
+        metric_items[run_id] = by_key
+        for key, items in by_key.items():
+            if len(items) > 1:
+                duplicate_metric_keys.append({
+                    "run_id": run_id,
+                    "metric_key": list(key),
+                    "count": len(items),
+                })
+            directions = {str(item.get("direction") or "") for item in items}
+            if len(directions) > 1:
+                direction_conflicts.append({
+                    "run_id": run_id,
+                    "metric_key": list(key),
+                    "directions": sorted(directions),
+                })
+    if duplicate_metric_keys:
+        incompatibilities.append({"field": "measurements", "reason": "duplicate_metric_key", "items": duplicate_metric_keys})
+    if direction_conflicts:
+        incompatibilities.append({"field": "measurements", "reason": "direction_mismatch", "items": direction_conflicts})
+
+    expected_keys = next(iter(metric_sets.values()), set())
+    metric_set_mismatches = [
+        {
+            "run_id": run_id,
+            "missing": [list(key) for key in sorted(expected_keys - keys)],
+            "extra": [list(key) for key in sorted(keys - expected_keys)],
+        }
+        for run_id, keys in metric_sets.items()
+        if keys != expected_keys
+    ]
+    # A missing/extra key must block all aggregation; no partial metric subset
+    # is safe here.  The first run is only the diagnostic reference set.
+    if metric_set_mismatches:
+        incompatibilities.append({"field": "measurements", "reason": "metric_set_mismatch", "items": metric_set_mismatches})
+    compatibility["metric_set"] = not metric_set_mismatches and bool(expected_keys)
+
+    base = {
+        "schema_version": "souldrive_experiment_repeat_summary_v0.1",
+        "project_id": next(iter(projects), None),
+        "experiment_id": next(iter(experiments), None),
+        "run_ids": normalized_ids,
+        "run_count": len(loaded),
+        "runs": [_run_ref(run) for run in loaded],
+        "condition": condition,
+        "compatibility": compatibility,
+        "incompatibilities": incompatibilities,
+    }
+    if incompatibilities:
+        reason = incompatibilities[0]["reason"]
+        return {**base, "status": "not_comparable", "reason": reason, "metrics": []}
+
     metrics: list[dict[str, Any]] = []
-    for key in sorted(grouped):
-        items = grouped[key]
-        directions = {str(measurement.get("direction") or "") for _, measurement in items}
-        if len(directions) != 1:
-            continue
+    for key in sorted(expected_keys):
+        items = [(run, metric_items[str(run["run_id"])][key][0]) for run in loaded]
         values = [float(measurement["value"]) for _, measurement in items]
         mean = sum(values) / len(values)
         variance = None
@@ -534,7 +648,8 @@ def summarize_experiment_repeats(
             "unit": key[1],
             "definition_version": key[2],
             "split": key[3],
-            "direction": next(iter(directions)),
+            "direction": str(items[0][1].get("direction") or ""),
+            "n": len(values),
             "run_count": len(values),
             "mean": round(mean, 12),
             "variance": round(variance, 12) if variance is not None else None,
@@ -542,15 +657,7 @@ def summarize_experiment_repeats(
             "confidence_method": "normal_approximation" if confidence_interval_95 else None,
             "sources": [_measurement_ref(run, measurement) for run, measurement in items],
         })
-    return {
-        "schema_version": "souldrive_experiment_repeat_summary_v0.1",
-        "status": "ready" if metrics else "not_comparable",
-        "project_id": next(iter(projects)),
-        "experiment_id": next(iter(experiments)),
-        "run_ids": normalized_ids,
-        "run_count": len(loaded),
-        "metrics": metrics,
-    }
+    return {**base, "status": "ready", "metrics": metrics}
 
 
 def compare_experiment_runs(
@@ -566,6 +673,22 @@ def compare_experiment_runs(
         return {"status": "missing", "baseline_run_id": baseline_run_id, "current_run_id": current_run_id}
     if project_id and {str(baseline["project_id"]), str(current["project_id"])} != {str(project_id)}:
         return {"status": "rejected", "reason": "cross_project", "baseline": _run_ref(baseline), "current": _run_ref(current)}
+    if str(baseline["run_id"]) == str(current["run_id"]):
+        return {
+            "schema_version": "souldrive_experiment_comparison_v0.1",
+            "status": "not_comparable",
+            "reason": "基线运行和当前运行必须是不同的两次运行；同一运行不能生成实验变化证据。",
+            "project_id": baseline["project_id"],
+            "baseline": _run_ref(baseline),
+            "current": _run_ref(current),
+            "compatibility": {
+                "same_project": True,
+                "run_identity": False,
+                "change_computation": "blocked",
+            },
+            "changes": [],
+            "factors": [],
+        }
     checks = {
         "same_project": baseline["project_id"] == current["project_id"],
         "dataset_version": _same_non_empty(baseline.get("dataset_version"), current.get("dataset_version")),
@@ -713,6 +836,7 @@ def build_experiment_evidence(comparison: dict[str, Any] | None) -> list[dict[st
             "id": evidence_id,
             "evidence_id": evidence_id,
             "evidence_type": "experiment_measurement",
+            "project_id": _bounded_text(comparison.get("project_id"), 128),
             "modality": "experiment",
             "score": 1.0,
             "source_filename": _measurement_source_filename(current_source, current) or "实验账本",

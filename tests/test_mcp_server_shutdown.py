@@ -30,6 +30,28 @@ class McpServerShutdownTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "shutdown_requested")
         handler.assert_called_once_with("api shutdown requested")
 
+    def test_shutdown_calls_handler_when_audit_fails(self):
+        handler = Mock()
+
+        class FailingAuditLogger:
+            def append_event(self, *_args, **_kwargs):
+                raise OSError("audit sink failed for shutdown-secret")
+
+        mcp_server.app.state.shutdown_handler = handler
+        with patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False), patch.object(
+            mcp_server, "current_audit_logger", return_value=FailingAuditLogger()
+        ):
+            response = TestClient(mcp_server.app).post(
+                "/shutdown",
+                headers={"X-SoulDrive-Token": "test-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "shutdown_requested")
+        self.assertIn("审计记录写入失败", response.json()["warning"])
+        self.assertNotIn("shutdown-secret", response.json()["warning"])
+        handler.assert_called_once_with("api shutdown requested")
+
     def test_shutdown_clears_workspace_keys(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = str(Path(temp_dir) / "runtime_state.json")

@@ -18,6 +18,7 @@ import {
   FileText,
   FolderOpen,
   GitBranch,
+  History,
   KeyRound,
   Layers3,
   Image as ImageIcon,
@@ -147,12 +148,14 @@ async function requestSkillApi<T>(
   method: "GET" | "POST" | "DELETE",
   path: string,
   body?: unknown,
+  idempotencyKey?: string,
 ): Promise<T> {
   try {
     const response = await invoke<SkillApiResponse>("skill_api_request", {
       method,
       path,
       body: body === undefined ? null : JSON.stringify(body),
+      idempotencyKey: idempotencyKey || null,
     });
     const payload = response.body ? JSON.parse(response.body) as T & { error?: string } : {} as T & { error?: string };
     if (response.status < 200 || response.status >= 300) {
@@ -235,6 +238,7 @@ interface RuntimeMetrics {
   failed_requests: number;
   chat_requests: number;
   chat_failures: number;
+  chat_abandoned?: number;
   chat_completed?: number;
   chat_under_5s_rate?: number;
   last_chat_first_token_ms?: number;
@@ -245,14 +249,40 @@ interface RuntimeMetrics {
 
 interface DocumentItem {
   name: string;
+  document_id?: string;
   relative_path: string;
   size_bytes: number;
   modified_at: number;
   indexed: boolean;
+  index_status?: "indexed" | "failed" | "processing" | "pending" | "changed";
+  index_present?: boolean;
+  source_changed?: boolean;
+  index_failure?: {
+    error_code?: string;
+    category?: string;
+    phase?: "parse" | "read" | "runtime" | "index" | string;
+    reason?: string;
+  } | null;
+  index_observation?: {
+    elapsed_ms?: number;
+    parse_ms?: number;
+    ingest_ms?: number;
+    graph_ms?: number;
+    chunk_count?: number;
+    modality?: string;
+    pages?: number;
+    ocr_ms?: number;
+    failed_page_count?: number;
+  } | null;
   media_type?: string;
   scope?: "global" | "project" | "ambiguous";
   project_id?: string | null;
   project_ids?: string[];
+}
+
+interface ActiveDocumentRef {
+  name: string;
+  document_id?: string;
 }
 
 interface DocumentLibrary {
@@ -263,10 +293,41 @@ interface DocumentLibrary {
   documents: DocumentItem[];
 }
 
+interface IndexPreviewItem {
+  name: string;
+  relative_path?: string;
+  index_status?: string;
+  index_freshness?: string;
+  index_present?: boolean;
+  source_changed?: boolean;
+}
+
+interface IndexPreview {
+  schema_version: string;
+  read_only: boolean;
+  indexing_status?: string;
+  counts: {
+    added: number;
+    modified: number;
+    deleted: number;
+    unchanged: number;
+    unverified: number;
+    blocked: number;
+  };
+  added: IndexPreviewItem[];
+  modified: IndexPreviewItem[];
+  deleted: IndexPreviewItem[];
+  unchanged: IndexPreviewItem[];
+  unverified: IndexPreviewItem[];
+  blocked: IndexPreviewItem[];
+}
+
 interface PresentationStyleSkill {
   skill_id: string;
   title: string;
   category: string;
+  scope?: "global" | "project";
+  project_id?: string | null;
   source_path?: string;
   presentation_style?: Record<string, string>;
   presentation_style_source?: string;
@@ -290,6 +351,8 @@ interface LearningSkill {
   skill_id: string;
   title: string;
   category: string;
+  scope?: "global" | "project";
+  project_id?: string | null;
   content: string;
   presentation_style?: Record<string, string>;
   presentation_style_source?: string;
@@ -310,6 +373,8 @@ interface SkillInboxItem {
   source: string;
   files: string[];
   target: "conversation" | "presentation";
+  replayed?: boolean;
+  warning?: string;
 }
 
 interface SkillAdapterReview {
@@ -319,6 +384,8 @@ interface SkillAdapterReview {
   compatibility_status?: string;
   adapter?: Record<string, unknown>;
   path?: string;
+  replayed?: boolean;
+  warning?: string;
 }
 
 function uniqueSkillsById<T extends { skill_id: string; title: string; content?: string }>(skills: T[]) {
@@ -332,6 +399,10 @@ function uniqueSkillsById<T extends { skill_id: string; title: string; content?:
     seen.add(contentKey);
     return true;
   });
+}
+
+function isLearningStorageSyncDegraded(payload: { storage_sync?: { status?: string } } | null | undefined) {
+  return payload?.storage_sync?.status === "degraded";
 }
 
 function isPresentationSkill(skill: PresentationStyleSkill) {
@@ -372,6 +443,7 @@ function compactPresentationSkillDescription(skill: PresentationStyleSkill) {
 
 interface DocumentPreview {
   name: string;
+  document_id?: string;
   media_type?: string;
   text: string;
   chunks?: DocumentPreviewChunk[];
@@ -421,6 +493,7 @@ interface RetrievalFeedback {
   feedback_id: string;
   scope: "global" | "project";
   project_id?: string | null;
+  workflow_id?: MultimodalWorkflowId | null;
   corrected_query: string;
   created_at?: number;
   updated_at?: number;
@@ -430,6 +503,7 @@ interface RetrievalTestResult {
   schema_version: string;
   query: string;
   project_id?: string | null;
+  workflow_id?: MultimodalWorkflowId | null;
   top_k: number;
   elapsed_ms: number;
   retrieval_mode?: string | null;
@@ -439,6 +513,12 @@ interface RetrievalTestResult {
   chunks: RetrievalTestChunk[];
   observability?: {
     stage_counts?: Record<string, unknown>;
+    document_scope?: {
+      mode?: string;
+      requested_name_count?: number;
+      requested_id_count?: number;
+      graph_blocked?: boolean;
+    };
     ranking?: Record<string, unknown>;
     section_route?: Array<Record<string, unknown>>;
     project_focus?: Record<string, unknown>;
@@ -446,6 +526,11 @@ interface RetrievalTestResult {
     sufficiency?: Record<string, unknown>;
     timings_ms?: Record<string, unknown>;
   };
+}
+
+interface PresentationSourceRef {
+  name: string;
+  document_id?: string;
 }
 
 type ProjectMode = "research" | "business";
@@ -491,6 +576,7 @@ interface MultimodalWorkflowPlan {
     has_audio: boolean;
     has_image: boolean;
     has_transcript: boolean;
+    has_text_note?: boolean;
     has_selected_text: boolean;
     has_experiment_comparison: boolean;
   };
@@ -631,7 +717,7 @@ interface ProductDiagnostics {
 
 interface GraphRagDiagnostics {
   ready: boolean;
-  status?: "not_built" | "building" | "failed" | "disabled" | "ready" | "locked";
+  status?: "not_built" | "building" | "failed" | "degraded" | "disabled" | "ready" | "locked";
   reason?: string;
   error?: string;
   project_id?: string | null;
@@ -655,6 +741,17 @@ interface GraphRagDiagnostics {
     report_method?: string;
   }>;
   built_at?: number;
+}
+
+interface BackupPreflight {
+  schema_version: string;
+  read_only: boolean;
+  ready: boolean;
+  decision: "allow" | "block";
+  indexing_status?: string;
+  indexer_worker_status?: "active" | "inactive" | "unverified";
+  blockers: Array<{ code: string; message: string }>;
+  task_journal?: { status?: string; active_count?: number };
 }
 
 interface DiagnosticSummary {
@@ -686,11 +783,13 @@ interface ReflectionReview {
   review_id: string;
   status: "pending" | "completed" | "discarded";
   candidates: ReflectionCandidate[];
+  warning?: string;
 }
 
 interface RuntimeMemoryNotice {
   memory_id: string;
   text: string;
+  project_id?: string | null;
 }
 
 interface LearningMemory {
@@ -710,27 +809,92 @@ interface LearningMemory {
   confirmation_status?: "human_reviewed" | "explicit_signal" | "legacy" | string;
   confirmed_at?: number | null;
   last_used_at?: number | null;
+  valid_from?: number | null;
+  invalid_at?: number | null;
+  validity_status?: "active_now" | "scheduled" | "expired" | string;
   record_version?: number;
   created_at?: number;
   updated_at?: number;
 }
 
+interface MemoryHealth {
+  status: "ok" | "degraded" | "error" | string;
+  counts: {
+    active_memories: number;
+    active_memory_chunks: number;
+    active_memory_versions: number;
+    pending_reviews: number;
+    pending_syncs: number;
+    retrying_syncs: number;
+    retry_blocked_syncs: number;
+  };
+  issue_count: number;
+  truncated?: boolean;
+}
+
 interface PresentationTask {
   task_id: string;
+  kind?: "presentation.plan" | "presentation.generate" | string;
+  phase?: "outline_review" | "generation" | string;
+  request_id?: string | null;
+  project_id?: string | null;
+  source_filenames?: string[];
+  source_document_ids?: string[];
+  plan_task_id?: string | null;
+  plan_digest?: string | null;
   status: "pending" | "running" | "interrupted" | "completed" | "failed" | "cancelled";
+  replayed?: boolean;
+  worker_started?: boolean;
   current_step?: string | null;
   error?: string | null;
   recoverable?: boolean;
+  cancellation_pending?: boolean;
+  repetition_guard?: {
+    decision: "allow" | "warn" | string;
+    matches?: Array<{
+      task_id: string;
+      status: string;
+      current_step?: string | null;
+      attempt_count?: number;
+    }>;
+  };
   progress: { completed: number; total: number };
+  steps?: Array<{
+    step_name: string;
+    status: string;
+    attempt_count?: number;
+    error?: string | null;
+    attempt_history?: Array<{
+      attempt: number;
+      status: string;
+      started_at?: number | null;
+      completed_at?: number | null;
+      error?: string | null;
+    }>;
+  }>;
   result?: {
-    output_path: string;
-    slide_count: number;
-    renderer: string;
-    opened_in_wps: boolean;
-    source_count: number;
+    phase?: "outline_review" | string;
+    request_id?: string | null;
+    plan_task_id?: string | null;
+    plan_digest?: string | null;
+    outline?: {
+      title?: string;
+      slides?: Array<{
+        kind?: string;
+        title?: string;
+        subtitle?: string;
+        points?: string[];
+        sources?: string[];
+      }>;
+    };
+    output_path?: string;
+    slide_count?: number;
+    renderer?: string;
+    opened_in_wps?: boolean;
+    source_count?: number;
     source_version_ids?: string[];
     artifact_id?: string | null;
-    outline_source: "local_ollama" | "extractive" | "custom_generator";
+    outline_source?: "local_ollama" | "extractive" | "custom_generator" | string;
     skill_application?: {
       skill_id?: string | null;
       skill_title?: string | null;
@@ -739,13 +903,33 @@ interface PresentationTask {
       style_source?: string | null;
       script_count?: number;
     };
-    evidence_metrics: {
-      evidence_slide_coverage: number;
-      selected_source_coverage: number;
-      evidence_bound_point_count: number;
-    };
-    elapsed_ms: number;
+    evidence_metrics?: PresentationEvidenceMetrics;
+    elapsed_ms?: number;
+    evidence_snapshot_available?: boolean;
   } | null;
+}
+
+interface PresentationEvidenceMetrics {
+  evidence_slide_coverage: number;
+  selected_source_coverage: number;
+  selected_label_coverage?: number;
+  selected_identity_count?: number;
+  cited_identity_count?: number;
+  source_identity_coverage_status?: "exact_object_ids" | "ambiguous_display_labels" | "display_name_only" | string;
+  evidence_bound_point_count: number;
+}
+
+function formatPresentationEvidenceCoverage(metrics: PresentationEvidenceMetrics) {
+  if (metrics.source_identity_coverage_status === "display_name_only") {
+    return `来源标签 ${Math.round((metrics.selected_label_coverage ?? metrics.selected_source_coverage) * 100)}%`;
+  }
+  if (metrics.selected_identity_count != null && metrics.cited_identity_count != null) {
+    const warning = metrics.source_identity_coverage_status === "ambiguous_display_labels"
+      ? "（同名展示标签无法精确归因）"
+      : "";
+    return `来源对象 ${metrics.cited_identity_count}/${metrics.selected_identity_count}${warning}`;
+  }
+  return `来源 ${Math.round(metrics.selected_source_coverage * 100)}%`;
 }
 
 interface MultimodalDecision {
@@ -902,7 +1086,7 @@ interface ReviewDraftState {
 
 interface DraftArtifact {
   artifact_id: string;
-  project_id: string;
+  project_id: string | null;
   artifact_type: "email_draft" | "schedule_draft";
   confirmation_status: "draft" | "confirmed" | "cancelled";
   plan: {
@@ -997,6 +1181,19 @@ const statusLabels: Record<string, string> = {
   skipped: "跳过",
   failed: "失败",
 };
+
+const taskStepStatusLabels: Record<string, string> = {
+  pending: "待执行",
+  running: "执行中",
+  completed: "已完成",
+  failed: "失败",
+  interrupted: "已中断",
+  cancelled: "已取消",
+};
+
+function formatTaskStepStatus(status: string) {
+  return taskStepStatusLabels[status] || status;
+}
 
 const multimodalIntentLabels: Record<string, string> = {
   selection_summary: "选区摘要",
@@ -1168,6 +1365,40 @@ function formatDocumentTime(timestamp?: number) {
   });
 }
 
+function documentIndexStatusLabel(document: DocumentItem) {
+  switch (document.index_status) {
+    case "failed": return "索引失败";
+    case "processing": return "索引中";
+    case "changed": return "原文已变化";
+    case "indexed": return "已索引";
+    default: return document.indexed ? "已索引" : "待索引";
+  }
+}
+
+function documentIndexStatusClass(document: DocumentItem) {
+  switch (document.index_status) {
+    case "failed": return "failed";
+    case "processing": return "processing";
+    case "changed": return "changed";
+    case "indexed": return "indexed";
+    default: return document.indexed ? "indexed" : "pending";
+  }
+}
+
+function documentIndexDiagnostic(document: DocumentItem) {
+  if (document.index_status === "failed") {
+    const phase = document.index_failure?.phase;
+    const phaseLabel = phase === "parse" ? "解析" : phase === "read" ? "读取" : phase === "runtime" ? "运行" : "入库";
+    return `${phaseLabel}：${document.index_failure?.reason || "索引失败"}`;
+  }
+  if (document.index_status === "processing") return "正在处理当前文档…";
+  if (document.index_status === "changed") return "原文件内容已变化，请重新启动索引";
+  if (document.index_status === "pending") return "等待手动启动索引";
+  const observation = document.index_observation;
+  if (observation?.chunk_count !== undefined) return `已生成 ${observation.chunk_count} 个父切片`;
+  return "";
+}
+
 function formatScheduleStartTime(value?: string) {
   if (!value) return "未设置";
   const date = new Date(value);
@@ -1180,6 +1411,13 @@ function formatScheduleStartTime(value?: string) {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+function formatScheduleCreatedAt(value?: string) {
+  if (!value) return "创建时间未知";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "创建时间无效";
+  return `创建于 ${date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })}`;
 }
 
 function scheduleInputValue(value?: string) {
@@ -1230,7 +1468,11 @@ export default function App() {
   const [runtimeMetrics, setRuntimeMetrics] = useState<RuntimeMetrics | null>(null);
   const [productDiagnostics, setProductDiagnostics] = useState<ProductDiagnostics | null>(null);
   const [graphRagDiagnostics, setGraphRagDiagnostics] = useState<GraphRagDiagnostics | null>(null);
+  const [backupPreflight, setBackupPreflight] = useState<BackupPreflight | null>(null);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentLibrary | null>(null);
+  const [indexPreview, setIndexPreview] = useState<IndexPreview | null>(null);
+  const [indexPreviewBusy, setIndexPreviewBusy] = useState(false);
+  const [indexPreviewMessage, setIndexPreviewMessage] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectListUnavailable, setProjectListUnavailable] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -1248,7 +1490,8 @@ export default function App() {
   const [projectDeleteBusy, setProjectDeleteBusy] = useState(false);
   const [projectMessage, setProjectMessage] = useState("");
   const [projectOverview, setProjectOverview] = useState<ProjectOverview | null>(null);
-  const [, setExperimentRuns] = useState<ExperimentRun[]>([]);
+  const [experimentRuns, setExperimentRuns] = useState<ExperimentRun[]>([]);
+  const [experimentRunsRefresh, setExperimentRunsRefresh] = useState(0);
   const [baselineExperimentRunId, setBaselineExperimentRunId] = useState("");
   const [currentExperimentRunId, setCurrentExperimentRunId] = useState("");
   const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
@@ -1258,7 +1501,7 @@ export default function App() {
   const [acknowledgeNoRecovery, setAcknowledgeNoRecovery] = useState(false);
   const [securityMessage, setSecurityMessage] = useState("");
   const [securityBusy, setSecurityBusy] = useState(false);
-  const [activeDocumentNames, setActiveDocumentNames] = useState<string[]>([]);
+  const [activeDocumentRefs, setActiveDocumentRefs] = useState<ActiveDocumentRef[]>([]);
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(null);
   const [documentPreviewMode, setDocumentPreviewMode] = useState<"text" | "chunks">("text");
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
@@ -1273,6 +1516,7 @@ export default function App() {
   const [documentDeleteAuthorization, setDocumentDeleteAuthorization] = useState<string | null>(null);
   const [documentDeletePassphrase, setDocumentDeletePassphrase] = useState("");
   const [documentDeleteTarget, setDocumentDeleteTarget] = useState<DocumentItem | null>(null);
+  const [documentDeleteIdempotencyKey, setDocumentDeleteIdempotencyKey] = useState<string | null>(null);
   const [documentDeleteBusy, setDocumentDeleteBusy] = useState(false);
   const [documentDeleteMessage, setDocumentDeleteMessage] = useState("");
   const [apiToken, setApiToken] = useState<string | null>(null);
@@ -1293,6 +1537,7 @@ export default function App() {
   const [cloudModelBusy, setCloudModelBusy] = useState(false);
   const [cloudModelMessage, setCloudModelMessage] = useState("");
   const [indexStartStatus, setIndexStartStatus] = useState<"idle" | "starting" | "error">("idle");
+  const [indexStartMessage, setIndexStartMessage] = useState("");
   const [documentImportStatus, setDocumentImportStatus] = useState<"idle" | "selecting" | "importing" | "error">("idle");
   const [documentImportMessage, setDocumentImportMessage] = useState("");
   const [documentImportScope, setDocumentImportScope] = useState<"global" | "project">("global");
@@ -1313,17 +1558,19 @@ export default function App() {
   const [runtimeMemoryNotice, setRuntimeMemoryNotice] = useState<RuntimeMemoryNotice | null>(null);
   const [memoryManagerOpen, setMemoryManagerOpen] = useState(false);
   const [learningMemories, setLearningMemories] = useState<LearningMemory[]>([]);
+  const [memoryHealth, setMemoryHealth] = useState<MemoryHealth | null>(null);
   const [memoryEdits, setMemoryEdits] = useState<Record<string, { title: string; content: string }>>({});
   const [memoryManagerBusy, setMemoryManagerBusy] = useState(false);
   const [memoryManagerMessage, setMemoryManagerMessage] = useState("");
   const [presentationOpen, setPresentationOpen] = useState(false);
-  const [presentationSources, setPresentationSources] = useState<Set<string>>(new Set());
+  const [presentationSources, setPresentationSources] = useState<PresentationSourceRef[]>([]);
   const [presentationTitle, setPresentationTitle] = useState("");
   const [presentationAudience, setPresentationAudience] = useState<"research" | "technical" | "government">("research");
   const [presentationMaxSlides, setPresentationMaxSlides] = useState(10);
   const [presentationOpenInWps, setPresentationOpenInWps] = useState(true);
   const [presentationStyleSkills, setPresentationStyleSkills] = useState<PresentationStyleSkill[]>([]);
   const [presentationStyleSkillId, setPresentationStyleSkillId] = useState("");
+  const [presentationRequestId, setPresentationRequestId] = useState("");
   const [presentationTask, setPresentationTask] = useState<PresentationTask | null>(null);
   const [presentationMessage, setPresentationMessage] = useState("");
   const [skillOpen, setSkillOpen] = useState(false);
@@ -1347,6 +1594,11 @@ export default function App() {
   const [projectScheduleArtifacts, setProjectScheduleArtifacts] = useState<ProjectArtifactSummary[]>([]);
   const [scheduleRailExpanded, setScheduleRailExpanded] = useState(false);
   const [selectedScheduleArtifactId, setSelectedScheduleArtifactId] = useState<string | null>(null);
+  const [scheduleHistoryOpen, setScheduleHistoryOpen] = useState(false);
+  const [scheduleHistoryBusy, setScheduleHistoryBusy] = useState(false);
+  const [scheduleHistoryMessage, setScheduleHistoryMessage] = useState("");
+  const [scheduleHistory, setScheduleHistory] = useState<ProjectArtifactSummary[]>([]);
+  const [selectedScheduleHistoryArtifactId, setSelectedScheduleHistoryArtifactId] = useState<string | null>(null);
   const [scheduleReminderArtifactId, setScheduleReminderArtifactId] = useState<string | null>(null);
   const [scheduleReminderOpen, setScheduleReminderOpen] = useState(false);
   const [scheduleReminderPhase, setScheduleReminderPhase] = useState<"upcoming" | "started" | null>(null);
@@ -1406,8 +1658,18 @@ export default function App() {
   const [sessionCreateName, setSessionCreateName] = useState("");
   const [sessionCreateWorkflowId, setSessionCreateWorkflowId] = useState<MultimodalWorkflowId | "">("");
   const mediaInputRef = useRef<HTMLInputElement>(null);
+  const indexRequestIdempotencyKeyRef = useRef("");
+  const indexRequestRunIdRef = useRef("");
+  const projectCreateFingerprintRef = useRef("");
+  const projectCreateIdempotencyKeyRef = useRef("");
   const scheduleDraftFingerprintRef = useRef("");
   const scheduleDraftIdempotencyKeyRef = useRef("");
+  const emailDraftFingerprintRef = useRef("");
+  const emailDraftIdempotencyKeyRef = useRef("");
+  const reflectionDraftFingerprintRef = useRef("");
+  const reflectionDraftIdempotencyKeyRef = useRef("");
+  const emailDeliveryArtifactRef = useRef("");
+  const emailDeliveryIdempotencyKeyRef = useRef("");
   const audioRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -1421,6 +1683,7 @@ export default function App() {
   const scheduleStartedEligibleRef = useRef<Set<string>>(new Set());
   const scheduleStartedNotifiedRef = useRef<Set<string>>(new Set());
   const scheduleReminderKeyRef = useRef("");
+  const skillDeleteIdempotencyKeyRef = useRef<Record<string, string>>({});
   const scheduleReminderAudioContextRef = useRef<AudioContext | null>(null);
   const imageSelectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const askTextAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -1428,6 +1691,8 @@ export default function App() {
   const targetGrounding = Boolean(uiAutomationSnapshot?.element && !mediaFiles.image);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionLoadRequestRef = useRef(0);
+  const sessionCreateFingerprintRef = useRef("");
+  const sessionCreateIdRef = useRef("");
   const workbenchRef = useRef<HTMLElement | null>(null);
   const visualWarmupFileRef = useRef<File | null>(null);
   const perceptionWarmupPromiseRef = useRef<Promise<MultimodalPerceptionWarmupResult | null> | null>(null);
@@ -1444,6 +1709,29 @@ export default function App() {
   const invalidateMediaPerception = () => {
     setMultimodalRuntime(null);
     setMultimodalCapturedAtMs(null);
+  };
+
+  const resetSessionScopedContext = () => {
+    // 会话是研究任务与证据范围的边界；切换会话不能把上一会话的
+    // 文档、实验运行、屏幕目标或媒体继续附加到下一条请求。
+    setInput("");
+    setActiveDocumentRefs([]);
+    setMediaFiles({ audio: null, image: null });
+    setUiAutomationSnapshot(null);
+    setSelectedImageRegion(null);
+    setImageSelectionDraft(null);
+    setMediaPreviewOpen(true);
+    setMediaMessage("");
+    setMultimodalDecision(null);
+    setSpeechConfirmationPending(false);
+    invalidateMediaPerception();
+    setArtifactTab("evidence");
+    setCollapsedNodeIds(new Set());
+    setWorkflowPlan(null);
+    setWorkflowMessage("");
+    setBaselineExperimentRunId("");
+    setCurrentExperimentRunId("");
+    setScheduleExportPath("");
   };
 
   const requestPerceptionWarmup = (): Promise<MultimodalPerceptionWarmupResult | null> => {
@@ -1514,10 +1802,26 @@ export default function App() {
 
   const documents = documentLibrary?.documents ?? [];
   const indexedDocuments = useMemo(() => documents.filter((document) => document.indexed), [documents]);
-  const activeDocumentName = activeDocumentNames[0] || null;
+  const activeDocumentNames = useMemo(
+    () => activeDocumentRefs.map((document) => document.name),
+    [activeDocumentRefs],
+  );
+  const activeDocumentIds = useMemo(
+    () => activeDocumentRefs.map((document) => document.document_id).filter((documentId): documentId is string => Boolean(documentId)),
+    [activeDocumentRefs],
+  );
+  const activeDocumentName = activeDocumentRefs[0]?.name || null;
   const locked = runtimeStatus?.locked ?? true;
   const indexingStatus = runtimeStatus?.indexing?.status || "idle";
   const indexBusy = ["queued", "scanning", "indexing"].includes(indexingStatus);
+  useEffect(() => {
+    const indexing = runtimeStatus?.indexing;
+    if (!indexing || !indexRequestRunIdRef.current || indexing.run_id !== indexRequestRunIdRef.current) return;
+    if (["completed", "failed", "blocked", "idle"].includes(indexing.status)) {
+      indexRequestIdempotencyKeyRef.current = "";
+      indexRequestRunIdRef.current = "";
+    }
+  }, [runtimeStatus]);
   const leftCollapsed = workbenchLayout.leftCollapsed;
   const artifactWeight = workbenchLayout.artifactWeight;
   const openArtifactStudio = (tab: typeof artifactTab) => {
@@ -1545,6 +1849,10 @@ export default function App() {
     if (!visibleScheduleArtifacts.length) return null;
     return visibleScheduleArtifacts.find((artifact) => artifact.artifact_id === selectedScheduleArtifactId) || visibleScheduleArtifacts[0];
   }, [selectedScheduleArtifactId, visibleScheduleArtifacts]);
+  const selectedScheduleHistoryArtifact = useMemo(() => {
+    if (!scheduleHistory.length) return null;
+    return scheduleHistory.find((artifact) => artifact.artifact_id === selectedScheduleHistoryArtifactId) || scheduleHistory[0];
+  }, [scheduleHistory, selectedScheduleHistoryArtifactId]);
   const scheduleReminderArtifact = useMemo(
     () => projectScheduleArtifacts.find((artifact) => artifact.artifact_id === scheduleReminderArtifactId && artifact.confirmation_status !== "cancelled") || null,
     [projectScheduleArtifacts, scheduleReminderArtifactId],
@@ -1950,6 +2258,33 @@ export default function App() {
 
   useEffect(() => {
     if (!runtimeConfigLoaded || locked) {
+      setBackupPreflight(null);
+      return;
+    }
+    let isMounted = true;
+    const refreshBackupPreflight = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/diagnostics/backup`, {
+          headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined,
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("backup preflight unavailable");
+        const data = await response.json() as BackupPreflight;
+        if (isMounted) setBackupPreflight(data);
+      } catch {
+        if (isMounted) setBackupPreflight(null);
+      }
+    };
+    void refreshBackupPreflight();
+    const timer = window.setInterval(() => void refreshBackupPreflight(), 3000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(timer);
+    };
+  }, [apiBaseUrl, apiToken, locked, runtimeConfigLoaded]);
+
+  useEffect(() => {
+    if (!runtimeConfigLoaded || locked) {
       setWorkflowSpecs([]);
       setWorkflowPlan(null);
       return;
@@ -2019,28 +2354,19 @@ export default function App() {
         if (active) setExperimentRuns([]);
       });
     return () => { active = false; };
-  }, [activeProjectId, apiBaseUrl, apiToken, locked, runtimeConfigLoaded]);
+  }, [activeProjectId, apiBaseUrl, apiToken, locked, runtimeConfigLoaded, experimentRunsRefresh]);
 
   useEffect(() => {
     // 项目是会话与文档上下文的边界，不能残留上一项目的选择或回答导图。
     sessionLoadRequestRef.current += 1;
-    setActiveDocumentNames([]);
-    setMediaFiles({ audio: null, image: null });
-    setUiAutomationSnapshot(null);
-    setSelectedImageRegion(null);
-    setImageSelectionDraft(null);
-    setMediaPreviewOpen(true);
-    invalidateMediaPerception();
-    setArtifactTab("evidence");
-    setCollapsedNodeIds(new Set());
+    resetSessionScopedContext();
+    setPresentationSources([]);
+    setPresentationTask(null);
+    setPresentationRequestId("");
+    setPresentationMessage("");
     setShowAllProjectSessions(false);
     setSelectedWorkflowId("");
     setSessionCreateWorkflowId("");
-    setWorkflowPlan(null);
-    setWorkflowMessage("");
-    setBaselineExperimentRunId("");
-    setCurrentExperimentRunId("");
-    setScheduleExportPath("");
   }, [activeProjectId]);
 
   useEffect(() => {
@@ -2048,7 +2374,7 @@ export default function App() {
     // 文件或本轮媒体变化后，旧计划不能继续冒充当前输入状态。
     setWorkflowPlan(null);
     setWorkflowMessage("");
-  }, [activeDocumentNames.join("\u001f"), baselineExperimentRunId, currentExperimentRunId, mediaFiles.audio, mediaFiles.image, selectedWorkflowId]);
+  }, [activeDocumentRefs, baselineExperimentRunId, currentExperimentRunId, mediaFiles.audio, mediaFiles.image, selectedWorkflowId]);
 
   useEffect(() => {
     if (!activeProjectId) setDocumentImportScope("global");
@@ -2068,6 +2394,7 @@ export default function App() {
     let active = true;
     const requestId = ++sessionLoadRequestRef.current;
     setSessionLoading(true);
+    resetSessionScopedContext();
     setMessages([]);
     setActiveSessionId(null);
     setSessionCreateOpen(false);
@@ -2075,7 +2402,7 @@ export default function App() {
     setSessionMessage("");
     const headers = { "X-SoulDrive-Token": apiToken };
     const loadHistory = async (session: ProjectSession) => {
-      const response = await fetch(`${apiBaseUrl}/sessions/${encodeURIComponent(session.session_id)}/history?limit=32`, { headers });
+      const response = await fetch(`${apiBaseUrl}/sessions/${encodeURIComponent(session.session_id)}/history?limit=32&project_id=${encodeURIComponent(activeProjectId)}`, { headers });
       if (!response.ok) throw new Error("session history unavailable");
       const payload = await response.json() as { history?: Array<{ role?: string; content?: string; timestamp_ms?: number; created_at?: number }> };
       if (!active || requestId !== sessionLoadRequestRef.current) return;
@@ -2123,6 +2450,10 @@ export default function App() {
   useEffect(() => {
     if (!runtimeConfigLoaded || !apiToken) {
       setProjectScheduleArtifacts([]);
+      setScheduleHistory([]);
+      setScheduleHistoryOpen(false);
+      setSelectedScheduleHistoryArtifactId(null);
+      setScheduleHistoryMessage("");
       setScheduleReminderArtifactId(null);
       setScheduleReminderMessage("");
       setScheduleReminderOpen(false);
@@ -2294,11 +2625,14 @@ export default function App() {
   useEffect(() => {
     const taskId = presentationTask?.task_id;
     if (!taskId) return;
+    const projectQuery = presentationTask?.project_id
+      ? `?project_id=${encodeURIComponent(presentationTask.project_id)}`
+      : "";
     let active = true;
     let timer: number | undefined;
     const pollTask = async () => {
       try {
-        const response = await fetch(`${apiBaseUrl}/presentations/tasks/${taskId}`, {
+        const response = await fetch(`${apiBaseUrl}/presentations/tasks/${taskId}${projectQuery}`, {
           cache: "no-store",
           headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined,
         });
@@ -2306,7 +2640,9 @@ export default function App() {
         const task = await response.json() as PresentationTask;
         if (!active) return;
         setPresentationTask(task);
-        if (task.status === "completed") {
+        if (task.status === "completed" && task.kind === "presentation.plan") {
+          setPresentationMessage("实际大纲已生成，请逐页查看并确认后再生成 PPT");
+        } else if (task.status === "completed") {
           const application = task.result?.skill_application;
           const skillLabel = application?.skill_title ? ` · 已调用 ${application.skill_title}` : "";
           const styleLabel = application?.style_applied ? "（版式已应用）" : "";
@@ -2314,6 +2650,9 @@ export default function App() {
         }
         if (task.status === "failed" || task.status === "interrupted") {
           setPresentationMessage(task.error || "生成中断，可从检查点继续");
+        }
+        if (task.status === "cancelled") {
+          setPresentationMessage("任务已停止；如需重新开始，请生成新的大纲请求");
         }
         if (!["pending", "running"].includes(task.status)) {
           if (timer !== undefined) window.clearInterval(timer);
@@ -2328,12 +2667,13 @@ export default function App() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [apiBaseUrl, apiToken, presentationTask?.task_id]);
+  }, [apiBaseUrl, apiToken, presentationTask?.project_id, presentationTask?.task_id]);
 
   useEffect(() => {
     if (!presentationOpen) return;
     let active = true;
-    void fetch(`${apiBaseUrl}/learning/skills`, { headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined })
+    const projectQuery = activeProjectId ? `?project_id=${encodeURIComponent(activeProjectId)}` : "";
+    void fetch(`${apiBaseUrl}/learning/skills${projectQuery}`, { headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined })
       .then(async (response) => response.ok ? response.json() : { skills: [] })
       .then((payload: { skills?: PresentationStyleSkill[] }) => {
         if (!active) return;
@@ -2346,12 +2686,13 @@ export default function App() {
       })
       .catch(() => { if (active) setPresentationStyleSkills([]); });
     return () => { active = false; };
-  }, [apiBaseUrl, apiToken, presentationOpen]);
+  }, [activeProjectId, apiBaseUrl, apiToken, presentationOpen]);
 
   useEffect(() => {
     if (!runtimeConfigLoaded) return;
     let active = true;
-    void requestSkillApi<{ skills?: LearningSkill[]; path?: string }>("GET", "/learning/skills")
+    const projectQuery = activeProjectId ? `?project_id=${encodeURIComponent(activeProjectId)}` : "";
+    void requestSkillApi<{ skills?: LearningSkill[]; path?: string }>("GET", `/learning/skills${projectQuery}`)
       .then((payload) => {
         if (!active) return;
         const skills = payload.skills || [];
@@ -2362,11 +2703,11 @@ export default function App() {
       })
       .catch((error) => { if (active) setSkillMessage(error instanceof Error ? error.message : "暂时无法读取本地 Skill"); });
     if (!skillOpen) return () => { active = false; };
-    void requestSkillApi<{ skills?: SkillInboxItem[] }>("GET", "/learning/skills/inbox")
+    void requestSkillApi<{ skills?: SkillInboxItem[] }>("GET", `/learning/skills/inbox${projectQuery}`)
       .then((payload) => { if (active) setSkillInbox(payload.skills || []); })
       .catch((error) => { if (active) setSkillMessage(error instanceof Error ? error.message : "暂时无法读取待审核 Skill"); });
     return () => { active = false; };
-  }, [apiBaseUrl, apiToken, runtimeConfigLoaded, skillOpen]);
+  }, [activeProjectId, apiBaseUrl, apiToken, runtimeConfigLoaded, skillOpen]);
 
   useEffect(() => {
     if (!skillMessage || skillBusy) return;
@@ -2468,6 +2809,27 @@ export default function App() {
 
   const authHeaders = (): Record<string, string> => (apiToken ? { "X-SoulDrive-Token": apiToken } : {});
 
+  const openScheduleHistory = async () => {
+    if (locked || scheduleHistoryBusy) return;
+    setScheduleHistoryOpen(true);
+    setScheduleHistoryBusy(true);
+    setScheduleHistoryMessage("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/schedules/history?days=7&limit=100`, { headers: authHeaders() });
+      const payload = await response.json() as { artifacts?: ProjectArtifactSummary[]; error?: string; detail?: string };
+      if (!response.ok) throw new Error(payload.error || payload.detail || "近 7 天日程历史加载失败");
+      const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+      setScheduleHistory(artifacts);
+      setSelectedScheduleHistoryArtifactId((current) => current && artifacts.some((item) => item.artifact_id === current) ? current : artifacts[0]?.artifact_id || null);
+    } catch (error) {
+      setScheduleHistory([]);
+      setSelectedScheduleHistoryArtifactId(null);
+      setScheduleHistoryMessage(error instanceof Error ? error.message : "近 7 天日程历史加载失败");
+    } finally {
+      setScheduleHistoryBusy(false);
+    }
+  };
+
   const fetchCloudModels = async () => {
     if (locked || cloudModelBusy) return;
     if (!cloudModelBaseUrl.trim()) {
@@ -2547,6 +2909,7 @@ export default function App() {
   const requestWorkflowPlan = async (
     workflowId: MultimodalWorkflowId,
     speechText = "",
+    textNote = "",
   ): Promise<MultimodalWorkflowPlan | null> => {
     setWorkflowBusy(true);
     setWorkflowMessage("");
@@ -2558,11 +2921,13 @@ export default function App() {
           workflow_id: workflowId,
           project_id: activeProjectId,
           document_names: activeDocumentNames,
+          document_ids: activeDocumentIds,
           has_audio: Boolean(mediaFiles.audio),
           has_image: Boolean(mediaFiles.image),
-          // 只有本轮录音/浏览器语音预览才可作为转写输入；普通提问不能
-          // 冒充会议原始记录，否则会让会议工作流绕过输入确认。
+          // 媒体预检把录音/浏览器语音预览记为转写；会议会话中的直接记录
+          // 另用 text_note 传递，永远不会被伪装成语音识别结果。
           speech_text: (mediaFiles.audio || speechDraftRef.current.trim()) ? speechText.slice(0, 6000) : "",
+          text_note: workflowId === "meeting_actions" && !mediaFiles.audio ? textNote.slice(0, 6000) : "",
           selected_text: uiAutomationSnapshot?.element?.selected_text?.slice(0, 4000) || "",
           ...(workflowId === "experiment_compare" ? {
             baseline_run_id: baselineExperimentRunId || undefined,
@@ -2586,7 +2951,11 @@ export default function App() {
 
   const ensureWorkflowReady = async (speechText = "") => {
     if (!selectedWorkflowId) return true;
-    const plan = await requestWorkflowPlan(selectedWorkflowId, speechText);
+    const plan = await requestWorkflowPlan(
+      selectedWorkflowId,
+      speechText,
+      selectedWorkflowId === "meeting_actions" && !mediaFiles.audio ? speechText : "",
+    );
     if (!plan?.ready) {
       setWorkflowMessage(plan?.next_action || "业务任务输入尚未就绪，本次未发送");
       return false;
@@ -2594,19 +2963,44 @@ export default function App() {
     return true;
   };
 
-  const toggleDocumentContext = (name: string) => {
-    setActiveDocumentNames((current) =>
-      current.includes(name) ? current.filter((item) => item !== name) : [...current, name].slice(0, 12),
-    );
+  const isActiveDocument = (document: Pick<DocumentItem, "name" | "document_id"> | Pick<DocumentPreview, "name" | "document_id">) => (
+    activeDocumentRefs.some((selected) => document.document_id
+      ? selected.document_id === document.document_id
+      : !selected.document_id && selected.name === document.name)
+  );
+
+  const toggleDocumentContext = (document: Pick<DocumentItem, "name" | "document_id"> | Pick<DocumentPreview, "name" | "document_id">) => {
+    const next = {
+      name: document.name,
+      ...(document.document_id ? { document_id: document.document_id } : {}),
+    };
+    setActiveDocumentRefs((current) => {
+      const selected = current.some((item) => document.document_id
+        ? item.document_id === document.document_id
+        : !item.document_id && item.name === document.name);
+      return selected
+        ? current.filter((item) => document.document_id
+          ? item.document_id !== document.document_id
+          : item.document_id || item.name !== document.name)
+        : [...current, next].slice(0, 12);
+    });
   };
 
   const openDocumentViewer = async (document: DocumentItem) => {
     closeDocumentLibrary();
     setDocumentViewerOpen(true);
     setDocumentPreviewMode("text");
-    setDocumentPreview({ name: document.name, media_type: document.media_type, text: "正在加载文档预览…" });
+    setDocumentPreview({
+      name: document.name,
+      document_id: document.document_id,
+      media_type: document.media_type,
+      text: "正在加载文档预览…",
+    });
     try {
-      const response = await fetch(`${apiBaseUrl}/documents/preview?name=${encodeURIComponent(document.name)}`, {
+      const previewQuery = new URLSearchParams({ name: document.name });
+      if (document.document_id) previewQuery.set("document_id", document.document_id);
+      if (activeProjectId) previewQuery.set("project_id", activeProjectId);
+      const response = await fetch(`${apiBaseUrl}/documents/preview?${previewQuery.toString()}`, {
         headers: authHeaders(),
       });
       const result = await response.json() as DocumentPreview & { error?: string };
@@ -2615,6 +3009,7 @@ export default function App() {
     } catch (error) {
       setDocumentPreview({
         name: document.name,
+        document_id: document.document_id,
         media_type: document.media_type,
         text: error instanceof Error ? error.message : "文档预览加载失败",
       });
@@ -2624,6 +3019,8 @@ export default function App() {
   const openDocumentLibrary = () => {
     setDocumentLibraryOpen(true);
     setDocumentViewerOpen(false);
+    setIndexPreview(null);
+    setIndexPreviewMessage("");
   };
 
   const closeDocumentLibrary = () => {
@@ -2638,8 +3035,34 @@ export default function App() {
     setDocumentDeleteAuthorization(null);
     setDocumentDeletePassphrase("");
     setDocumentDeleteTarget(null);
+    setDocumentDeleteIdempotencyKey(null);
     setDocumentDeleteMessage("");
     setDocumentScopeMessage("");
+    setIndexPreview(null);
+    setIndexPreviewMessage("");
+  };
+
+  const openDocumentDeleteConfirmation = (document: DocumentItem) => {
+    setDocumentDeleteTarget(document);
+    setDocumentDeleteIdempotencyKey(`document-delete-${crypto.randomUUID()}`);
+    setDocumentDeleteMessage("");
+  };
+
+  const previewIndexChanges = async () => {
+    if (locked || indexPreviewBusy) return;
+    setIndexPreviewBusy(true);
+    setIndexPreviewMessage("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/index/preview`, { headers: authHeaders() });
+      const payload = await response.json() as IndexPreview & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "索引变更预览失败");
+      setIndexPreview(payload);
+    } catch (error) {
+      setIndexPreview(null);
+      setIndexPreviewMessage(error instanceof Error ? error.message : "索引变更预览失败");
+    } finally {
+      setIndexPreviewBusy(false);
+    }
   };
 
   const openRetrievalTest = (initialQuery = "") => {
@@ -2669,7 +3092,12 @@ export default function App() {
       const response = await fetch(`${apiBaseUrl}/diagnostics/retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ query, top_k: 6, project_id: activeProjectId }),
+        body: JSON.stringify({
+          query,
+          top_k: 6,
+          project_id: activeProjectId,
+          workflow_id: selectedWorkflowId || undefined,
+        }),
       });
       const payload = await response.json() as RetrievalTestResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "检索测试失败");
@@ -2701,6 +3129,7 @@ export default function App() {
           corrected_query: corrected,
           scope,
           project_id: activeProjectId,
+          workflow_id: retrievalTestResult?.workflow_id || selectedWorkflowId || undefined,
         }),
       });
       const payload = await response.json() as { feedback?: RetrievalFeedback; error?: string };
@@ -2711,7 +3140,10 @@ export default function App() {
         const nextFeedback = oldFeedback.filter((item) => item.feedback_id !== payload.feedback?.feedback_id);
         return { ...current, feedback: [payload.feedback!, ...nextFeedback] };
       });
-      setRetrievalTestMessage(scope === "global" ? "已记住为所有项目的检索提示。" : "已记住为当前项目的检索提示。");
+      const workflowScoped = Boolean(retrievalTestResult?.workflow_id || selectedWorkflowId);
+      setRetrievalTestMessage(workflowScoped
+        ? (scope === "global" ? "已记住为所有项目的当前窗口检索提示。" : "已记住为当前项目的当前窗口检索提示。")
+        : (scope === "global" ? "已记住为所有项目的检索提示。" : "已记住为当前项目的检索提示。"));
     } catch (error) {
       setRetrievalTestMessage(error instanceof Error ? error.message : "保存检索提示失败");
     } finally {
@@ -2719,13 +3151,16 @@ export default function App() {
     }
   };
 
-  const revokeRetrievalFeedback = async (feedbackId: string) => {
-    if (!feedbackId || retrievalFeedbackBusy || locked) return;
+  const revokeRetrievalFeedback = async (feedback: RetrievalFeedback) => {
+    if (!feedback.feedback_id || retrievalFeedbackBusy || locked) return;
     if (!window.confirm("撤销这条检索提示？撤销后它不会再参与后续问答。")) return;
     setRetrievalFeedbackBusy(true);
     setRetrievalTestMessage("");
     try {
-      const response = await fetch(`${apiBaseUrl}/diagnostics/retrieval/feedback/${encodeURIComponent(feedbackId)}?confirm=true`, {
+      const projectQuery = feedback.project_id
+        ? `&project_id=${encodeURIComponent(feedback.project_id)}`
+        : "";
+      const response = await fetch(`${apiBaseUrl}/diagnostics/retrieval/feedback/${encodeURIComponent(feedback.feedback_id)}?confirm=true${projectQuery}`, {
         method: "DELETE",
         headers: { ...authHeaders() },
       });
@@ -2733,7 +3168,7 @@ export default function App() {
       if (!response.ok) throw new Error(payload.error || "撤销检索提示失败");
       setRetrievalTestResult((current) => current ? {
         ...current,
-        feedback: (current.feedback || []).filter((item) => item.feedback_id !== feedbackId),
+        feedback: (current.feedback || []).filter((item) => item.feedback_id !== feedback.feedback_id),
       } : current);
       setRetrievalTestMessage("检索提示已撤销。");
     } catch (error) {
@@ -2778,14 +3213,25 @@ export default function App() {
     try {
       const response = await fetch(`${apiBaseUrl}/documents/delete`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: documentDeleteTarget.name, authorization: documentDeleteAuthorization }),
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+          ...(documentDeleteIdempotencyKey ? { "Idempotency-Key": documentDeleteIdempotencyKey } : {}),
+        },
+        body: JSON.stringify({
+          name: documentDeleteTarget.name,
+          document_id: documentDeleteTarget.document_id,
+          authorization: documentDeleteAuthorization,
+        }),
       });
-      const payload = await response.json() as { error?: string };
+      const payload = await response.json() as { error?: string; warning?: string; replayed?: boolean };
       if (!response.ok) throw new Error(payload.error || "删除失败");
-      setActiveDocumentNames((current) => current.filter((name) => name !== documentDeleteTarget.name));
+      setActiveDocumentRefs((current) => current.filter((selected) => documentDeleteTarget.document_id
+        ? selected.document_id !== documentDeleteTarget.document_id
+        : selected.document_id || selected.name !== documentDeleteTarget.name));
       setDocumentDeleteTarget(null);
-      setDocumentDeleteMessage("文档及其本地索引已删除。本次文档库会话无需重复校验密码。");
+      setDocumentDeleteIdempotencyKey(null);
+      setDocumentDeleteMessage(`文档及其本地索引已删除${payload.replayed ? "（已回放之前的删除结果）" : ""}。本次文档库会话无需重复校验密码。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
       const listResponse = await fetch(`${apiBaseUrl}/documents/list`, { headers: authHeaders() });
       if (listResponse.ok) setDocumentLibrary(await listResponse.json());
     } catch (error) {
@@ -3359,14 +3805,34 @@ export default function App() {
       message: "正在生成候选记忆...",
     }));
 
+    const draftFingerprint = JSON.stringify({
+      trigger,
+      project_id: activeProjectId || null,
+      workflow_id: selectedWorkflowId || null,
+      messages,
+    });
+    if (reflectionDraftFingerprintRef.current !== draftFingerprint) {
+      reflectionDraftFingerprintRef.current = draftFingerprint;
+      reflectionDraftIdempotencyKeyRef.current = `reflection_${crypto.randomUUID()}`;
+    }
+    const idempotencyKey = reflectionDraftIdempotencyKeyRef.current;
+
     try {
       const response = await fetch(`${apiBaseUrl}/reflection/draft`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
           ...authHeaders(),
         },
-        body: JSON.stringify({ trigger, messages }),
+        body: JSON.stringify({
+          trigger,
+          messages,
+          project_id: activeProjectId || null,
+          session_id: activeSessionId || null,
+          workflow_id: selectedWorkflowId || null,
+          request_id: idempotencyKey,
+        }),
       });
       if (!response.ok) throw new Error("reflection draft failed");
 
@@ -3386,8 +3852,12 @@ export default function App() {
         selectedIds,
         edits,
         mode: review.candidates.length ? "reviewing" : "done",
-        message: review.candidates.length ? "" : "本轮没有可沉淀内容。",
+        message: review.warning
+          ? `候选记忆已生成，但${review.warning}`
+          : (review.candidates.length ? "" : "本轮没有可沉淀内容。"),
       });
+      reflectionDraftFingerprintRef.current = "";
+      reflectionDraftIdempotencyKeyRef.current = "";
       return review;
     } catch {
       setReviewState((previous) => ({
@@ -3438,11 +3908,14 @@ export default function App() {
         },
         body: JSON.stringify({ decisions, project_id: activeProjectId }),
       });
-      if (!response.ok) throw new Error("reflection decide failed");
+      const payload = await response.json() as { storage_sync?: { status?: string }; error?: string; warning?: string };
+      if (!response.ok) throw new Error(payload.error || "reflection decide failed");
       setReviewState((previous) => ({
         ...previous,
         mode: "done",
-        message: "记忆已完成。",
+        message: isLearningStorageSyncDegraded(payload)
+          ? `记忆已保存，但归档/检索同步待恢复；后续打开记忆管理器或提问时会自动重试。${payload.warning ? ` 注意：${payload.warning}` : ""}`
+          : `记忆已完成。${payload.warning ? ` 注意：${payload.warning}` : ""}`,
       }));
     } catch {
       setReviewState((previous) => ({
@@ -3453,20 +3926,26 @@ export default function App() {
     }
   };
 
-  const saveRuntimeMemory = async (message: string, sessionId: string | null, projectId: string | null) => {
+  const saveRuntimeMemory = async (
+    message: string,
+    sessionId: string | null,
+    projectId: string | null,
+    requestId: string | null,
+  ) => {
     if (!sessionId || !projectId) return;
     try {
       const response = await fetch(`${apiBaseUrl}/learning/memories/runtime`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ message, session_id: sessionId, project_id: projectId }),
+        body: JSON.stringify({ message, session_id: sessionId, project_id: projectId, request_id: requestId || undefined }),
       });
       if (!response.ok) return;
-      const payload = await response.json() as { status?: string; memory_id?: string; notice?: string };
+      const payload = await response.json() as { status?: string; memory_id?: string; project_id?: string | null; notice?: string; warning?: string };
       if (payload.status === "saved" && payload.memory_id) {
         setRuntimeMemoryNotice({
           memory_id: payload.memory_id,
-          text: payload.notice || "已自动记录一条用户偏好，可撤销。",
+          project_id: payload.project_id ?? projectId,
+          text: `${payload.notice || "已自动记录一条用户偏好，可撤销。"}${payload.warning ? ` 注意：${payload.warning}` : ""}`,
         });
       }
     } catch {
@@ -3478,13 +3957,21 @@ export default function App() {
     const notice = runtimeMemoryNotice;
     if (!notice) return;
     try {
-      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(notice.memory_id)}/revoke`, {
+      const scopeQuery = notice.project_id ? `?project_id=${encodeURIComponent(notice.project_id)}` : "";
+      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(notice.memory_id)}/revoke${scopeQuery}`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: { ...authHeaders(), "Idempotency-Key": globalThis.crypto.randomUUID() },
       });
-      if (!response.ok) throw new Error("memory revoke failed");
+      const payload = await response.json() as { storage_sync?: { status?: string }; error?: string; warning?: string };
+      if (!response.ok) throw new Error(payload.error || "memory revoke failed");
       setRuntimeMemoryNotice(null);
-      setReviewState((previous) => ({ ...previous, mode: "done", message: "已撤销刚才自动记录的记忆。" }));
+      setReviewState((previous) => ({
+        ...previous,
+        mode: "done",
+        message: isLearningStorageSyncDegraded(payload)
+          ? `已撤销刚才自动记录的记忆，但归档/检索同步待恢复。${payload.warning ? ` 注意：${payload.warning}` : ""}`
+          : `已撤销刚才自动记录的记忆。${payload.warning ? ` 注意：${payload.warning}` : ""}`,
+      }));
     } catch {
       setReviewState((previous) => ({ ...previous, mode: "error", message: "记忆撤销失败，请稍后重试。" }));
     }
@@ -3503,15 +3990,17 @@ export default function App() {
         cache: "no-store",
         headers: authHeaders(),
       });
-      const payload = await response.json() as { memories?: LearningMemory[]; error?: string };
+      const payload = await response.json() as { memories?: LearningMemory[]; health?: MemoryHealth; error?: string };
       if (!response.ok) throw new Error(payload.error || "memory list failed");
       const memories = Array.isArray(payload.memories) ? payload.memories : [];
       setLearningMemories(memories);
+      setMemoryHealth(payload.health || null);
       setMemoryEdits(Object.fromEntries(
         memories.map((memory) => [memory.memory_id, { title: memory.title, content: memory.content }]),
       ));
     } catch {
       setLearningMemories([]);
+      setMemoryHealth(null);
       setMemoryManagerMessage("偏好画像加载失败，请稍后重试。");
     } finally {
       setMemoryManagerBusy(false);
@@ -3542,20 +4031,27 @@ export default function App() {
     setMemoryManagerBusy(true);
     setMemoryManagerMessage("");
     try {
-      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(memory.memory_id)}`, {
+      const scopeQuery = memory.project_id ? `?project_id=${encodeURIComponent(memory.project_id)}` : "";
+      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(memory.memory_id)}${scopeQuery}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+          "Idempotency-Key": globalThis.crypto.randomUUID(),
+        },
         body: JSON.stringify({
           title: edit.title,
           content: edit.content,
           expected_updated_at: memory.updated_at,
         }),
       });
-      const payload = await response.json() as { memory?: LearningMemory; error?: string };
+      const payload = await response.json() as { memory?: LearningMemory; storage_sync?: { status?: string }; error?: string; warning?: string };
       if (!response.ok || !payload.memory) throw new Error(payload.error || "memory update failed");
       setLearningMemories((previous) => previous.map((item) => item.memory_id === memory.memory_id ? payload.memory! : item));
       setMemoryEdits((previous) => ({ ...previous, [memory.memory_id]: { title: payload.memory!.title, content: payload.memory!.content } }));
-      setMemoryManagerMessage("偏好已更新，检索索引已同步。");
+      setMemoryManagerMessage(isLearningStorageSyncDegraded(payload)
+        ? `偏好已更新，但检索同步待恢复；后续打开记忆管理器或提问时会自动重试。${payload.warning ? ` 注意：${payload.warning}` : ""}`
+        : `偏好已更新，检索索引已同步。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
     } catch (error) {
       setMemoryManagerMessage(error instanceof Error && error.message.includes("reload") ? "该偏好已被更新，请重新加载后再编辑。" : "偏好更新失败，请稍后重试。");
     } finally {
@@ -3568,13 +4064,17 @@ export default function App() {
     setMemoryManagerBusy(true);
     setMemoryManagerMessage("");
     try {
-      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(memory.memory_id)}/revoke`, {
+      const scopeQuery = memory.project_id ? `?project_id=${encodeURIComponent(memory.project_id)}` : "";
+      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(memory.memory_id)}/revoke${scopeQuery}`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: { ...authHeaders(), "Idempotency-Key": globalThis.crypto.randomUUID() },
       });
-      if (!response.ok) throw new Error("memory revoke failed");
+      const payload = await response.json() as { storage_sync?: { status?: string }; error?: string; warning?: string };
+      if (!response.ok) throw new Error(payload.error || "memory revoke failed");
       setLearningMemories((previous) => previous.filter((item) => item.memory_id !== memory.memory_id));
-      setMemoryManagerMessage("偏好已停用，不会再被注入问答上下文。");
+      setMemoryManagerMessage(isLearningStorageSyncDegraded(payload)
+        ? `偏好已停用，但归档/检索同步待恢复；后续打开记忆管理器或提问时会自动重试。${payload.warning ? ` 注意：${payload.warning}` : ""}`
+        : `偏好已停用，不会再被注入问答上下文。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
       if (runtimeMemoryNotice?.memory_id === memory.memory_id) setRuntimeMemoryNotice(null);
     } catch {
       setMemoryManagerMessage("偏好停用失败，请稍后重试。");
@@ -3588,13 +4088,17 @@ export default function App() {
     setMemoryManagerBusy(true);
     setMemoryManagerMessage("");
     try {
-      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(memory.memory_id)}?confirm=true`, {
+      const scopeQuery = memory.project_id ? `&project_id=${encodeURIComponent(memory.project_id)}` : "";
+      const response = await fetch(`${apiBaseUrl}/learning/memories/${encodeURIComponent(memory.memory_id)}?confirm=true${scopeQuery}`, {
         method: "DELETE",
-        headers: authHeaders(),
+        headers: { ...authHeaders(), "Idempotency-Key": globalThis.crypto.randomUUID() },
       });
-      if (!response.ok) throw new Error("memory delete failed");
+      const payload = await response.json() as { storage_sync?: { status?: string }; error?: string; warning?: string };
+      if (!response.ok) throw new Error(payload.error || "memory delete failed");
       setLearningMemories((previous) => previous.filter((item) => item.memory_id !== memory.memory_id));
-      setMemoryManagerMessage("偏好已删除，活动索引和问答上下文均已移除。");
+      setMemoryManagerMessage(isLearningStorageSyncDegraded(payload)
+        ? `偏好已删除，但归档/检索同步待恢复；后续打开记忆管理器或提问时会自动重试。${payload.warning ? ` 注意：${payload.warning}` : ""}`
+        : `偏好已删除，活动索引和问答上下文均已移除。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
       if (runtimeMemoryNotice?.memory_id === memory.memory_id) setRuntimeMemoryNotice(null);
     } catch {
       setMemoryManagerMessage("偏好删除失败，请稍后重试。");
@@ -3741,6 +4245,7 @@ export default function App() {
               payload: {
                 document_name: activeDocumentName,
                 document_names: activeDocumentNames,
+                document_ids: activeDocumentIds,
                 ...(visualRegion ? { selected_region: visualRegion } : {}),
                 project_id: activeProjectId,
               },
@@ -3836,8 +4341,10 @@ export default function App() {
     let chatCompleted = false;
     let timedOut = false;
     let timeout = 0;
+    let chatRequestId: string | null = null;
     try {
       const requestId = globalThis.crypto.randomUUID();
+      chatRequestId = requestId;
       const chatPayload = {
         query: userQuery,
         top_k: 6,
@@ -3851,6 +4358,7 @@ export default function App() {
             project_id: activeProjectId,
             document_name: activeDocumentName || undefined,
             document_names: activeDocumentNames,
+            document_ids: activeDocumentIds,
             ...(selectedWorkflowId === "experiment_compare" ? {
               baseline_run_id: baselineExperimentRunId || undefined,
               current_run_id: currentExperimentRunId || undefined,
@@ -3940,7 +4448,7 @@ export default function App() {
         if (uiAutomationCapturedAtMs) {
           setUiAutomationSnapshot((current) => current?.captured_at_ms === uiAutomationCapturedAtMs ? null : current);
         }
-        void saveRuntimeMemory(userQuery, activeSessionId, activeProjectId);
+        void saveRuntimeMemory(userQuery, activeSessionId, activeProjectId, chatRequestId);
       }
     }
     return chatCompleted;
@@ -3948,17 +4456,33 @@ export default function App() {
 
   const startIndexing = async () => {
     if (locked || indexBusy || indexStartStatus === "starting") return;
+    if (indexStartStatus === "idle") {
+      indexRequestIdempotencyKeyRef.current = "";
+      indexRequestRunIdRef.current = "";
+    }
+    if (!indexRequestIdempotencyKeyRef.current) {
+      indexRequestIdempotencyKeyRef.current = crypto.randomUUID();
+    }
     setIndexStartStatus("starting");
     try {
       const response = await fetch(`${apiBaseUrl}/index/run`, {
         method: "POST",
-        headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined,
+        headers: {
+          ...authHeaders(),
+          "Idempotency-Key": indexRequestIdempotencyKeyRef.current,
+        },
       });
+      const payload = await response.json().catch(() => ({})) as { run_id?: string | null; replayed?: boolean };
+      if (payload.run_id) indexRequestRunIdRef.current = payload.run_id;
       if (!response.ok && response.status !== 409) {
+        indexRequestIdempotencyKeyRef.current = "";
+        indexRequestRunIdRef.current = "";
         throw new Error("indexer unavailable");
       }
+      setIndexStartMessage(payload.replayed ? "已回放已有索引任务" : "索引任务已提交");
       setIndexStartStatus("idle");
     } catch {
+      setIndexStartMessage("");
       setIndexStartStatus("error");
     }
   };
@@ -3972,17 +4496,17 @@ export default function App() {
       const response = await fetch(`${apiBaseUrl}/documents/globalize`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: document.name }),
+        body: JSON.stringify({ name: document.name, document_id: document.document_id }),
       });
-      const payload = await response.json() as { error?: string; reindex_required?: boolean };
+      const payload = await response.json() as { error?: string; reindex_required?: boolean; warning?: string };
       if (!response.ok) throw new Error(payload.error || "文档归类失败");
       const listResponse = await fetch(`${apiBaseUrl}/documents/list`, { headers: authHeaders() });
       if (listResponse.ok) setDocumentLibrary(await listResponse.json());
       if (payload.reindex_required) {
-        setDocumentScopeMessage("已归为全局知识库，正在重建知识索引与 GraphRAG…");
+        setDocumentScopeMessage(`已归为全局知识库，正在重建知识索引与 GraphRAG…${payload.warning ? ` 注意：${payload.warning}` : ""}`);
         await startIndexing();
       } else {
-        setDocumentScopeMessage("该文档已经属于全局知识库。");
+        setDocumentScopeMessage(`该文档已经属于全局知识库。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
       }
     } catch (error) {
       setDocumentScopeMessage(error instanceof Error ? error.message : "文档归类失败");
@@ -3996,35 +4520,54 @@ export default function App() {
       setPresentationMessage("请先选择一个项目，再生成可追溯的 PPT 产物。");
       return;
     }
-    const indexedNames = new Set(indexedDocuments.map((document) => document.name));
-    const firstSources = (activeDocumentNames.length
-      ? activeDocumentNames.filter((name) => indexedNames.has(name))
-      : indexedDocuments.slice(0, 3).map((document) => document.name)).slice(0, 12);
-    setPresentationSources((previous) => previous.size ? previous : new Set(firstSources));
+    const selectedDocuments = activeDocumentRefs.length
+      ? indexedDocuments.filter((document) => activeDocumentRefs.some((selected) => document.document_id
+        ? selected.document_id === document.document_id
+        : !selected.document_id && selected.name === document.name))
+      : indexedDocuments.slice(0, 3);
+    setPresentationSources((previous) => previous.length
+      ? previous
+      : selectedDocuments.slice(0, 12).map((document) => ({
+        name: document.name,
+        ...(document.document_id ? { document_id: document.document_id } : {}),
+      })));
     setPresentationStyleSkillId("");
     if (!presentationTitle.trim() && activeDocumentNames.length) setPresentationTitle("论文精读组会汇报");
     setPresentationTask(null);
+    setPresentationRequestId(crypto.randomUUID());
     setPresentationMessage("");
     setPresentationOpen(true);
   };
 
   const selectRecentPresentationSources = () => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recent = indexedDocuments.filter((document) => document.modified_at * 1000 >= cutoff).slice(0, 12).map((document) => document.name);
-    setPresentationSources(new Set(recent));
+    const recent = indexedDocuments
+      .filter((document) => document.modified_at * 1000 >= cutoff)
+      .slice(0, 12);
+    setPresentationSources(recent.map((document) => ({
+      name: document.name,
+      ...(document.document_id ? { document_id: document.document_id } : {}),
+    })));
     setPresentationTitle(recent.length ? "近七天论文阅读组会汇报" : "");
     setPresentationMessage(recent.length ? `已按本地导入/保存时间选中 ${recent.length} 份文档` : "最近七天没有已索引文档");
   };
+
+  const isPresentationSource = (document: DocumentItem) => presentationSources.some((selected) => (
+    document.document_id
+      ? selected.document_id === document.document_id
+      : !selected.document_id && selected.name === document.name
+  ));
 
   const syncProjectSkills = async () => {
     setSkillBusy(true);
     setSkillMessage("正在同步项目 Skills...");
     try {
-      const payload = await requestSkillApi<{ skills?: LearningSkill[]; summary?: Record<string, number>; path?: string }>("POST", "/learning/skills/sync");
+      const projectQuery = activeProjectId ? `?project_id=${encodeURIComponent(activeProjectId)}` : "";
+      const payload = await requestSkillApi<{ skills?: LearningSkill[]; summary?: Record<string, number>; path?: string; warning?: string }>("POST", `/learning/skills/sync${projectQuery}`);
       setLearningSkills(payload.skills || []);
       if (payload.path) setSkillRootPath(payload.path);
       const summary = payload.summary || {};
-      setSkillMessage(`已同步 ${summary.imported || 0} 个新增、${summary.updated || 0} 个更新（目录：${payload.path || "skills"}）`);
+      setSkillMessage(`已同步 ${summary.imported || 0} 个新增、${summary.updated || 0} 个更新（目录：${payload.path || "skills"}）${payload.warning ? `；${payload.warning}` : ""}`);
     } catch (error) {
       setSkillMessage(error instanceof Error ? error.message : "同步项目 Skills 失败");
     } finally {
@@ -4064,10 +4607,11 @@ export default function App() {
     setSkillBusy(true);
     setSkillMessage("正在下载到待审核区，不会执行其中脚本...");
     try {
-      const payload = await requestSkillApi<SkillInboxItem>("POST", "/learning/skills/install", { source: skillSource.trim(), target: skillInstallTarget });
+      const payload = await requestSkillApi<SkillInboxItem>("POST", "/learning/skills/install", { source: skillSource.trim(), target: skillInstallTarget, project_id: activeProjectId });
       setSkillInbox((previous) => [payload, ...previous.filter((item) => item.skill_name !== payload.skill_name)]);
       setSkillSource("");
-      setSkillMessage(`已下载「${payload.skill_title}」并归类为${payload.target === "presentation" ? "PPT" : "对话"} Skill，请审核来源后批准；适配和验证将自动完成。`);
+      const replayLabel = payload.replayed ? "已在待审核区，回放了已有内容" : "已下载到待审核区";
+      setSkillMessage(`「${payload.skill_title}」${replayLabel}并归类为${payload.target === "presentation" ? "PPT" : "对话"} Skill，请审核来源后批准；适配和验证将自动完成。${payload.warning ? `；${payload.warning}` : ""}`);
     } catch (error) {
       setSkillMessage(error instanceof Error ? error.message : "Skill 下载失败");
     } finally {
@@ -4079,9 +4623,11 @@ export default function App() {
     setSkillBusy(true);
     setSkillMessage(`正在生成「${skill.skill_title}」的本地适配契约...`);
     try {
-      const payload = await requestSkillApi<SkillAdapterReview>("POST", `/learning/skills/inbox/${encodeURIComponent(skill.skill_name)}/approve`);
+      const projectQuery = activeProjectId ? `?project_id=${encodeURIComponent(activeProjectId)}` : "";
+      const payload = await requestSkillApi<SkillAdapterReview>("POST", `/learning/skills/inbox/${encodeURIComponent(skill.skill_name)}/approve${projectQuery}`);
       setSkillAdapterReview(payload);
-      setSkillMessage(`「${skill.skill_title}」的适配契约已生成，请人工查看后确认启用。`);
+      const replayLabel = payload.replayed ? "已回放已有适配契约" : "适配契约已生成";
+      setSkillMessage(`「${skill.skill_title}」${replayLabel}，请人工查看后确认启用。${payload.warning ? `；${payload.warning}` : ""}`);
     } catch (error) {
       setSkillMessage(error instanceof Error ? error.message : "Skill 批准失败");
     } finally {
@@ -4093,11 +4639,13 @@ export default function App() {
     if (!skillAdapterReview) return;
     setSkillBusy(true);
     try {
-      const payload = await requestSkillApi<{ skills?: LearningSkill[] }>("POST", `/learning/skills/inbox/${encodeURIComponent(skillAdapterReview.skill_name)}/activate`);
+      const projectQuery = activeProjectId ? `?project_id=${encodeURIComponent(activeProjectId)}` : "";
+      const payload = await requestSkillApi<{ skills?: LearningSkill[]; replayed?: boolean; warning?: string }>("POST", `/learning/skills/inbox/${encodeURIComponent(skillAdapterReview.skill_name)}/activate${projectQuery}`);
       setLearningSkills(payload.skills || []);
       setSkillInbox((previous) => previous.filter((item) => item.skill_name !== skillAdapterReview.skill_name));
       setSkillAdapterReview(null);
-      setSkillMessage(`「${skillAdapterReview.skill_title || skillAdapterReview.skill_name}」已确认启用。`);
+      const replayLabel = payload.replayed ? "已回放已启用结果" : "已确认启用";
+      setSkillMessage(`「${skillAdapterReview.skill_title || skillAdapterReview.skill_name}」${replayLabel}。${payload.warning ? `；${payload.warning}` : ""}`);
     } catch (error) {
       setSkillMessage(error instanceof Error ? error.message : "Skill 启用失败");
     } finally {
@@ -4109,9 +4657,14 @@ export default function App() {
     setSkillBusy(true);
     setSkillDeletingId(skill.skill_id);
     setSkillMessage(`正在删除「${skill.title}」...`);
+    const deleteKeyId = `${activeProjectId || "global"}:${skill.skill_id}`;
+    const idempotencyKey = skillDeleteIdempotencyKeyRef.current[deleteKeyId] || `skill-delete-${crypto.randomUUID()}`;
+    skillDeleteIdempotencyKeyRef.current[deleteKeyId] = idempotencyKey;
     try {
-      const payload = await requestSkillApi<{ skills?: LearningSkill[]; warning?: string }>("DELETE", `/learning/skills/${encodeURIComponent(skill.skill_id)}`);
+      const projectQuery = activeProjectId ? `?project_id=${encodeURIComponent(activeProjectId)}` : "";
+      const payload = await requestSkillApi<{ skills?: LearningSkill[]; warning?: string }>("DELETE", `/learning/skills/${encodeURIComponent(skill.skill_id)}${projectQuery}`, undefined, idempotencyKey);
       setLearningSkills(payload.skills || []);
+      delete skillDeleteIdempotencyKeyRef.current[deleteKeyId];
       setSkillMessage(payload.warning ? `「${skill.title}」已删除；${payload.warning}` : `「${skill.title}」已从当前项目删除。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Skill 删除失败";
@@ -4123,8 +4676,21 @@ export default function App() {
   };
 
   const generatePresentation = async () => {
-    if (!presentationSources.size || presentationTask?.status === "running") return;
-    setPresentationMessage("正在创建可恢复任务...");
+    if (!presentationSources.length || ["pending", "running"].includes(presentationTask?.status || "")) return;
+    const hasIdentifiedPresentationSource = presentationSources.some((source) => Boolean(source.document_id));
+    const hasLegacyPresentationSource = presentationSources.some((source) => !source.document_id);
+    if (hasIdentifiedPresentationSource && hasLegacyPresentationSource) {
+      setPresentationMessage("安全对象与普通文件不能混合生成 PPT，请分开选择后重试；这样才能保持来源对象身份可追溯。");
+      return;
+    }
+    const requestId = presentationTask?.status === "cancelled"
+      ? crypto.randomUUID()
+      : presentationRequestId || crypto.randomUUID();
+    setPresentationRequestId(requestId);
+    setPresentationMessage("正在提取文档证据并生成实际大纲...");
+    const presentationSourceIds = presentationSources.every((source) => Boolean(source.document_id))
+      ? presentationSources.map((source) => source.document_id as string)
+      : [];
     try {
       const response = await fetch(`${apiBaseUrl}/presentations/generate`, {
         method: "POST",
@@ -4133,34 +4699,98 @@ export default function App() {
           ...(apiToken ? { "X-SoulDrive-Token": apiToken } : {}),
         },
         body: JSON.stringify({
-          source_filenames: [...presentationSources],
+          request_id: requestId,
+          source_filenames: presentationSources.map((source) => source.name),
+          source_document_ids: presentationSourceIds,
           project_id: activeProjectId,
           title: presentationTitle,
           audience: presentationAudience,
           max_slides: presentationMaxSlides,
           open_in_wps: presentationOpenInWps,
           style_skill_id: presentationStyleSkillId || null,
+          ...(selectedWorkflowId === "experiment_compare" ? {
+            baseline_run_id: baselineExperimentRunId || undefined,
+            current_run_id: currentExperimentRunId || undefined,
+          } : {}),
         }),
       });
       const payload = await response.json() as PresentationTask & { error?: string };
       if (!response.ok) throw new Error(payload.error || "presentation generation failed");
       setPresentationTask(payload);
-      setPresentationMessage("正在提取文档证据...");
+      setPresentationMessage(
+        payload.replayed
+          ? payload.status === "completed"
+            ? "已回放已完成的 PPT 大纲，可查看并确认。"
+            : "已回放已有 PPT 任务，界面将继续显示其执行状态。"
+          : payload.worker_started === false
+            ? "PPT 任务已提交，等待本地 worker 接管。"
+            : "正在提取文档证据并生成实际大纲...",
+      );
     } catch (error) {
       setPresentationMessage(error instanceof Error ? error.message : "PPT 任务创建失败");
     }
   };
 
+  const confirmPresentation = async () => {
+    const planDigest = presentationTask?.plan_digest || presentationTask?.result?.plan_digest;
+    if (!presentationTask || !planDigest) return;
+    const projectQuery = presentationTask.project_id
+      ? `?project_id=${encodeURIComponent(presentationTask.project_id)}`
+      : "";
+    setPresentationMessage("正在确认大纲并创建 PPT 生成任务...");
+    try {
+      const response = await fetch(`${apiBaseUrl}/presentations/tasks/${presentationTask.task_id}/confirm${projectQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ plan_digest: planDigest }),
+      });
+      const payload = await response.json() as PresentationTask & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "大纲确认失败");
+      setPresentationTask(payload);
+      setPresentationMessage("大纲已确认，正在生成可编辑 PPTX...");
+    } catch (error) {
+      setPresentationMessage(error instanceof Error ? error.message : "大纲确认失败");
+    }
+  };
+
+  const cancelPresentation = async () => {
+    if (!presentationTask || !["pending", "running"].includes(presentationTask.status)) return;
+    const projectQuery = presentationTask.project_id
+      ? `?project_id=${encodeURIComponent(presentationTask.project_id)}`
+      : "";
+    setPresentationMessage("正在停止，等待当前步骤结束...");
+    try {
+      const response = await fetch(`${apiBaseUrl}/presentations/tasks/${presentationTask.task_id}/cancel${projectQuery}`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const payload = await response.json() as PresentationTask & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "停止任务失败");
+      setPresentationTask(payload);
+    } catch (error) {
+      setPresentationMessage(error instanceof Error ? error.message : "停止任务失败");
+    }
+  };
+
+  const resetPresentationPlan = () => {
+    setPresentationTask(null);
+    setPresentationRequestId(crypto.randomUUID());
+    setPresentationMessage("已返回参数编辑；提交后会生成新的大纲请求");
+  };
+
   const resumePresentation = async () => {
     if (!presentationTask) return;
+    const projectQuery = presentationTask.project_id
+      ? `?project_id=${encodeURIComponent(presentationTask.project_id)}`
+      : "";
     setPresentationMessage("正在从检查点恢复...");
     try {
-      const response = await fetch(`${apiBaseUrl}/presentations/tasks/${presentationTask.task_id}/resume`, {
+      const response = await fetch(`${apiBaseUrl}/presentations/tasks/${presentationTask.task_id}/resume${projectQuery}`, {
         method: "POST",
         headers: apiToken ? { "X-SoulDrive-Token": apiToken } : undefined,
       });
       const payload = await response.json() as PresentationTask & { error?: string };
-      if (!response.ok && response.status !== 409) throw new Error(payload.error || "resume failed");
+      if (!response.ok) throw new Error(payload.error || "resume failed");
       setPresentationTask(payload);
     } catch (error) {
       setPresentationMessage(error instanceof Error ? error.message : "恢复失败");
@@ -4185,21 +4815,40 @@ export default function App() {
   const createProject = async () => {
     const name = projectCreateName.trim();
     if (locked || !name || projectCreateBusy) return;
+    const projectFingerprint = JSON.stringify({
+      name,
+      project_mode: projectCreateMode,
+      root_path: projectCreateRoot.trim(),
+    });
+    if (projectCreateFingerprintRef.current !== projectFingerprint) {
+      projectCreateFingerprintRef.current = projectFingerprint;
+      projectCreateIdempotencyKeyRef.current = crypto.randomUUID();
+    }
+    if (!projectCreateIdempotencyKeyRef.current) {
+      projectCreateIdempotencyKeyRef.current = crypto.randomUUID();
+    }
     setProjectCreateBusy(true);
     setProjectCreateMessage("正在创建本地项目...");
     try {
       const response = await fetch(`${apiBaseUrl}/projects`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+          "Idempotency-Key": projectCreateIdempotencyKeyRef.current,
+        },
         body: JSON.stringify({ name, project_mode: projectCreateMode, root_path: projectCreateRoot.trim() || undefined }),
       });
-      const payload = await response.json() as { project_id?: string; error?: string };
+      const payload = await response.json() as { project_id?: string; replayed?: boolean; error?: string; warning?: string };
       if (!response.ok || !payload.project_id) throw new Error(payload.error || "项目创建失败");
+      projectCreateFingerprintRef.current = "";
+      projectCreateIdempotencyKeyRef.current = "";
       setProjectCreateName("");
       setProjectCreateMode("research");
       setProjectCreateRoot("");
       setProjectCreateOpen(false);
       setProjectCreateMessage("");
+      setProjectMessage(`${payload.replayed ? "项目创建请求已回放，仍使用已有项目。" : "本地项目已创建。"}${payload.warning ? ` 注意：${payload.warning}` : ""}`);
       setActiveProjectId(payload.project_id);
       const listResponse = await fetch(`${apiBaseUrl}/projects`, { headers: authHeaders() });
       if (listResponse.ok) {
@@ -4225,7 +4874,7 @@ export default function App() {
         method: "DELETE",
         headers: authHeaders(),
       });
-      const payload = await response.json() as { error?: string };
+      const payload = await response.json() as { error?: string; warning?: string };
       if (!response.ok) throw new Error(payload.error || "项目删除失败");
       let remaining = projects.filter((item) => item.project_id !== project.project_id);
       const listResponse = await fetch(`${apiBaseUrl}/projects`, { headers: authHeaders() });
@@ -4235,7 +4884,7 @@ export default function App() {
       }
       setProjects(remaining);
       setProjectListUnavailable(false);
-      window.alert(`项目“${project.name}”及其原始项目文件夹已删除。`);
+      window.alert(`项目“${project.name}”及其原始项目文件夹已删除。${payload.warning ? `\n\n注意：${payload.warning}` : ""}`);
       if (activeProjectId === project.project_id) {
         setActiveProjectId(remaining[0]?.project_id || null);
         setProjectSessions([]);
@@ -4264,14 +4913,16 @@ export default function App() {
     if (
       isGenerating
       || !apiToken
+      || !activeProjectId
       || (session.session_id === activeSessionId && messages.length > 0)
     ) return;
     const requestId = ++sessionLoadRequestRef.current;
     setSessionLoading(true);
+    resetSessionScopedContext();
     setMessages([]);
     setSessionMessage("");
     try {
-      const response = await fetch(`${apiBaseUrl}/sessions/${encodeURIComponent(session.session_id)}/history?limit=32`, { headers: authHeaders() });
+      const response = await fetch(`${apiBaseUrl}/sessions/${encodeURIComponent(session.session_id)}/history?limit=32&project_id=${encodeURIComponent(activeProjectId)}`, { headers: authHeaders() });
       if (!response.ok) throw new Error("session history unavailable");
       const payload = await response.json() as { history?: Array<{ role?: string; content?: string; timestamp_ms?: number; created_at?: number }> };
       if (requestId !== sessionLoadRequestRef.current) return;
@@ -4297,7 +4948,11 @@ export default function App() {
   const openProjectSessionDialog = () => {
     if (locked || !activeProjectId || !apiToken || isGenerating || sessionLoading) return;
     setSessionCreateName("");
-    setSessionCreateWorkflowId("");
+    sessionCreateFingerprintRef.current = "";
+    sessionCreateIdRef.current = "";
+    // Keep the current business as the default for a new session.  This prevents
+    // two sessions created from the same business view from silently diverging.
+    setSessionCreateWorkflowId(selectedWorkflowId);
     setSessionMessage("");
     setSessionCreateOpen(true);
   };
@@ -4311,20 +4966,33 @@ export default function App() {
     setSessionLoading(true);
     setSessionMessage("");
     try {
+      const sessionFingerprint = [activeProjectId, title, sessionCreateWorkflowId || ""].join("|\u001f|");
+      if (sessionCreateFingerprintRef.current !== sessionFingerprint) {
+        sessionCreateFingerprintRef.current = sessionFingerprint;
+        sessionCreateIdRef.current = `session_${crypto.randomUUID()}`;
+      }
       const response = await fetch(`${apiBaseUrl}/projects/${encodeURIComponent(activeProjectId)}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ title, workflow_id: sessionCreateWorkflowId || undefined }),
+        body: JSON.stringify({
+          session_id: sessionCreateIdRef.current,
+          title,
+          workflow_id: sessionCreateWorkflowId || undefined,
+        }),
       });
-      const payload = await response.json() as { session?: ProjectSession; error?: string };
+      const payload = await response.json() as { session?: ProjectSession; replayed?: boolean; error?: string; warning?: string };
       if (!response.ok || !payload.session) throw new Error(payload.error || "新建对话失败");
       setProjectSessions((current) => [payload.session!, ...current]);
       setActiveSessionId(payload.session.session_id);
       setSelectedWorkflowId((payload.session.workflow_id || "") as MultimodalWorkflowId | "");
+      resetSessionScopedContext();
       setMessages([]);
       setSessionCreateName("");
       setSessionCreateWorkflowId("");
       setSessionCreateOpen(false);
+      sessionCreateFingerprintRef.current = "";
+      sessionCreateIdRef.current = "";
+      setSessionMessage(`${payload.replayed ? "会话创建请求已回放，仍使用已有会话。" : "会话已创建。"}${payload.warning ? ` 注意：${payload.warning}` : ""}`);
     } catch (error) {
       setSessionMessage(error instanceof Error ? error.message : "新建会话失败");
     } finally {
@@ -4343,9 +5011,10 @@ export default function App() {
         method: "DELETE",
         headers: authHeaders(),
       });
-      const payload = await response.json() as { error?: string };
+      const payload = await response.json() as { error?: string; warning?: string };
       if (!response.ok) throw new Error(payload.error || "删除会话失败");
       if (requestId !== sessionLoadRequestRef.current) return;
+      setSessionMessage(payload.warning ? `会话已删除。注意：${payload.warning}` : "会话已删除。");
       const remaining = projectSessions.filter((item) => item.session_id !== session.session_id);
       setProjectSessions(remaining);
       if (activeSessionId === session.session_id) {
@@ -4394,7 +5063,7 @@ export default function App() {
           project_ids: [],
         }),
       });
-      const payload = await response.json() as { contact_id?: string; error?: string };
+      const payload = await response.json() as { contact_id?: string; replayed?: boolean; error?: string; warning?: string };
       if (!response.ok || !payload.contact_id) throw new Error(payload.error || "本地联系人保存失败");
       const contact: LocalContact = {
         contact_id: payload.contact_id,
@@ -4411,7 +5080,9 @@ export default function App() {
       setContactAliases("");
       setContactDialogOpen(false);
       setContactMessage("");
-      setDraftMessage("本地联系人已保存，可用姓名或别名创建草稿。");
+      setDraftMessage(`${payload.replayed
+        ? "本地联系人请求已回放，未新增重复记录。"
+        : "本地联系人已保存，可用姓名或别名创建草稿。"}${payload.warning ? ` 注意：${payload.warning}` : ""}`);
     } catch (error) {
       setContactMessage(error instanceof Error ? error.message : "本地联系人保存失败");
     } finally {
@@ -4443,10 +5114,10 @@ export default function App() {
         method: "DELETE",
         headers: authHeaders(),
       });
-      const payload = await response.json() as { error?: string };
+      const payload = await response.json() as { error?: string; warning?: string };
       if (!response.ok) throw new Error(payload.error || "联系人删除失败");
       setContacts((current) => current.filter((item) => item.contact_id !== contact.contact_id));
-      setDraftMessage(`联系人“${contact.display_name}”已删除。`);
+      setDraftMessage(`联系人“${contact.display_name}”已删除。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
     } catch (error) {
       setDraftMessage(error instanceof Error ? error.message : "联系人删除失败");
     } finally {
@@ -4471,6 +5142,13 @@ export default function App() {
         scheduleDraftFingerprintRef.current = scheduleFingerprint;
         scheduleDraftIdempotencyKeyRef.current = crypto.randomUUID();
       }
+      const emailFingerprint = isEmail
+        ? [activeProjectId || "", emailRecipient.trim(), emailSubject.trim(), emailBody.trim(), ...emailAttachmentRefs].join("|\u001f|")
+        : "";
+      if (isEmail && emailDraftFingerprintRef.current !== emailFingerprint) {
+        emailDraftFingerprintRef.current = emailFingerprint;
+        emailDraftIdempotencyKeyRef.current = crypto.randomUUID();
+      }
       const schedulePayload = {
         title: scheduleTitle.trim(),
         start_at: scheduleStartAt,
@@ -4489,21 +5167,37 @@ export default function App() {
           subject: emailSubject.trim(),
           body: emailBody.trim(),
           attachment_refs: emailAttachmentRefs,
+          idempotency_key: emailDraftIdempotencyKeyRef.current,
         } : schedulePayload),
       });
-      const payload = await response.json() as { artifact?: DraftArtifact; error?: string; detail?: string };
+      const payload = await response.json() as { artifact?: DraftArtifact; replayed?: boolean; error?: string; warning?: string; detail?: string };
       if (!response.ok || !payload.artifact) {
         const action = isScheduleEdit ? "日程修改" : "草稿创建";
         const detail = payload.error || payload.detail;
         throw new Error(detail ? `${action}失败：${detail}` : `${action}失败（HTTP ${response.status}）`);
       }
       setDraftArtifact(payload.artifact);
-      if (draftKind === "email") setEmailAttachmentRefs([]);
+      if (draftKind === "email") {
+        setEmailAttachmentRefs([]);
+        emailDraftFingerprintRef.current = "";
+        emailDraftIdempotencyKeyRef.current = "";
+      }
       else if (isScheduleEdit) {
         setProjectScheduleArtifacts((current) => current.map((artifact) => artifact.artifact_id === payload.artifact!.artifact_id ? { ...artifact, ...payload.artifact } : artifact));
+        setScheduleHistory((current) => current.map((artifact) => artifact.artifact_id === payload.artifact!.artifact_id ? { ...artifact, ...payload.artifact } : artifact));
         setSelectedScheduleArtifactId(payload.artifact.artifact_id);
         setDraftMessage("日程已修改，确认后才会冻结新的日程时间。");
       } else {
+        // ponytail: update the local rail immediately; the 30-second poll is only reconciliation.
+        setProjectScheduleArtifacts((current) => [
+          payload.artifact!,
+          ...current.filter((artifact) => artifact.artifact_id !== payload.artifact!.artifact_id),
+        ]);
+        setScheduleHistory((current) => [
+          payload.artifact!,
+          ...current.filter((artifact) => artifact.artifact_id !== payload.artifact!.artifact_id),
+        ]);
+        setSelectedScheduleArtifactId(payload.artifact.artifact_id);
         setScheduleTitle("");
         setScheduleStartAt("");
         setScheduleDuration(60);
@@ -4512,7 +5206,12 @@ export default function App() {
         scheduleDraftFingerprintRef.current = "";
         scheduleDraftIdempotencyKeyRef.current = "";
       }
-      setDraftMessage(isScheduleEdit ? "日程已修改，确认后才会冻结新的日程时间。" : "草稿已保存在本地，确认前不会发生外部副作用。");
+      const auditNote = payload.warning ? ` 注意：${payload.warning}` : "";
+      setDraftMessage(isScheduleEdit
+        ? `日程已修改，确认后才会冻结新的日程时间。${auditNote}`
+        : `${payload.replayed
+          ? "请求已回放已有本地草稿，确认前不会发生外部副作用。"
+          : "草稿已保存在本地，确认前不会发生外部副作用。"}${auditNote}`);
     } catch (error) {
       setDraftMessage(error instanceof Error ? error.message : isScheduleEdit ? "日程修改失败" : "草稿创建失败");
     } finally {
@@ -4558,18 +5257,22 @@ export default function App() {
     if (!draftArtifact || draftArtifact.confirmation_status !== "draft") return;
     setDraftBusy(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/drafts/${encodeURIComponent(draftArtifact.artifact_id)}/status`, {
+      const projectQuery = draftArtifact.project_id
+        ? `?project_id=${encodeURIComponent(draftArtifact.project_id)}`
+        : "";
+      const response = await fetch(`${apiBaseUrl}/drafts/${encodeURIComponent(draftArtifact.artifact_id)}/status${projectQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ status }),
       });
-      const payload = await response.json() as { artifact?: DraftArtifact; error?: string };
+      const payload = await response.json() as { artifact?: DraftArtifact; error?: string; warning?: string };
       if (!response.ok || !payload.artifact) throw new Error(payload.error || "草稿状态更新失败");
       setDraftArtifact(payload.artifact);
       if (payload.artifact.artifact_type === "schedule_draft") {
         setProjectScheduleArtifacts((current) => current.map((artifact) => artifact.artifact_id === payload.artifact!.artifact_id ? { ...artifact, ...payload.artifact } : artifact));
       }
-      setDraftMessage(status === "confirmed" ? "草稿已确认。配置 SMTP 后可手动发送一次。" : "草稿已取消，未执行任何外部操作。");
+      const auditNote = payload.warning ? ` 注意：${payload.warning}` : "";
+      setDraftMessage(status === "confirmed" ? `草稿已确认。配置 SMTP 后可手动发送一次。${auditNote}` : `草稿已取消，未执行任何外部操作。${auditNote}`);
     } catch (error) {
       setDraftMessage(error instanceof Error ? error.message : "草稿状态更新失败");
     } finally {
@@ -4592,7 +5295,7 @@ export default function App() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ provider: smtpProvider, sender: smtpSender.trim(), authorization_code: smtpAuthorizationCode.trim() }),
       });
-      const payload = await response.json() as { configured?: boolean; error?: string; detail?: string };
+      const payload = await response.json() as { configured?: boolean; error?: string; detail?: string; warning?: string };
       if (!response.ok || payload.configured !== true) {
         throw new Error(payload.error || payload.detail || "SMTP 配置保存后核验失败");
       }
@@ -4612,7 +5315,7 @@ export default function App() {
       ]);
       setSmtpConfigOpen(false);
       setSmtpStatusMessage("当前发件邮箱已配置，可在确认草稿后手动发送。");
-      setDraftMessage("SMTP 已保存到 Windows 凭据管理器，授权码不会写入项目文件。");
+      setDraftMessage(`SMTP 已保存到 Windows 凭据管理器，授权码不会写入项目文件。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "SMTP 配置失败";
       setSmtpConfigured("unconfigured");
@@ -4655,14 +5358,34 @@ export default function App() {
     if (!draftArtifact || draftArtifact.confirmation_status !== "confirmed" || !smtpSender.trim()) return;
     setDraftBusy(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/drafts/${encodeURIComponent(draftArtifact.artifact_id)}/send`, {
+      if (emailDeliveryArtifactRef.current !== draftArtifact.artifact_id) {
+        emailDeliveryArtifactRef.current = draftArtifact.artifact_id;
+        emailDeliveryIdempotencyKeyRef.current = crypto.randomUUID();
+      }
+      const projectQuery = draftArtifact.project_id
+        ? `?project_id=${encodeURIComponent(draftArtifact.project_id)}`
+        : "";
+      const response = await fetch(`${apiBaseUrl}/drafts/${encodeURIComponent(draftArtifact.artifact_id)}/send${projectQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ sender: smtpSender.trim(), idempotency_key: crypto.randomUUID() }),
+        body: JSON.stringify({
+          sender: smtpSender.trim(),
+          idempotency_key: emailDeliveryIdempotencyKeyRef.current,
+        }),
       });
-      const payload = await response.json() as { status?: string; error?: string };
+      const payload = await response.json() as {
+        status?: string;
+        idempotent?: boolean;
+        delivery_status?: string;
+        warning?: string;
+        error?: string;
+      };
       if (!response.ok || payload.status !== "sent") throw new Error(payload.error || "邮件发送失败");
-      setDraftMessage("邮件已通过已配置的 SMTP 服务发送，发送记录已写入本地审计日志。");
+      setDraftMessage(
+        payload.idempotent
+          ? `邮件发送请求已回放，未重复调用 SMTP；已有发送记录仍为成功。${payload.warning ? ` 注意：${payload.warning}` : ""}`
+          : `邮件已通过已配置的 SMTP 服务发送，发送记录已写入本地审计日志。${payload.warning ? ` 注意：${payload.warning}` : ""}`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "邮件发送失败";
       setDraftMessage(message === "SMTP is not configured for this sender" ? "此发件邮箱尚未配置 SMTP，请先点击“保存并核验 SMTP 配置”。" : message);
@@ -4678,10 +5401,12 @@ export default function App() {
       const response = await fetch(`${apiBaseUrl}/drafts/${encodeURIComponent(draftArtifact.artifact_id)}/calendar-ics`, {
         method: "POST", headers: authHeaders(),
       });
-      const payload = await response.json() as { output_path?: string; error?: string };
+      const payload = await response.json() as { output_path?: string; replayed?: boolean; warning?: string; error?: string };
       if (!response.ok || !payload.output_path) throw new Error(payload.error || "日程导出失败");
       setScheduleExportPath(payload.output_path);
-      setDraftMessage(`日程已导出为本地 .ics 文件：${payload.output_path}`);
+      setDraftMessage(payload.replayed
+        ? `日程导出请求已回放，未重复写入本地 .ics 文件：${payload.output_path}${payload.warning ? `；${payload.warning}` : ""}`
+        : `日程已导出为本地 .ics 文件：${payload.output_path}${payload.warning ? `；${payload.warning}` : ""}`);
     } catch (error) {
       setDraftMessage(error instanceof Error ? error.message : "日程导出失败");
     } finally {
@@ -4707,14 +5432,15 @@ export default function App() {
         method: "DELETE",
         headers: authHeaders(),
       });
-      const payload = await response.json() as { artifact?: DraftArtifact; error?: string };
+      const payload = await response.json() as { artifact?: DraftArtifact; warning?: string; error?: string };
       if (!response.ok || !payload.artifact) throw new Error(payload.error || "日程删除失败");
       setProjectScheduleArtifacts((current) => current.filter((artifact) => artifact.artifact_id !== artifactId));
+      setScheduleHistory((current) => current.map((artifact) => artifact.artifact_id === artifactId ? { ...artifact, ...payload.artifact } : artifact));
       setDraftArtifact((current) => (current?.artifact_id === artifactId ? null : current));
       setSelectedScheduleArtifactId((current) => (current === artifactId ? null : current));
       setScheduleReminderArtifactId((current) => (current === artifactId ? null : current));
       setScheduleReminderMessage("");
-      setDraftMessage("日程已删除。");
+      setDraftMessage(`日程已删除。${payload.warning ? ` 注意：${payload.warning}` : ""}`);
     } catch (error) {
       setDraftMessage(error instanceof Error ? error.message : "日程删除失败");
     } finally {
@@ -4858,7 +5584,11 @@ export default function App() {
       void sendCapturedMedia(speechConfirmationPending);
       return;
     }
-    void submitQuery(input);
+    void (async () => {
+      const query = input.trim();
+      if (!query || !(await ensureWorkflowReady(query))) return;
+      await submitQuery(query);
+    })();
   };
 
   useEffect(() => {
@@ -4939,6 +5669,16 @@ export default function App() {
               <span>我的日程</span>
               <small>{visibleScheduleArtifacts.length ? `${visibleScheduleArtifacts.length} 项` : "暂无日程"}</small>
               {scheduleReminderPhase === "upcoming" && scheduleReminderLiveMessage && <small className={scheduleReminderArtifactId ? "urgent" : ""}>{scheduleReminderLiveMessage}</small>}
+              <button
+                type="button"
+                className="schedule-history-toggle"
+                disabled={locked || scheduleHistoryBusy}
+                onClick={() => void openScheduleHistory()}
+                title="查看近 7 天创建的日程"
+              >
+                <History size={13} />
+                {scheduleHistoryBusy ? "加载中" : "近 7 天历史"}
+              </button>
               <button
                 type="button"
                 className="schedule-rail-toggle"
@@ -5326,6 +6066,35 @@ export default function App() {
                   <ClipboardList size={14} /> Skills 管理
                 </button>
               </div>
+              {selectedWorkflowId === "experiment_compare" && (
+                <div className="experiment-run-picker" aria-label="实验对比运行选择">
+                  <strong>明确选择两次实验运行</strong>
+                  <label>
+                    基线运行
+                    <select aria-label="基线实验运行" value={baselineExperimentRunId} onChange={(event) => setBaselineExperimentRunId(event.target.value)} disabled={locked}>
+                      <option value="">请选择基线，不自动取第一条</option>
+                      {experimentRuns.map((run) => (
+                        <option key={run.run_id} value={run.run_id} disabled={run.run_id === currentExperimentRunId}>
+                          {run.experiment_name} · {formatDocumentTime(Date.parse(run.performed_at))} · {run.config_ref || "未标注配置"} · {run.run_id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    当前运行
+                    <select aria-label="当前实验运行" value={currentExperimentRunId} onChange={(event) => setCurrentExperimentRunId(event.target.value)} disabled={locked}>
+                      <option value="">请选择不同的当前运行</option>
+                      {experimentRuns.map((run) => (
+                        <option key={run.run_id} value={run.run_id} disabled={run.run_id === baselineExperimentRunId}>
+                          {run.experiment_name} · {formatDocumentTime(Date.parse(run.performed_at))} · {run.config_ref || "未标注配置"} · {run.run_id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <small>{experimentRuns.length ? "只使用已确认入账的运行；单位、数据版本等不兼容时会说明原因。配置差异不代表已证实因果。" : "当前项目尚无已确认运行，需先预览并确认导入指标。"}</small>
+                  <button type="button" onClick={() => setExperimentRunsRefresh((value) => value + 1)} disabled={locked}>刷新运行列表</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -5376,7 +6145,7 @@ export default function App() {
               </div>
             </div>
             <div className={`indexing-strip ${indexBusy ? "active" : indexStartStatus === "error" ? "warn" : ""}`}>
-              <span>{indexStartStatus === "error" ? "索引启动失败" : indexingStatus.toUpperCase()}</span>
+              <span>{indexStartStatus === "error" ? "索引启动失败" : indexStartMessage || indexingStatus.toUpperCase()}</span>
               <strong>
                 {runtimeStatus?.indexing?.processed_files ?? 0}/{runtimeStatus?.indexing?.total_files ?? 0}
               </strong>
@@ -5459,6 +6228,8 @@ export default function App() {
                     ? "构建中（索引完成后可用）"
                     : graphRagDiagnostics.status === "failed"
                       ? "构建失败（请重建索引）"
+                      : graphRagDiagnostics.status === "degraded"
+                        ? "部分完成（有项目图谱失败）"
                       : graphRagDiagnostics.status === "locked"
                         ? "工作区已锁定（解锁后查看）"
                       : graphRagDiagnostics.status === "disabled"
@@ -5468,6 +6239,16 @@ export default function App() {
                           : graphRagDiagnostics.observation_stale
                             ? "未构建（运行记录已完成，但当前索引文件缺失；请重建）"
                             : "未构建（请在知识文档区重建）"}
+                </strong>
+              </div>
+              <div>
+                <span>备份预检</span>
+                <strong>
+                  {backupPreflight === null
+                    ? "诊断不可用"
+                    : backupPreflight.ready
+                      ? "可进入人工备份"
+                      : `阻塞 · ${backupPreflight.blockers[0]?.code || "需处理"}`}
                 </strong>
               </div>
               <div>
@@ -5481,6 +6262,10 @@ export default function App() {
               <div>
                 <span>完整回答</span>
                 <strong>{runtimeMetrics?.last_chat_total_ms ?? 0} ms</strong>
+              </div>
+              <div>
+                <span>流式断线</span>
+                <strong>{runtimeMetrics?.chat_abandoned ?? 0}</strong>
               </div>
               <div>
                 <span>&lt;5s 达标率</span>
@@ -5684,7 +6469,7 @@ export default function App() {
             <div className="active-document-context" title={activeDocumentNames.join("、")}>
               <span>已选 {activeDocumentNames.length} 份上下文：{activeDocumentNames.join("、")}</span>
               <small>本轮只检索这些文档；选中文档时会暂停 GraphRAG，避免混入其他来源。</small>
-              <button type="button" onClick={() => setActiveDocumentNames([])} title="清除当前文档上下文">
+              <button type="button" onClick={() => setActiveDocumentRefs([])} title="清除当前文档上下文">
                 <X size={13} />
               </button>
             </div>
@@ -5914,6 +6699,9 @@ export default function App() {
                     <small>{documents.length} 份文档 · {indexedDocuments.length} 份已索引 · {activeDocumentNames.length} 份当前上下文</small>
                   </div>
                   <div className="document-viewer-header-actions">
+                    <button type="button" className="document-header-action" onClick={() => void previewIndexChanges()} disabled={indexPreviewBusy} title="只读比较当前文件与已有索引">
+                      <RefreshCw size={14} /> {indexPreviewBusy ? "检查中…" : "检查变更"}
+                    </button>
                     <button type="button" className="document-header-action" onClick={() => openRetrievalTest()} title="测试当前项目的检索结果">
                       <Search size={14} /> 检索测试
                     </button>
@@ -5929,15 +6717,43 @@ export default function App() {
                   {documentScopeMessage && !documentDeleteTarget && (
                     <div className="document-delete-notice" role="status">{documentScopeMessage}</div>
                   )}
+                  {indexPreviewMessage && !documentDeleteTarget && (
+                    <div className="document-delete-notice" role="alert">{indexPreviewMessage}</div>
+                  )}
+                  {indexPreview && !documentDeleteTarget && (
+                    <div className="index-preview-summary" role="status" aria-live="polite">
+                      <div className="index-preview-summary-header">
+                        <strong>索引变更预览</strong>
+                        <span>只读检查 · 不会修改文档或索引</span>
+                      </div>
+                      <div className="index-preview-counts">
+                        <span className={indexPreview.counts.added ? "attention" : ""}>新增 {indexPreview.counts.added}</span>
+                        <span className={indexPreview.counts.modified ? "attention" : ""}>修改 {indexPreview.counts.modified}</span>
+                        <span className={indexPreview.counts.deleted ? "attention" : ""}>删除 {indexPreview.counts.deleted}</span>
+                        <span>未变化 {indexPreview.counts.unchanged}</span>
+                        <span className={indexPreview.counts.unverified ? "attention" : ""}>未验证 {indexPreview.counts.unverified}</span>
+                        <span className={indexPreview.counts.blocked ? "attention" : ""}>阻塞 {indexPreview.counts.blocked}</span>
+                      </div>
+                      {(indexPreview.modified.length > 0 || indexPreview.deleted.length > 0 || indexPreview.added.length > 0) && (
+                        <small>
+                          {[...indexPreview.added.map((item) => `新增：${item.name}`), ...indexPreview.modified.map((item) => `修改：${item.name}`), ...indexPreview.deleted.map((item) => `删除：${item.name}`)].slice(0, 6).join(" · ")}
+                          {(indexPreview.added.length + indexPreview.modified.length + indexPreview.deleted.length) > 6 ? " · …" : ""}
+                        </small>
+                      )}
+                    </div>
+                  )}
                   <div className="document-library-list">
                     {documents.length ? documents.map((document) => (
-                      <article key={document.relative_path} className={`document-library-row ${activeDocumentNames.includes(document.name) ? "selected" : ""}`}>
+                      <article key={document.document_id || document.relative_path} className={`document-library-row ${isActiveDocument(document) ? "selected" : ""}`}>
                         <div className="document-library-row-title">
                           {document.media_type?.startsWith("image/") || isImageDocumentName(document.name) ? <ImageIcon size={16} /> : <FileText size={16} />}
-                          <strong title={document.name}>{document.name}</strong>
+                          <div className="document-library-row-title-copy">
+                            <strong title={document.name}>{document.name}</strong>
+                            {documentIndexDiagnostic(document) && <small className={`document-library-row-diagnostic ${documentIndexStatusClass(document)}`} title={documentIndexDiagnostic(document)}>{documentIndexDiagnostic(document)}</small>}
+                          </div>
                         </div>
                         <div className="document-library-row-meta">
-                          <span className={document.indexed ? "indexed" : "pending"}>{document.indexed ? "已索引" : "待索引"}</span>
+                          <span className={documentIndexStatusClass(document)}>{documentIndexStatusLabel(document)}</span>
                           <span className={document.scope === "global" ? "global" : document.scope === "ambiguous" ? "ambiguous" : "project"}>
                             {document.scope === "global" ? "全局知识库" : document.scope === "ambiguous" ? "多个项目绑定" : "项目专属"}
                           </span>
@@ -5946,8 +6762,8 @@ export default function App() {
                         </div>
                         <div className="document-library-row-actions">
                           <button type="button" className="document-view-button" onClick={() => void openDocumentViewer(document)}>查看</button>
-                          <button type="button" className="document-context-button" disabled={!document.indexed} onClick={() => toggleDocumentContext(document.name)}>
-                            <LocateFixed size={12} /> {activeDocumentNames.includes(document.name) ? "已选上下文" : "加入上下文"}
+                          <button type="button" className="document-context-button" disabled={!document.indexed} onClick={() => toggleDocumentContext(document)}>
+                            <LocateFixed size={12} /> {isActiveDocument(document) ? "已选上下文" : "加入上下文"}
                           </button>
                           {document.scope === "project" && (
                             <button
@@ -5960,7 +6776,7 @@ export default function App() {
                               归为全局
                             </button>
                           )}
-                          <button type="button" className="document-delete-button" onClick={() => setDocumentDeleteTarget(document)} title="删除文档及其本地索引">
+                          <button type="button" className="document-delete-button" onClick={() => openDocumentDeleteConfirmation(document)} title="删除文档及其本地索引">
                             <Trash2 size={12} /> 删除
                           </button>
                         </div>
@@ -5978,10 +6794,10 @@ export default function App() {
                     {!documentDeleteAuthorization ? (
                       <form onSubmit={(event) => { event.preventDefault(); void authorizeDocumentDelete(); }}>
                         <input type="password" autoFocus value={documentDeletePassphrase} onChange={(event) => setDocumentDeletePassphrase(event.target.value)} placeholder="输入工作区密码" />
-                        <div><button type="button" onClick={() => setDocumentDeleteTarget(null)}>取消</button><button type="submit" disabled={documentDeleteBusy || !documentDeletePassphrase}>校验并删除</button></div>
+                        <div><button type="button" onClick={() => { setDocumentDeleteTarget(null); setDocumentDeleteIdempotencyKey(null); }}>取消</button><button type="submit" disabled={documentDeleteBusy || !documentDeletePassphrase}>校验并删除</button></div>
                       </form>
                     ) : (
-                      <div className="document-delete-actions"><button type="button" disabled={documentDeleteBusy} onClick={() => setDocumentDeleteTarget(null)}>取消</button><button type="button" className="danger" disabled={documentDeleteBusy} onClick={() => void deleteDocument()}>{documentDeleteBusy ? "正在删除…" : "确认删除"}</button></div>
+                      <div className="document-delete-actions"><button type="button" disabled={documentDeleteBusy} onClick={() => { setDocumentDeleteTarget(null); setDocumentDeleteIdempotencyKey(null); }}>取消</button><button type="button" className="danger" disabled={documentDeleteBusy} onClick={() => void deleteDocument()}>{documentDeleteBusy ? "正在删除…" : "确认删除"}</button></div>
                     )}
                     {documentDeleteMessage && <small>{documentDeleteMessage}</small>}
                   </div>
@@ -6043,11 +6859,11 @@ export default function App() {
                               {variant.trim() !== retrievalTestQuery.trim() && (
                                 <>
                                   <button type="button" className="retrieval-test-save-button" onClick={() => void saveRetrievalFeedback(variant, "global")} disabled={retrievalTestBusy || retrievalFeedbackBusy}>
-                                    {retrievalFeedbackBusy ? "保存中…" : "记住全局"}
+                                    {retrievalFeedbackBusy ? "保存中…" : selectedWorkflowId ? "记住全局·当前窗口" : "记住全局"}
                                   </button>
                                   {activeProjectId && (
                                     <button type="button" className="retrieval-test-save-button" onClick={() => void saveRetrievalFeedback(variant, "project")} disabled={retrievalTestBusy || retrievalFeedbackBusy}>
-                                      记住当前项目
+                                      {selectedWorkflowId ? "记住当前项目·当前窗口" : "记住当前项目"}
                                     </button>
                                   )}
                                 </>
@@ -6063,8 +6879,8 @@ export default function App() {
                         <strong>已生效的检索提示</strong>
                         {(retrievalTestResult.feedback || []).map((feedback) => (
                           <div key={feedback.feedback_id}>
-                            <span>{feedback.scope === "global" ? "全局" : "当前项目"} · {feedback.corrected_query}</span>
-                            <button type="button" onClick={() => void revokeRetrievalFeedback(feedback.feedback_id)} disabled={retrievalFeedbackBusy || retrievalTestBusy}>
+                            <span>{feedback.scope === "global" ? "全局" : "当前项目"}{feedback.workflow_id ? ` · ${workflowSpecs.find((workflow) => workflow.workflow_id === feedback.workflow_id)?.title || feedback.workflow_id}` : ""} · {feedback.corrected_query}</span>
+                            <button type="button" onClick={() => void revokeRetrievalFeedback(feedback)} disabled={retrievalFeedbackBusy || retrievalTestBusy}>
                               撤销
                             </button>
                           </div>
@@ -6114,9 +6930,9 @@ export default function App() {
                   </button>
                 </header>
                 <div className="document-viewer-toolbar">
-                  <button type="button" className="document-context-button" onClick={() => toggleDocumentContext(documentPreview.name)}>
+                  <button type="button" className="document-context-button" onClick={() => toggleDocumentContext(documentPreview)}>
                     <LocateFixed size={13} />
-                    {activeDocumentNames.includes(documentPreview.name) ? "移出上下文" : "加入上下文"}
+                    {isActiveDocument(documentPreview) ? "移出上下文" : "加入上下文"}
                   </button>
                   <span>{activeDocumentNames.length ? `当前已选 ${activeDocumentNames.length} 份上下文` : "当前使用全局索引检索"}</span>
                   {documentPreview.chunks?.length ? (
@@ -6252,7 +7068,9 @@ export default function App() {
                           });
                         }}
                       />
-                      <span>{candidate.asset_type.toUpperCase()} · {candidate.subtype}</span>
+                      <span>
+                        {candidate.asset_type.toUpperCase()} · {candidate.subtype === "project_constraint" ? "项目约束" : candidate.subtype}
+                      </span>
                     </label>
                     <input
                       value={edit.title}
@@ -6306,19 +7124,31 @@ export default function App() {
             </div>
             <div className="learning-memory-summary">
               <p>
-                {activeProjectId ? "当前显示：当前项目偏好 + 全局偏好。其他项目的偏好不会出现在这里。" : "当前显示：全部已启用偏好。选择项目后可按项目范围管理。"}
+                {activeProjectId ? "当前显示：当前项目长期记忆/约束 + 全局偏好。其他项目内容不会出现在这里。" : "当前显示：全部已启用全局偏好。选择项目后可按项目范围管理。"}
               </p>
-              <p>偏好只影响表达和排序，不得改写事实、数值、证据或安全边界。</p>
+              <p>偏好和项目约束只影响当前项目的工作方式，不得改写事实、数值、证据或安全边界。</p>
+              {memoryHealth && (
+                <p className="learning-memory-message" role="status">
+                  {memoryHealth.status === "ok"
+                    ? `记忆健康检查正常：活动事实 ${memoryHealth.counts.active_memories} 条，检索块 ${memoryHealth.counts.active_memory_chunks} 个。`
+                    : `记忆健康检查发现 ${memoryHealth.issue_count} 项待处理问题（活动事实 ${memoryHealth.counts.active_memories} 条，待同步 ${memoryHealth.counts.pending_syncs} 条）。请优先人工检查，不会自动合并或删除记忆。`}
+                </p>
+              )}
               {memoryManagerMessage && <p className="learning-memory-message" role="status">{memoryManagerMessage}</p>}
             </div>
             <div className="learning-memory-list">
               {memoryManagerBusy && <p className="learning-memory-empty">正在同步偏好画像…</p>}
               {!memoryManagerBusy && learningMemories.length === 0 && (
-                <p className="learning-memory-empty">当前范围没有已启用的偏好。</p>
+                <p className="learning-memory-empty">当前范围没有已启用的长期记忆或项目约束。</p>
               )}
               {!memoryManagerBusy && learningMemories.map((memory) => {
                 const edit = memoryEdits[memory.memory_id] || { title: memory.title, content: memory.content };
                 const sourceIndexes = memory.source_trace?.message_indexes || [];
+                const validityLabel = memory.validity_status === "scheduled"
+                  ? "计划生效"
+                  : memory.validity_status === "expired"
+                    ? "已过期"
+                    : "当前生效";
                 const confirmationLabel = memory.confirmation_status === "human_reviewed"
                   ? "人工确认"
                   : memory.confirmation_status === "explicit_signal"
@@ -6328,7 +7158,16 @@ export default function App() {
                   <article key={memory.memory_id} className="learning-memory-card">
                     <div className="learning-memory-card-head">
                       <div className="learning-memory-badges">
-                        <span>{memory.scope === "global" ? "全局偏好" : `项目偏好 · ${memory.project_id || "当前项目"}`}</span>
+                        <span>
+                          {memory.subtype === "project_constraint"
+                            ? `项目约束 · ${memory.project_id || "当前项目"}`
+                            : memory.subtype === "project_fact"
+                              ? `项目事实 · ${memory.project_id || "当前项目"}`
+                              : memory.scope === "global"
+                                ? "全局偏好"
+                                : `项目偏好 · ${memory.project_id || "当前项目"}`}
+                        </span>
+                        <span>{validityLabel}</span>
                         <span>{confirmationLabel}</span>
                         <span>v{memory.record_version || 1}</span>
                       </div>
@@ -6388,17 +7227,26 @@ export default function App() {
                 <button type="button" onClick={selectRecentPresentationSources}>选择最近 7 天文档</button>
                 <small>按本地导入/保存时间筛选，不代表论文发表时间。</small>
                 {indexedDocuments.map((document) => (
-                  <label key={document.relative_path} className={presentationSources.has(document.name) ? "selected" : ""}>
+                  <label key={document.document_id || document.relative_path} className={isPresentationSource(document) ? "selected" : ""}>
                     <input
                       type="checkbox"
-                      checked={presentationSources.has(document.name)}
-                      disabled={!presentationSources.has(document.name) && presentationSources.size >= 12}
+                      checked={isPresentationSource(document)}
+                      disabled={!isPresentationSource(document) && presentationSources.length >= 12}
                       onChange={(event) => {
                         setPresentationSources((previous) => {
-                          const next = new Set(previous);
-                          if (event.target.checked) next.add(document.name);
-                          else next.delete(document.name);
-                          return next;
+                          const selected = previous.some((item) => document.document_id
+                            ? item.document_id === document.document_id
+                            : !item.document_id && item.name === document.name);
+                          if (event.target.checked === selected) return previous;
+                          const source = {
+                            name: document.name,
+                            ...(document.document_id ? { document_id: document.document_id } : {}),
+                          };
+                          return event.target.checked
+                            ? [...previous, source].slice(0, 12)
+                            : previous.filter((item) => document.document_id
+                              ? item.document_id !== document.document_id
+                              : item.document_id || item.name !== document.name);
                         });
                       }}
                     />
@@ -6468,16 +7316,63 @@ export default function App() {
                 </label>
                 <div className={`presentation-task-state ${presentationTask?.status || "idle"}`} role="status" aria-live="polite">
                   <strong>{presentationTask?.status?.toUpperCase() || "READY"}</strong>
-                  <span>{presentationMessage || `已选择 ${presentationSources.size} 份文档`}</span>
+                  <span>{presentationMessage || `已选择 ${presentationSources.length} 份文档`}</span>
                   {presentationTask && (
                     <div className="presentation-progress">
                       <i style={{ width: `${Math.round(100 * presentationTask.progress.completed / Math.max(1, presentationTask.progress.total))}%` }} />
                     </div>
                   )}
-                  {presentationTask?.result && (
+                  {presentationTask?.repetition_guard?.decision === "warn" ? (
+                    <p className="presentation-repetition-warning" role="alert">
+                      检测到相同任务输入曾失败或中断（{presentationTask.repetition_guard.matches?.length || 0} 次）。请先检查执行轨迹，再决定是否继续。
+                    </p>
+                  ) : null}
+                  {presentationTask?.steps?.length ? (
+                    <details className="presentation-attempt-history">
+                      <summary>
+                        执行轨迹 · {presentationTask.progress.completed}/{presentationTask.progress.total} 步 · {presentationTask.steps.reduce((total, step) => total + Number(step.attempt_count || 0), 0)} 次尝试
+                      </summary>
+                      <ol>
+                        {presentationTask.steps.map((step) => (
+                          <li key={step.step_name}>
+                            <div>
+                              <b>{step.step_name}</b>
+                              <span>{formatTaskStepStatus(step.status)} · {step.attempt_count || 0} 次</span>
+                            </div>
+                            {step.attempt_history?.length ? (
+                              <ul>
+                                {step.attempt_history.map((attempt) => (
+                                  <li key={`${step.step_name}-${attempt.attempt}`}>
+                                    第 {attempt.attempt} 次：{formatTaskStepStatus(attempt.status)}{attempt.error ? ` · ${attempt.error.slice(0, 240)}` : ""}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  ) : null}
+                  {presentationTask?.result?.outline && (
+                    <div className="presentation-outline-review">
+                      <strong>大纲审核 · {presentationTask.result.outline.title || presentationTitle || "未命名汇报"}</strong>
+                      <span>确认下面的实际大纲摘要后，系统才会生成本地 PPTX。</span>
+                      <ol>
+                        {(presentationTask.result.outline.slides || []).map((slide, index) => (
+                          <li key={`${index}-${slide.title || "slide"}`}>
+                            <b>{index + 1}. {slide.title || "未命名页面"}</b>
+                            {slide.points?.length ? <small>{slide.points.join(" · ")}</small> : null}
+                            {slide.sources?.length ? <em>证据：{slide.sources.join("、")}</em> : null}
+                          </li>
+                        ))}
+                      </ol>
+                      {presentationTask.result.plan_digest && <code>摘要：{presentationTask.result.plan_digest.slice(0, 16)}…</code>}
+                    </div>
+                  )}
+                  {presentationTask?.result?.output_path && (
                     <p title={presentationTask.result.output_path}>
                       {presentationTask.result.slide_count} 页 · {presentationTask.result.renderer} · {presentationTask.result.outline_source === "local_ollama" ? "Ollama 提纲" : presentationTask.result.outline_source === "extractive" ? "证据提炼" : "自定义提纲"}
-                      <br />证据页 {Math.round(presentationTask.result.evidence_metrics.evidence_slide_coverage * 100)}% · 来源 {Math.round(presentationTask.result.evidence_metrics.selected_source_coverage * 100)}% · {Math.round(presentationTask.result.elapsed_ms)} ms
+                      {presentationTask.result.evidence_metrics ? <><br />证据页 {Math.round(presentationTask.result.evidence_metrics.evidence_slide_coverage * 100)}% · {formatPresentationEvidenceCoverage(presentationTask.result.evidence_metrics)} · {Math.round(presentationTask.result.elapsed_ms || 0)} ms</> : null}
                       {presentationTask.result.skill_application?.skill_title && <><br />Skill：{presentationTask.result.skill_application.skill_title} · 指令{presentationTask.result.skill_application.instructions_applied ? "已应用" : "未应用"} · 样式{presentationTask.result.skill_application.style_applied ? "已应用" : "未提供"}</>}
                       {presentationTask.result.artifact_id && <><br />项目产物已登记：{presentationTask.result.artifact_id}</>}
                     </p>
@@ -6488,15 +7383,22 @@ export default function App() {
 
             <div className="learning-review-actions">
               <button type="button" onClick={() => setPresentationOpen(false)}>关闭</button>
-              {presentationTask?.recoverable ? (
+              {presentationTask && ["pending", "running"].includes(presentationTask.status) ? (
+                <button type="button" onClick={() => void cancelPresentation()} disabled={presentationTask.cancellation_pending}>停止</button>
+              ) : presentationTask?.kind === "presentation.plan" && presentationTask.status === "completed" && (presentationTask.plan_digest || presentationTask.result?.plan_digest) ? (
+                <>
+                  <button type="button" onClick={resetPresentationPlan}>返回修改参数</button>
+                  <button type="button" onClick={() => void confirmPresentation()}>确认并生成 PPT</button>
+                </>
+              ) : presentationTask?.recoverable ? (
                 <button type="button" onClick={() => void resumePresentation()}>继续生成</button>
               ) : (
                 <button
                   type="button"
-                  disabled={!presentationSources.size || ["pending", "running"].includes(presentationTask?.status || "")}
+                  disabled={!presentationSources.length || presentationTask?.status === "completed"}
                   onClick={() => void generatePresentation()}
                 >
-                  生成 PPT
+                  {presentationTask?.status === "cancelled" || presentationTask?.status === "failed" ? "重新生成大纲" : "生成大纲"}
                 </button>
               )}
             </div>
@@ -6895,6 +7797,60 @@ export default function App() {
             </div>
           )}
         </section>
+      )}
+      {scheduleHistoryOpen && (
+        <div className="schedule-history-backdrop" role="presentation" onMouseDown={() => setScheduleHistoryOpen(false)}>
+          <section className="schedule-history-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-history-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header className="schedule-history-head">
+              <div>
+                <span>Schedule History</span>
+                <h2 id="schedule-history-title">近 7 天日程</h2>
+                <small>按创建时间保留最近 7 天；到期和已取消记录仍可查看。</small>
+              </div>
+              <button type="button" className="layout-icon-button" title="关闭日程历史" onClick={() => setScheduleHistoryOpen(false)}>
+                <X size={17} />
+              </button>
+            </header>
+            {scheduleHistoryMessage && <div className="schedule-history-message" role="status">{scheduleHistoryMessage}</div>}
+            <div className="schedule-history-body">
+              <div className="schedule-history-list" aria-label="近 7 天日程列表">
+                {scheduleHistory.length ? scheduleHistory.map((artifact) => (
+                  <button
+                    key={artifact.artifact_id}
+                    type="button"
+                    className={`schedule-history-item ${selectedScheduleHistoryArtifactId === artifact.artifact_id ? "selected" : ""}`}
+                    onClick={() => setSelectedScheduleHistoryArtifactId(artifact.artifact_id)}
+                  >
+                    <strong>{artifact.plan?.title || "未命名日程"}</strong>
+                    <span>{formatScheduleStartTime(artifact.plan?.start_at)}</span>
+                    <small>{formatScheduleCreatedAt(artifact.created_at)}</small>
+                    <em>{artifact.confirmation_status === "confirmed" ? "已确认" : artifact.confirmation_status === "cancelled" ? "已取消" : "草稿"}</em>
+                  </button>
+                )) : <div className="schedule-empty">近 7 天暂无已创建日程</div>}
+              </div>
+              <article className="schedule-history-detail" aria-label="日程历史详情">
+                {selectedScheduleHistoryArtifact ? (
+                  <>
+                    <div className="schedule-history-detail-head">
+                      <div>
+                        <span>历史详情</span>
+                        <h3>{selectedScheduleHistoryArtifact.plan?.title || "未命名日程"}</h3>
+                      </div>
+                      <em>{selectedScheduleHistoryArtifact.confirmation_status === "confirmed" ? "已确认" : selectedScheduleHistoryArtifact.confirmation_status === "cancelled" ? "已取消" : "草稿"}</em>
+                    </div>
+                    <dl>
+                      <div><dt>创建时间</dt><dd>{formatScheduleCreatedAt(selectedScheduleHistoryArtifact.created_at)}</dd></div>
+                      <div><dt>开始时间</dt><dd>{formatScheduleStartTime(selectedScheduleHistoryArtifact.plan?.start_at)}</dd></div>
+                      <div><dt>时长</dt><dd>{selectedScheduleHistoryArtifact.plan?.duration_minutes ? `${selectedScheduleHistoryArtifact.plan.duration_minutes} 分钟` : "未设置"}</dd></div>
+                      <div><dt>参与人</dt><dd>{selectedScheduleHistoryArtifact.plan?.participant?.display_name ? `${selectedScheduleHistoryArtifact.plan.participant.display_name} <${selectedScheduleHistoryArtifact.plan.participant.email}>` : "未填写"}</dd></div>
+                    </dl>
+                    <p>{selectedScheduleHistoryArtifact.plan?.notes || selectedScheduleHistoryArtifact.change_summary || "暂无说明"}</p>
+                  </>
+                ) : <div className="schedule-empty">点击左侧日程查看详细信息</div>}
+              </article>
+            </div>
+          </section>
+        </div>
       )}
       {scheduleReminderOpen && scheduleReminderArtifact && (
         <div className="schedule-reminder-backdrop" role="presentation">

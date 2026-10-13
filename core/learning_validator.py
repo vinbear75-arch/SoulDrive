@@ -1,13 +1,15 @@
+import math
 import re
 from typing import Any
 
-from core.memory_gate import evaluate_memory_write_gate
+from core.memory_gate import contains_untrusted_memory_instruction, evaluate_memory_write_gate
+from core.skill_runtime import SUPPORTED_WORKFLOW_IDS
 
 
 VALID_ASSET_TYPES = {"memory", "skill"}
-VALID_MEMORY_SUBTYPES = {"user_preference", "project_fact", "workflow_fact"}
+VALID_MEMORY_SUBTYPES = {"user_preference", "project_constraint", "project_fact", "workflow_fact"}
 VALID_SKILL_SUBTYPES = {"sop", "troubleshooting", "template", "pitfall"}
-USER_BOUND_MEMORY_SUBTYPES = {"user_preference", "project_fact"}
+USER_BOUND_MEMORY_SUBTYPES = {"user_preference", "project_constraint", "project_fact"}
 SENSITIVE_PATTERNS = (
     "ignore previous instructions",
     "reveal the system prompt",
@@ -70,6 +72,10 @@ def _normalize_candidate(candidate: dict[str, Any], messages: list[dict[str, str
         return None
     if asset_type == "skill" and subtype not in VALID_SKILL_SUBTYPES:
         return None
+    if asset_type == "memory" and subtype == "workflow_fact":
+        workflow_id = str(candidate.get("workflow_id") or "").strip()
+        if not workflow_id or workflow_id not in SUPPORTED_WORKFLOW_IDS:
+            return None
 
     title = str(candidate.get("title") or "").strip()
     content = str(candidate.get("content") or "").strip()
@@ -164,7 +170,7 @@ def _looks_conflicting(left: str, right: str) -> bool:
 def _contains_sensitive_instruction(candidate: dict[str, Any]) -> bool:
     text = _normalize_text(" ".join(str(candidate.get(key) or "") for key in ("title", "content", "rationale")))
     text += " " + _normalize_text(" ".join(candidate.get("evidence") or []))
-    return any(pattern in text for pattern in SENSITIVE_PATTERNS)
+    return any(pattern in text for pattern in SENSITIVE_PATTERNS) or contains_untrusted_memory_instruction(text)
 
 
 def _asset_text(asset: dict[str, Any]) -> str:
@@ -202,6 +208,8 @@ def _confidence(value: Any) -> float:
         parsed = float(value)
     except (TypeError, ValueError):
         parsed = 0.0
+    if not math.isfinite(parsed):
+        return 0.0
     return max(0.0, min(parsed, 1.0))
 
 

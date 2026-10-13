@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import random
 import re
 import time
@@ -35,6 +37,16 @@ GLOBAL_MARKERS = (
     "综合分析",
     "趋势",
 )
+
+
+def _error_observation(exc: BaseException) -> dict[str, Any]:
+    """保留 freshness 失败的关联信息，但不把异常原文放入诊断结果。"""
+    message = str(exc or "")
+    return {
+        "error_type": type(exc).__name__,
+        "error_digest": hashlib.sha256(message.encode("utf-8")).hexdigest()[:16],
+        "error_chars": len(message),
+    }
 LOCAL_GRAPH_MARKERS = (
     "关系",
     "关联",
@@ -48,6 +60,58 @@ LOCAL_GRAPH_MARKERS = (
     "社区",
     "图谱",
     "graphrag",
+)
+
+
+def _graph_snapshot_digest(snapshot: dict[str, Any] | None) -> str:
+    """Return a deterministic digest for the graph facts behind a derived index."""
+    encoded = json.dumps(
+        snapshot or {},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _normalize_chunk_project_ids(chunk_project_ids: dict[str, Any] | None) -> dict[str, str]:
+    return {
+        str(chunk_id): str(
+            (value.get("project_id") if isinstance(value, dict) else value) or ""
+        ).strip()
+        for chunk_id, value in (chunk_project_ids or {}).items()
+        if str(chunk_id)
+    }
+
+
+def _graph_scope_digest(
+    snapshot: dict[str, Any] | None,
+    chunk_project_ids: dict[str, Any] | None,
+    *,
+    project_id: str | None,
+    global_only: bool,
+) -> str:
+    """Digest graph facts plus the external chunk-scope input used by indexing."""
+    return _graph_snapshot_digest({
+        "snapshot": snapshot or {},
+        "chunk_project_ids": _normalize_chunk_project_ids(chunk_project_ids),
+        "project_id": str(project_id or "").strip() or None,
+        "global_only": bool(global_only),
+    })
+
+
+# A broad word such as "整体" can appear together with a concrete entity
+# relation request. Keep those requests on local search: GraphRAG local search
+# is the entity/relation path, while global search is corpus-wide synthesis.
+LOCAL_RELATION_MARKERS = (
+    "影响链",
+    "路径",
+    "多跳",
+    "上下游",
+    "依赖",
+    "为什么会导致",
+    "如何联系",
 )
 SOURCE_DIVERSITY_MARKERS = (
     "对比",
@@ -87,6 +151,66 @@ def _graph_document_priority(document: dict[str, Any]) -> tuple[int, str]:
     return score, source
 
 
+def _graph_document_identity(document: dict[str, Any]) -> str:
+    """Return a stable document identity without using the display filename as a key."""
+    explicit = str(document.get("document_id") or "").strip()
+    if explicit:
+        return explicit
+    source = str(document.get("source_filename") or "").strip()
+    if not source:
+        return ""
+    project_id = str(document.get("project_id") or "").strip()
+    value = f"document:{project_id}\0{source}"
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _apply_scoped_entity_attributes(
+    item: dict[str, Any],
+    scoped_chunk_ids: list[str],
+    *,
+    scope_requested: bool,
+) -> dict[str, Any]:
+    """Keep entity attributes only when their chunk provenance covers the scope."""
+    if not scope_requested:
+        return dict(item)
+
+    scoped_item = dict(item)
+    source_attributes = []
+    for source in item.get("source_attributes") or []:
+        if not isinstance(source, dict):
+            continue
+        chunk_id = str(source.get("chunk_id") or "").strip()
+        if not chunk_id:
+            continue
+        source_attributes.append({
+            "chunk_id": chunk_id,
+            "type": str(source.get("type") or ""),
+            "description": str(source.get("description") or ""),
+        })
+    source_by_chunk = {source["chunk_id"]: source for source in source_attributes}
+    if source_by_chunk:
+        if not set(scoped_chunk_ids).issubset(source_by_chunk):
+            # A partially migrated entity cannot prove that its aggregate
+            # description belongs to the current project/document scope.
+            scoped_item["type"] = ""
+            scoped_item["description"] = ""
+            scoped_item["source_attributes"] = []
+            return scoped_item
+        selected = [source_by_chunk[chunk_id] for chunk_id in scoped_chunk_ids]
+        scoped_item["source_attributes"] = selected
+        types = list(dict.fromkeys(
+            source["type"] for source in selected if source["type"]
+        ))
+        descriptions = list(dict.fromkeys(
+            source["description"] for source in selected if source["description"]
+        ))
+        scoped_item["type"] = " / ".join(types)
+        scoped_item["description"] = "；".join(descriptions)[:4000]
+        return scoped_item
+
+    return scoped_item
+
+
 def _is_graph_entity_noise(name: str) -> bool:
     normalized = " ".join(str(name or "").split())
     if not normalized or len(normalized) < 2:
@@ -110,13 +234,7 @@ def _scope_graph_snapshot(
     chunk_project_ids: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     project_id = str(project_id or "").strip()
-    chunk_project_ids = {
-        str(chunk_id): str(
-            (value.get("project_id") if isinstance(value, dict) else value) or ""
-        ).strip()
-        for chunk_id, value in (chunk_project_ids or {}).items()
-        if str(chunk_id)
-    }
+    chunk_project_ids = _normalize_chunk_project_ids(chunk_project_ids)
 
     source_documents = list(snapshot.get("documents") or [])
     if project_id:
@@ -157,9 +275,10 @@ def _scope_graph_snapshot(
                     for chunk_id in known_chunk_ids
                     if not chunk_project_ids.get(chunk_id)
                 ]
-            elif document_project_id:
-                # With incomplete metadata, fail closed for an explicitly
-                # project-scoped graph document.
+            elif chunk_project_ids:
+                # Once a child-scope manifest is present, an omitted chunk is
+                # unknown rather than global.  Treating it as shared would
+                # silently widen the global index when metadata is partial.
                 continue
             else:
                 scoped_chunk_ids = original_chunk_ids
@@ -194,9 +313,28 @@ def _scope_graph_snapshot(
     # corpus manifest when multiple independent GraphRAG indexes are needed.
     entities = []
     for item in snapshot.get("entities") or []:
+        original_chunk_ids = {
+            str(chunk_id)
+            for chunk_id in item.get("chunk_ids") or []
+            if str(chunk_id)
+        }
         chunk_ids = scoped_chunks(item)
         if chunk_ids:
-            entities.append({**item, "chunk_ids": chunk_ids})
+            scoped_item = _apply_scoped_entity_attributes(
+                {**item, "chunk_ids": chunk_ids},
+                chunk_ids,
+                scope_requested=bool(project_id or global_only),
+            )
+            if (project_id or global_only) and original_chunk_ids - set(chunk_ids):
+                # Entity descriptions are currently stored as one aggregate
+                # value, while chunk provenance is finer grained.  When a
+                # scoped index keeps only part of an entity's evidence, fail
+                # closed instead of carrying an unbound description from
+                # another project/document into the community index.
+                if not scoped_item.get("source_attributes"):
+                    scoped_item["type"] = ""
+                    scoped_item["description"] = ""
+            entities.append(scoped_item)
     relationships = []
     for item in snapshot.get("relationships") or []:
         chunk_ids = scoped_chunks(item)
@@ -231,7 +369,18 @@ def route_graph_query(query: str) -> GraphRoute:
 
     global_hits = tuple(marker for marker in GLOBAL_MARKERS if marker in normalized)
     local_hits = tuple(marker for marker in LOCAL_GRAPH_MARKERS if marker in normalized)
+    local_relation_hits = tuple(
+        marker for marker in LOCAL_RELATION_MARKERS if marker in normalized
+    )
     source_hits = tuple(marker for marker in SOURCE_DIVERSITY_MARKERS if marker in normalized)
+    if local_relation_hits:
+        return GraphRoute(
+            True,
+            "local",
+            "entity_relation_or_multi_hop_question",
+            tuple(dict.fromkeys(local_relation_hits)),
+            "medium_index_lookup",
+        )
     if global_hits or (source_hits and ("总结" in normalized or "分析" in normalized)):
         return GraphRoute(
             True,
@@ -347,6 +496,7 @@ class GraphRAGBuilder:
         global_only: bool = False,
         chunk_project_ids: dict[str, str] | None = None,
         index_name: str | None = None,
+        source_snapshot: dict[str, Any] | None = None,
     ):
         self.graph_store = graph_store
         self.report_generator = report_generator
@@ -357,6 +507,7 @@ class GraphRAGBuilder:
         self.project_id = str(project_id or "").strip() or None
         self.global_only = bool(global_only)
         self.chunk_project_ids = dict(chunk_project_ids or {})
+        self.source_snapshot = source_snapshot
         self.index_name = str(index_name or (
             "global_shared"
             if self.global_only
@@ -364,8 +515,20 @@ class GraphRAGBuilder:
         ))
 
     def build(self) -> dict[str, Any]:
+        source_snapshot = (
+            self.source_snapshot
+            if self.source_snapshot is not None
+            else self.graph_store.get_graph_snapshot()
+        )
+        source_snapshot_digest = _graph_snapshot_digest(source_snapshot)
+        source_scope_digest = _graph_scope_digest(
+            source_snapshot,
+            self.chunk_project_ids,
+            project_id=self.project_id,
+            global_only=self.global_only,
+        )
         snapshot = _scope_graph_snapshot(
-            self.graph_store.get_graph_snapshot(),
+            source_snapshot,
             self.max_documents,
             project_id=self.project_id,
             global_only=self.global_only,
@@ -415,6 +578,11 @@ class GraphRAGBuilder:
                 for community in communities
                 for source in community["source_filenames"]
             }),
+            "source_document_ids": sorted({
+                document_id
+                for community in communities
+                for document_id in community.get("source_document_ids") or []
+            }),
             "chunk_ids": sorted({
                 chunk_id
                 for community in communities
@@ -426,11 +594,14 @@ class GraphRAGBuilder:
         root["children"] = [theme["community_id"] for theme in themes]
         root["report"] = _root_report(themes or communities)
         payload = {
-            "schema_version": "souldrive_graphrag_index_v2",
+            "schema_version": "souldrive_graphrag_index_v4",
             "algorithm": "leiden_v1_local_move_refine_hierarchy",
             "seed": self.seed,
             "resolution": resolution,
             "built_at": time.time(),
+            "source_snapshot_digest": source_snapshot_digest,
+            "source_scope_digest": source_scope_digest,
+            "scope_metadata_required": bool(self.chunk_project_ids),
             "entity_count": len(entities),
             "relationship_count": len(relationships),
             "document_count": len(documents),
@@ -453,6 +624,7 @@ class GraphRAGBuilder:
             "memory_policy": "document_derived_index_only; user_memory_is_not_graph_data",
             "project_id": self.project_id,
             "index_name": self.index_name,
+            "global_only": self.global_only,
         }
         try:
             self.graph_store.save_graphrag_index(payload, index_name=self.index_name)
@@ -466,7 +638,7 @@ class GraphRAGBuilder:
         if self.report_generator is not None:
             try:
                 generated = _clean_report(self.report_generator(community))
-                if generated:
+                if generated and _community_report_has_grounding_signal(community, generated):
                     community["report_method"] = "llm"
                     return generated
             except Exception:
@@ -476,8 +648,19 @@ class GraphRAGBuilder:
 
 
 class GraphRAGIndex:
-    def __init__(self, graph_store):
+    def __init__(
+        self,
+        graph_store,
+        *,
+        scope_metadata_provider: Callable[[list[str]], dict[str, Any]] | None = None,
+    ):
         self.graph_store = graph_store
+        self.scope_metadata_provider = scope_metadata_provider
+        self._stale_index_names: set[str] = set()
+        self._unverified_index_names: set[str] = set()
+        self._freshness_errors: dict[str, dict[str, Any]] = {}
+        self._scope_unverified_index_names: set[str] = set()
+        self._scope_freshness_errors: dict[str, dict[str, Any]] = {}
 
     def _load(self, index_name: str = "default"):
         try:
@@ -487,19 +670,219 @@ class GraphRAGIndex:
                 return None
             return self.graph_store.load_graphrag_index()
 
-    def _load_for_project(self, project_id: str | None):
-        normalized_project_id = str(project_id or "").strip() or None
-        index_name = f"project:{normalized_project_id}" if normalized_project_id else "default"
+    def _load_checked(self, index_name: str):
         payload = self._load(index_name)
+        if payload is None:
+            return None
+        project_scoped = bool(str(payload.get("project_id") or "").strip())
+        expected_digest = str(payload.get("source_snapshot_digest") or "").strip()
+        if not expected_digest:
+            # Indexes written before source-digest support remain readable, but
+            # diagnostics must make their freshness limitation explicit.
+            self._unverified_index_names.add(index_name)
+            self._stale_index_names.discard(index_name)
+            if project_scoped:
+                # A project index without a source digest cannot prove that
+                # its document-to-project binding is still current.
+                self._scope_unverified_index_names.add(index_name)
+                return None
+            return payload
+        self._unverified_index_names.discard(index_name)
+        try:
+            current_snapshot = self.graph_store.get_graph_snapshot()
+            current_digest = _graph_snapshot_digest(current_snapshot)
+        except Exception as exc:
+            self._stale_index_names.discard(index_name)
+            self._freshness_errors[index_name] = _error_observation(exc)
+            return None
+        if current_digest != expected_digest:
+            self._stale_index_names.add(index_name)
+            self._freshness_errors.pop(index_name, None)
+            return None
+        self._stale_index_names.discard(index_name)
+        self._freshness_errors.pop(index_name, None)
+
+        expected_scope_digest = str(payload.get("source_scope_digest") or "").strip()
+        scope_metadata_required = bool(payload.get("scope_metadata_required"))
+        if project_scoped and (not expected_scope_digest or not scope_metadata_required):
+            # A readable legacy project payload is not evidence that its
+            # current chunks still belong to the requested project.
+            self._scope_unverified_index_names.add(index_name)
+            self._scope_freshness_errors.pop(index_name, None)
+            return None
+        if expected_scope_digest and bool(payload.get("scope_metadata_required")):
+            provider = self.scope_metadata_provider
+            if not callable(provider):
+                self._scope_unverified_index_names.add(index_name)
+                self._scope_freshness_errors.pop(index_name, None)
+                # A mixed all-project index has the same isolation risk as a
+                # project index when its child-scope manifest cannot be
+                # revalidated.  Only the explicitly global shared index keeps
+                # the older read-only compatibility behavior.
+                if project_scoped or str(index_name) == "all_projects":
+                    return None
+                # Older callers that only inspect a global graph store remain
+                # compatible, but diagnostics show that external metadata was
+                # not revalidated.
+                return payload
+            chunk_ids = sorted({
+                str(chunk_id)
+                for document in current_snapshot.get("documents") or []
+                for chunk_id in document.get("chunk_ids") or []
+                if str(chunk_id)
+            })
+            try:
+                current_scope_metadata = provider(chunk_ids)
+                current_scope_digest = _graph_scope_digest(
+                    current_snapshot,
+                    current_scope_metadata,
+                    project_id=payload.get("project_id"),
+                    global_only=bool(payload.get("global_only")),
+                )
+            except Exception as exc:
+                self._stale_index_names.discard(index_name)
+                self._scope_freshness_errors[index_name] = _error_observation(exc)
+                return None
+            self._scope_unverified_index_names.discard(index_name)
+            self._scope_freshness_errors.pop(index_name, None)
+            if current_scope_digest != expected_scope_digest:
+                self._stale_index_names.add(index_name)
+                return None
+        self._scope_unverified_index_names.discard(index_name)
+        return payload
+
+    def _freshness_status(self, index_name: str) -> str:
+        if index_name in self._stale_index_names:
+            return "stale"
+        if index_name in self._freshness_errors:
+            return "unavailable"
+        if index_name in self._unverified_index_names:
+            return "unverified"
+        return "verified"
+
+    def _scope_freshness_status(self, index_name: str) -> str:
+        if index_name in self._stale_index_names:
+            return "stale"
+        if index_name in self._scope_freshness_errors:
+            return "unavailable"
+        if index_name in self._scope_unverified_index_names:
+            return "unverified"
+        return "verified"
+
+    def _load_for_project(
+        self,
+        project_id: str | None,
+        *,
+        index_name_override: str | None = None,
+    ):
+        normalized_project_id = str(project_id or "").strip() or None
+        if index_name_override:
+            index_name = str(index_name_override).strip()
+            if not index_name:
+                return None, "", False
+            return self._load_checked(index_name), index_name, False
+        # An unbound request may only read the explicitly global graph index.
+        # The historical ``default`` index could contain project documents
+        # because it was built before project-scoped indexes were introduced.
+        # Do not let a missing project binding silently widen that corpus.
+        index_name = f"project:{normalized_project_id}" if normalized_project_id else "global_shared"
+        payload = self._load_checked(index_name)
+        if not normalized_project_id and payload is None:
+            # Keep a narrow compatibility path for callers that explicitly
+            # built a global-only legacy index under ``default``.  A mixed or
+            # unmarked default payload is intentionally not trusted.
+            global_index_blocked = any(
+                index_name in registry
+                for registry in (
+                    self._stale_index_names,
+                    self._freshness_errors,
+                    self._scope_freshness_errors,
+                )
+            )
+            if not global_index_blocked:
+                legacy_payload = self._load_checked("default")
+                if legacy_payload and bool(legacy_payload.get("global_only")):
+                    return legacy_payload, "default", False
+            return None, index_name, False
+        if normalized_project_id and index_name in self._scope_unverified_index_names:
+            # Do not hide an unverifiable project index behind the shared
+            # global fallback: that would silently change the requested scope.
+            return None, index_name, False
         if normalized_project_id and not (payload and payload.get("communities")):
-            shared_payload = self._load("global_shared")
+            shared_payload = self._load_checked("global_shared")
             if shared_payload and shared_payload.get("communities"):
                 return shared_payload, "global_shared", True
         return payload, index_name, False
 
-    def diagnostics(self, project_id: str | None = None) -> dict[str, Any]:
-        payload, index_name, shared_fallback = self._load_for_project(project_id)
+    def diagnostics(
+        self,
+        project_id: str | None = None,
+        *,
+        index_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Return health for the requested project or an explicit index.
+
+        The default remains the project/shared read path for backwards
+        compatibility.  Operators and cross-project callers can select a
+        named derived index (notably ``all_projects``) without accidentally
+        reporting the shared-only index as its health.
+        """
+        payload, resolved_index_name, shared_fallback = self._load_for_project(
+            project_id,
+            index_name_override=index_name,
+        )
+        index_name = resolved_index_name
         if not payload:
+            if index_name in self._stale_index_names:
+                return {
+                    "ready": False,
+                    "status": "stale",
+                    "reason": "graphrag_index_stale",
+                    "algorithm": "leiden_v1_local_move_refine",
+                    "memory_policy": "user_memory_excluded",
+                    "project_id": project_id,
+                    "index_name": index_name,
+                    "source_freshness": self._freshness_status(index_name),
+                    "scope_freshness": self._scope_freshness_status(index_name),
+                }
+            if index_name in self._freshness_errors:
+                return {
+                    "ready": False,
+                    "status": "unavailable",
+                    "reason": "graphrag_source_snapshot_unavailable",
+                    "algorithm": "leiden_v1_local_move_refine",
+                    "memory_policy": "user_memory_excluded",
+                    "project_id": project_id,
+                    "index_name": index_name,
+                    "source_freshness": self._freshness_status(index_name),
+                    "scope_freshness": self._scope_freshness_status(index_name),
+                    **self._freshness_errors[index_name],
+                }
+            if index_name in self._scope_freshness_errors:
+                return {
+                    "ready": False,
+                    "status": "unavailable",
+                    "reason": "graphrag_scope_metadata_unavailable",
+                    "algorithm": "leiden_v1_local_move_refine",
+                    "memory_policy": "user_memory_excluded",
+                    "project_id": project_id,
+                    "index_name": index_name,
+                    "source_freshness": self._freshness_status(index_name),
+                    "scope_freshness": self._scope_freshness_status(index_name),
+                    **self._scope_freshness_errors[index_name],
+                }
+            if index_name in self._scope_unverified_index_names:
+                return {
+                    "ready": False,
+                    "status": "unverified",
+                    "reason": "graphrag_scope_metadata_unverified",
+                    "algorithm": "leiden_v1_local_move_refine",
+                    "memory_policy": "user_memory_excluded",
+                    "project_id": project_id,
+                    "index_name": index_name,
+                    "source_freshness": self._freshness_status(index_name),
+                    "scope_freshness": self._scope_freshness_status(index_name),
+                }
             return {
                 "ready": False,
                 "status": "not_built",
@@ -508,11 +891,22 @@ class GraphRAGIndex:
                 "memory_policy": "user_memory_excluded",
                 "project_id": project_id,
                 "index_name": index_name,
+                "source_freshness": self._freshness_status(index_name),
             }
         communities = list(payload.get("communities") or [])
+        scope_freshness = self._scope_freshness_status(index_name)
+        scope_unverified = (
+            bool(payload.get("scope_metadata_required"))
+            and scope_freshness == "unverified"
+        )
         return {
-            "ready": bool(communities),
-            "status": "ready" if communities else "not_built",
+            "ready": bool(communities) and not scope_unverified,
+            "status": (
+                "unverified"
+                if scope_unverified
+                else "ready" if communities else "not_built"
+            ),
+            **({"reason": "graphrag_scope_metadata_unverified"} if scope_unverified else {}),
             "schema_version": payload.get("schema_version"),
             "algorithm": payload.get("algorithm"),
             "resolution": payload.get("resolution"),
@@ -527,8 +921,13 @@ class GraphRAGIndex:
                     "community_id": item.get("community_id"),
                     "title": item.get("title"),
                     "entity_count": len(item.get("entity_names") or []),
-                    "source_count": len(item.get("source_filenames") or []),
+                    "source_count": len(
+                        item.get("source_document_ids")
+                        or item.get("source_filenames")
+                        or []
+                    ),
                     "entity_names": list(item.get("entity_names") or [])[:24],
+                    "source_document_ids": list(item.get("source_document_ids") or [])[:12],
                     "source_filenames": list(item.get("source_filenames") or [])[:12],
                     "report": _clean_report(item.get("report"))[:1200],
                     "report_method": item.get("report_method"),
@@ -540,6 +939,8 @@ class GraphRAGIndex:
             "project_id": project_id or payload.get("project_id"),
             "index_name": payload.get("index_name", index_name),
             "scope_fallback": "global_shared" if shared_fallback else None,
+            "source_freshness": self._freshness_status(index_name),
+            "scope_freshness": scope_freshness,
         }
 
     def retrieve(
@@ -548,15 +949,112 @@ class GraphRAGIndex:
         mode: str = "global",
         limit: int = 4,
         project_id: str | None = None,
+        index_name: str | None = None,
     ) -> dict[str, Any]:
-        payload, index_name, shared_fallback = self._load_for_project(project_id)
-        return self._retrieve_payload(
+        payload, index_name, shared_fallback = self._load_for_project(
+            project_id,
+            index_name_override=index_name,
+        )
+        if not payload and index_name in self._stale_index_names:
+            return {
+                "mode": mode,
+                "communities": [],
+                "graph_context": [],
+                "evidence": [],
+                "matched_entities": [],
+                "chunk_ids": [],
+                "index_name": index_name,
+                "scope_fallback": "global_shared" if shared_fallback else None,
+                "reason": "graphrag_index_stale",
+                "source_freshness": self._freshness_status(index_name),
+                "scope_freshness": self._scope_freshness_status(index_name),
+            }
+        if not payload and index_name in self._freshness_errors:
+            return {
+                "mode": mode,
+                "communities": [],
+                "graph_context": [],
+                "evidence": [],
+                "matched_entities": [],
+                "chunk_ids": [],
+                "index_name": index_name,
+                "scope_fallback": "global_shared" if shared_fallback else None,
+                "reason": "graphrag_source_snapshot_unavailable",
+                "source_freshness": self._freshness_status(index_name),
+                "scope_freshness": self._scope_freshness_status(index_name),
+            }
+        if not payload and index_name in self._scope_freshness_errors:
+            return {
+                "mode": mode,
+                "communities": [],
+                "graph_context": [],
+                "evidence": [],
+                "matched_entities": [],
+                "chunk_ids": [],
+                "index_name": index_name,
+                "scope_fallback": "global_shared" if shared_fallback else None,
+                "reason": "graphrag_scope_metadata_unavailable",
+                "source_freshness": self._freshness_status(index_name),
+                "scope_freshness": self._scope_freshness_status(index_name),
+            }
+        if not payload and index_name in self._scope_unverified_index_names:
+            return {
+                "mode": mode,
+                "communities": [],
+                "graph_context": [],
+                "evidence": [],
+                "matched_entities": [],
+                "chunk_ids": [],
+                "index_name": index_name,
+                "scope_fallback": "global_shared" if shared_fallback else None,
+                "reason": "graphrag_scope_metadata_unverified",
+                "source_freshness": self._freshness_status(index_name),
+                "scope_freshness": self._scope_freshness_status(index_name),
+            }
+        if not payload and index_name == "all_projects":
+            return {
+                "mode": mode,
+                "communities": [],
+                "graph_context": [],
+                "evidence": [],
+                "matched_entities": [],
+                "chunk_ids": [],
+                "index_name": index_name,
+                "scope_fallback": "global_shared" if shared_fallback else None,
+                "reason": "cross_project_graph_index_not_built",
+                "source_freshness": self._freshness_status(index_name),
+                "scope_freshness": self._scope_freshness_status(index_name),
+            }
+        result = self._retrieve_payload(
             payload,
             query=query,
             mode=mode,
             limit=limit,
             index_name=index_name,
             shared_fallback=shared_fallback,
+        )
+        result["source_freshness"] = self._freshness_status(index_name)
+        result["scope_freshness"] = self._scope_freshness_status(index_name)
+        return result
+
+    def retrieve_all_projects(
+        self,
+        query: str,
+        mode: str = "global",
+        limit: int = 4,
+    ) -> dict[str, Any]:
+        """Read the explicitly built all-project graph index.
+
+        ``global_shared`` contains only unbound shared material.  An explicit
+        cross-project query needs a separate mixed-corpus index so that its
+        graph leg has the same scope as the vector leg.
+        """
+        return self.retrieve(
+            query,
+            mode=mode,
+            limit=limit,
+            project_id=None,
+            index_name="all_projects",
         )
 
     def retrieve_project_and_global(
@@ -586,8 +1084,12 @@ class GraphRAGIndex:
         # global_shared. Do not duplicate the same communities and pointers.
         if project_result.get("scope_fallback") == "global_shared":
             return project_result
+        if project_result.get("reason"):
+            # A project scope failure must not be converted into a seemingly
+            # successful project-plus-global answer.
+            return project_result
 
-        shared_payload = self._load("global_shared")
+        shared_payload = self._load_checked("global_shared")
         if not (shared_payload and shared_payload.get("communities")):
             return project_result
         shared_result = self._retrieve_payload(
@@ -624,6 +1126,12 @@ class GraphRAGIndex:
             "[全局共享知识]" + context
             for context in shared_result.get("graph_context") or []
         ]
+        project_expansion = dict(project_result.get("graph_expansion") or {})
+        shared_expansion = dict(shared_result.get("graph_expansion") or {})
+        expanded_communities = [
+            *(f"project:{item}" for item in project_expansion.get("expanded_communities") or []),
+            *(f"global_shared:{item}" for item in shared_expansion.get("expanded_communities") or []),
+        ]
         project_chunk_ids = list(project_result.get("chunk_ids") or [])
         global_chunk_ids = list(shared_result.get("chunk_ids") or [])
         return {
@@ -640,6 +1148,23 @@ class GraphRAGIndex:
             "global_chunk_ids": global_chunk_ids,
             "index_name": f"{project_result.get('index_name') or f'project:{normalized_project_id}'}+global_shared",
             "scope_fallback": "project_plus_global",
+            "source_freshness": (
+                "verified"
+                if project_result.get("source_freshness") == "verified"
+                and self._freshness_status("global_shared") == "verified"
+                else "unverified"
+            ),
+            "scope_freshness": (
+                "verified"
+                if project_result.get("scope_freshness") == "verified"
+                and self._scope_freshness_status("global_shared") == "verified"
+                else "unverified"
+            ),
+            "graph_expansion": {
+                "mode": "one_hop" if expanded_communities else None,
+                "expanded_communities": expanded_communities,
+                "expanded_count": len(expanded_communities),
+            },
         }
 
     @staticmethod
@@ -661,12 +1186,14 @@ class GraphRAGIndex:
                 str(community.get("title") or ""),
                 str(community.get("report") or ""),
                 " ".join(str(item) for item in community.get("entity_names") or []),
+                " ".join(str(item) for item in community.get("relationships") or []),
                 " ".join(str(item) for item in community.get("source_filenames") or []),
             ])
             score = _term_overlap(query_terms, _terms(search_text))
             scored.append((score, str(community.get("community_id") or ""), community))
 
         scored.sort(key=lambda item: (-item[0], item[1]))
+        expanded_communities: list[str] = []
         if mode == "global":
             selected = [item[2] for item in scored[:max(1, min(limit, len(scored)))]]
             root = next((item for item in (payload.get("levels") or []) if item.get("community_id") == "ROOT"), None)
@@ -676,19 +1203,69 @@ class GraphRAGIndex:
             selected = [item[2] for item in scored if item[0] > 0][:max(1, min(limit, len(scored)))]
             if not selected and scored:
                 selected = [scored[0][2]]
+            selected_ids = {
+                str(item.get("community_id") or "")
+                for item in selected
+                if str(item.get("community_id") or "")
+            }
+            community_by_id = {
+                str(item.get("community_id") or ""): item
+                for item in communities
+                if str(item.get("community_id") or "")
+            }
+            neighbor_candidates: list[tuple[float, str, dict[str, Any]]] = []
+            for edge in payload.get("community_relationships") or []:
+                source_id = str(edge.get("source_community_id") or "")
+                target_id = str(edge.get("target_community_id") or "")
+                if not source_id or not target_id:
+                    continue
+                if source_id in selected_ids and target_id not in selected_ids:
+                    neighbor_id = target_id
+                elif target_id in selected_ids and source_id not in selected_ids:
+                    neighbor_id = source_id
+                else:
+                    continue
+                neighbor = community_by_id.get(neighbor_id)
+                if neighbor is None:
+                    continue
+                relation_text = " ".join(str(item) for item in edge.get("relationships") or [])
+                neighbor_text = " ".join([
+                    relation_text,
+                    str(neighbor.get("title") or ""),
+                    " ".join(str(item) for item in neighbor.get("entity_names") or []),
+                ])
+                relation_score = _term_overlap(query_terms, _terms(neighbor_text))
+                if relation_score <= 0:
+                    continue
+                neighbor_candidates.append((relation_score, neighbor_id, neighbor))
+            for _, neighbor_id, neighbor in sorted(
+                neighbor_candidates,
+                key=lambda item: (-item[0], item[1]),
+            ):
+                if len(selected) >= max(1, min(limit, len(communities))):
+                    break
+                if neighbor_id in selected_ids:
+                    continue
+                selected.append(neighbor)
+                selected_ids.add(neighbor_id)
+                expanded_communities.append(neighbor_id)
 
         evidence = []
         graph_context = []
         matched_entities = []
         for community in selected:
             community_id = str(community.get("community_id") or "")
+            expanded = community_id in expanded_communities
             report = _clean_report(community.get("report"))
             title = str(community.get("title") or community_id)
             sources = [str(item) for item in community.get("source_filenames") or []]
+            source_document_ids = [
+                str(item) for item in community.get("source_document_ids") or []
+            ]
             entities = [str(item) for item in community.get("entity_names") or []]
             matched_entities.extend(item for item in entities if item in query and item not in matched_entities)
             graph_context.append(
-                f"社区报告 {community_id}（{title}）\n"
+                f"{'关系邻居扩展 ' if expanded else ''}社区报告 {community_id}（{title}）\n"
                 f"核心实体：{'、'.join(entities[:12])}\n"
                 f"覆盖资料：{'、'.join(sources[:8]) or '未登记来源'}\n"
                 f"摘要：{report}"
@@ -701,8 +1278,10 @@ class GraphRAGIndex:
                 "score": round(0.2 + min(0.5, _term_overlap(query_terms, _terms(report))), 6),
                 "graph_community_id": community_id,
                 "source_filenames": sources,
+                "source_document_ids": source_document_ids,
                 "chunk_ids": list(community.get("chunk_ids") or []),
                 "derived_index": True,
+                "graph_expansion": "one_hop" if expanded else None,
             })
 
         return {
@@ -716,6 +1295,11 @@ class GraphRAGIndex:
                 for community in selected
                 for chunk_id in community.get("chunk_ids") or []
             }),
+            "graph_expansion": {
+                "mode": "one_hop" if expanded_communities else None,
+                "expanded_communities": expanded_communities,
+                "expanded_count": len(expanded_communities),
+            },
             "index_name": index_name,
             "scope_fallback": "global_shared" if shared_fallback else None,
         }
@@ -791,38 +1375,65 @@ def _community_payload(*, community_id, entity_names, entities, relationships, d
         for name in entity_names
     }
     chunk_ids = sorted({chunk_id for values in entity_chunks.values() for chunk_id in values})
+    chunk_id_set = set(chunk_ids)
+    related_docs = [
+        document
+        for document in documents
+        if chunk_id_set & {
+            str(item) for item in document.get("chunk_ids") or []
+        }
+        and str(document.get("source_filename") or "").strip()
+    ]
+    if not related_docs:
+        related_docs = [
+            document
+            for document in documents[:4]
+            if str(document.get("source_filename") or "").strip()
+        ]
     source_filenames = sorted({
         str(document.get("source_filename") or "")
-        for document in documents
-        if set(str(item) for item in document.get("chunk_ids") or []) & set(chunk_ids)
+        for document in related_docs
     })
-    if not source_filenames:
-        source_filenames = sorted({
-            str(document.get("source_filename") or "")
-            for document in documents[:4]
-            if document.get("source_filename")
-        })
     inside_relations = [
         f"{item.get('source')} --({item.get('relation')})--> {item.get('target')}"
         for item in relationships
         if item.get("source") in entity_names and item.get("target") in entity_names
     ]
-    related_docs = [
-        document for document in documents
-        if str(document.get("source_filename") or "") in source_filenames
-    ]
+    source_document_ids = sorted({
+        document_id
+        for document in related_docs
+        for document_id in [_graph_document_identity(document)]
+        if document_id
+    })
     title = " / ".join(entity_names[:3]) or "未命名主题"
+    entity_attributes = []
+    for name in entity_names:
+        entity = entities.get(name) or {}
+        entity_type = str(entity.get("type") or "").strip()
+        description = str(entity.get("description") or "").strip()
+        if not entity_type and not description:
+            continue
+        entity_attributes.append({
+            "name": name,
+            "type": entity_type[:120],
+            "description": description[:900],
+        })
+        if len(entity_attributes) >= 24:
+            break
     return {
         "community_id": community_id,
         "level": 1,
         "parent_id": "ROOT",
         "title": title[:180],
         "entity_names": entity_names,
+        "entity_attributes": entity_attributes,
+        "source_document_ids": source_document_ids,
         "source_filenames": source_filenames,
         "chunk_ids": chunk_ids,
         "relationships": inside_relations[:24],
         "document_summaries": [
             {
+                "document_id": _graph_document_identity(document),
                 "source_filename": document.get("source_filename"),
                 "summary": str(document.get("summary") or "")[:900],
                 "keywords": list(document.get("keywords") or [])[:12],
@@ -864,6 +1475,11 @@ def _community_hierarchy(
         members = [item for item in communities if item["community_id"] in group]
         title = " / ".join(item["title"] for item in members[:2])[:180] or "跨社区主题"
         sources = sorted({source for item in members for source in item.get("source_filenames") or []})
+        source_document_ids = sorted({
+            document_id
+            for item in members
+            for document_id in item.get("source_document_ids") or []
+        })
         entities = sorted({name for item in members for name in item.get("entity_names") or []})
         chunk_ids = sorted({chunk_id for item in members for chunk_id in item.get("chunk_ids") or []})
         bridge_relations = [
@@ -876,6 +1492,7 @@ def _community_hierarchy(
             "community_id": f"T{index:03d}", "level": 1, "parent_id": "ROOT",
             "title": title, "children": children, "entity_names": entities,
             "source_filenames": sources, "chunk_ids": chunk_ids,
+            "source_document_ids": source_document_ids,
             "relationships": bridge_relations,
         }
         theme["report"] = _structured_report({
@@ -901,6 +1518,20 @@ def _structured_report(community: dict[str, Any]) -> str:
     relationships = list(community.get("relationships") or [])[:6]
     if relationships:
         lines.append("主要关系：" + "；".join(relationships) + "。")
+    entity_attributes = [
+        item for item in community.get("entity_attributes") or []
+        if isinstance(item, dict)
+        and (str(item.get("type") or "").strip() or str(item.get("description") or "").strip())
+    ]
+    if entity_attributes:
+        lines.append(
+            "实体属性："
+            + "；".join(
+                f"{item.get('name')}（{item.get('type') or '未分类'}）：{item.get('description') or '无描述'}"
+                for item in entity_attributes[:6]
+            )
+            + "。"
+        )
     summaries = [
         str(item.get("summary") or "").strip()
         for item in community.get("document_summaries") or []
@@ -948,3 +1579,16 @@ def _clean_report(value: Any) -> str:
     text = re.sub(r"```", "", text)
     text = " ".join(text.split()).strip()
     return text[:1800]
+
+
+def _community_report_has_grounding_signal(community: dict[str, Any], report: str) -> bool:
+    """Reject an otherwise non-empty report with no community-derived anchor."""
+    anchors = [
+        str(community.get("title") or ""),
+        *(str(item) for item in community.get("entity_names") or []),
+        *(str(item) for item in community.get("relationships") or []),
+        *(str(item) for item in community.get("source_filenames") or []),
+    ]
+    anchor_terms = _terms(" ".join(anchors))
+    report_terms = _terms(report)
+    return bool(anchor_terms and report_terms and anchor_terms.intersection(report_terms))

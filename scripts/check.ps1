@@ -33,6 +33,19 @@ try {
     Invoke-SoulDrivePython -Arguments @("-m", "compileall", "-q", "core", "tests")
     Assert-LastCommandSucceeded "python compileall"
 
+    New-Item -ItemType Directory -Force -Path (Join-Path $Root "build/quality-gates") | Out-Null
+    Invoke-SoulDrivePython -Arguments @("scripts/eval_memory_quality.py", "--output", "build/quality-gates/memory-quality.json")
+    Assert-LastCommandSucceeded "memory quality gate"
+
+    Invoke-SoulDrivePython -Arguments @("scripts/eval_graphrag_route.py", "--output", "build/quality-gates/graphrag-route.json")
+    Assert-LastCommandSucceeded "GraphRAG route quality gate"
+
+    Invoke-SoulDrivePython -Arguments @("scripts/eval_workflow_roles.py", "--output", "build/quality-gates/workflow-roles.json")
+    Assert-LastCommandSucceeded "workflow role quality gate"
+
+    Invoke-SoulDrivePython -Arguments @("scripts/eval_episodic_workflow_routing.py", "--runtime", "--output", "build/quality-gates/episodic-workflow-routing.json")
+    Assert-LastCommandSucceeded "episodic workflow routing gate"
+
     Push-Location "souldrive-ui"
     try {
         npm.cmd run build

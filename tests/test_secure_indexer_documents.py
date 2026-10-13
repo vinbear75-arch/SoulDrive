@@ -47,6 +47,30 @@ class _RecordingParser:
 
 
 class SecureIndexerDocumentsTests(unittest.TestCase):
+    def test_secure_document_identity_does_not_depend_on_runtime_temp_path(self):
+        indexer = DriveIndexer()
+
+        first_runtime_path = r"D:\runtime\secure-index-run-a\object.pdf"
+        second_runtime_path = r"D:\runtime\secure-index-run-b\object.pdf"
+
+        first_identity = indexer._stable_document_id(
+            first_runtime_path,
+            source_identity="secure-object-a",
+        )
+        second_identity = indexer._stable_document_id(
+            second_runtime_path,
+            source_identity="secure-object-a",
+        )
+
+        self.assertEqual(first_identity, second_identity)
+        self.assertNotEqual(
+            first_identity,
+            indexer._stable_document_id(
+                second_runtime_path,
+                source_identity="secure-object-b",
+            ),
+        )
+
     def test_indexer_reads_encrypted_documents_through_deleted_temp_files(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()

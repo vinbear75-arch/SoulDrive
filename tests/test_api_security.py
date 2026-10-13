@@ -85,12 +85,14 @@ class ApiSecurityTests(unittest.TestCase):
         metrics = RuntimeMetrics()
 
         metrics.record_error(
-            r"failed C:\Private\Project\models\model.gguf token=SECRET"
+            r"failed redis://user:password@private-host:6379/0 C:\Private\Project\models\model.gguf token=SECRET"
         )
         snapshot = metrics.snapshot()
 
-        self.assertIn("[local path]", snapshot["last_error"])
-        self.assertIn("token=[redacted]", snapshot["last_error"])
+        self.assertEqual(snapshot["last_error"], "运行异常，请查看运行诊断。")
+        self.assertEqual(snapshot["last_error_observation"]["error_type"], "UnknownError")
+        self.assertRegex(snapshot["last_error_observation"]["error_digest"], r"^[0-9a-f]{16}$")
+        self.assertIsInstance(snapshot["last_error_observation"]["error_chars"], int)
         self.assertNotIn("D:\\PycharmProjects", snapshot["last_error"])
         self.assertNotIn("SECRET", snapshot["last_error"])
 

@@ -1,5 +1,6 @@
 import os
 import json
+import inspect
 import re
 from core.graph_db import LocalGraphDB
 from core.logging_config import get_logger
@@ -10,6 +11,41 @@ from core.secure_graph_store import SecureGraphStore
 from core.workspace import SoulDriveWorkspace
 
 logger = get_logger(__name__)
+
+
+GRAPH_EXTRACTION_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "entities": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "type": {"type": "string"},
+                    "description": {"type": "string"},
+                },
+                "required": ["name", "type", "description"],
+                "additionalProperties": False,
+            },
+        },
+        "relationships": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source": {"type": "string"},
+                    "target": {"type": "string"},
+                    "relation": {"type": "string"},
+                },
+                "required": ["source", "target", "relation"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["entities", "relationships"],
+    "additionalProperties": False,
+}
 
 
 class GraphExtractor:
@@ -199,7 +235,12 @@ class GraphExtractor:
             "只描述输入中能支持的主题、关系和来源，不补充外部事实；不要输出 Markdown、JSON、"
             "提示词或行动指令。社区报告是检索摘要，回答时必须回到原始证据核验。"
         )
-        user_prompt = json.dumps(community, ensure_ascii=False)
+        output_tokens = min(800, self.runtime_config.graph_max_tokens)
+        prompt_budget = _graph_prompt_char_budget(
+            self.runtime_config.graph_n_ctx,
+            output_tokens,
+        )
+        user_prompt = _compact_community_payload(community, max_chars=prompt_budget)
         try:
             response = self.llm.create_chat_completion(
                 messages=[
@@ -207,7 +248,7 @@ class GraphExtractor:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=min(0.2, self.runtime_config.graph_temperature),
-                max_tokens=min(800, self.runtime_config.graph_max_tokens),
+                max_tokens=output_tokens,
                 repeat_penalty=self.runtime_config.graph_repeat_penalty,
             )
             content = str(response["choices"][0]["message"].get("content") or "").strip()
@@ -272,15 +313,18 @@ class GraphExtractor:
 
         try:
             # 触发极低温度的确定性推理
-            response = self.llm.create_chat_completion(
-                messages=[
+            completion_kwargs = {
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=self.runtime_config.graph_temperature,
-                max_tokens=self.runtime_config.graph_max_tokens,
-                repeat_penalty=self.runtime_config.graph_repeat_penalty
-            )
+                "temperature": self.runtime_config.graph_temperature,
+                "max_tokens": self.runtime_config.graph_max_tokens,
+                "repeat_penalty": self.runtime_config.graph_repeat_penalty,
+            }
+            if _supports_response_format(self.llm):
+                completion_kwargs["response_format"] = GRAPH_EXTRACTION_RESPONSE_SCHEMA
+            response = self.llm.create_chat_completion(**completion_kwargs)
 
             raw_output = response['choices'][0]['message']['content']
             data = self._parse_llm_json(raw_output)
@@ -423,6 +467,68 @@ def _document_digest(texts: list[str], source_filename: str) -> str:
     if len(normalized) > 2:
         excerpts.append(normalized[-1])
     return f"文档：{source_filename}\n索引阶段保留的结构化摘要片段：" + "\n".join(excerpts)[:3800]
+
+
+def _supports_response_format(llm) -> bool:
+    """仅向明确声明该参数的模型传递结构化输出约束。"""
+    try:
+        parameters = inspect.signature(llm.create_chat_completion).parameters.values()
+    except (TypeError, ValueError, AttributeError):
+        return False
+    return "response_format" in {parameter.name for parameter in parameters}
+
+
+def _graph_prompt_char_budget(graph_n_ctx: int, output_tokens: int) -> int:
+    """为本地模型的社区摘要预留系统提示词和生成空间。"""
+    context_limit = max(1024, int(graph_n_ctx or 8192))
+    generation_budget = max(128, int(output_tokens or 800))
+    return max(2200, min(6000, context_limit - generation_budget - 512))
+
+
+def _compact_community_payload(community: dict, *, max_chars: int) -> str:
+    """构造有界且仍为合法 JSON 的社区摘要输入。"""
+    def candidate(entity_limit, source_limit, relation_limit, document_limit, summary_limit, keyword_limit):
+        payload = {
+            "community_id": str(community.get("community_id") or ""),
+            "title": str(community.get("title") or "")[:180],
+            "entity_names": [str(item) for item in (community.get("entity_names") or [])[:entity_limit]],
+            "source_filenames": [
+                str(item) for item in (community.get("source_filenames") or [])[:source_limit]
+            ],
+            "relationships": [
+                str(item) for item in (community.get("relationships") or [])[:relation_limit]
+            ],
+            "document_summaries": [
+                {
+                    "source_filename": str(item.get("source_filename") or ""),
+                    "summary": str(item.get("summary") or "")[:summary_limit],
+                    "keywords": [
+                        str(keyword) for keyword in (item.get("keywords") or [])[:keyword_limit]
+                    ],
+                }
+                for item in (community.get("document_summaries") or [])[:document_limit]
+                if isinstance(item, dict)
+            ],
+        }
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+    candidates = (
+        (24, 8, 16, 4, 500, 8),
+        (16, 6, 10, 2, 300, 6),
+        (10, 4, 6, 1, 180, 4),
+        (6, 3, 3, 0, 0, 0),
+        (3, 2, 0, 0, 0, 0),
+        (1, 1, 0, 0, 0, 0),
+    )
+    for limits in candidates:
+        encoded = candidate(*limits)
+        if len(encoded) <= max_chars:
+            return encoded
+    minimal = {
+        "community_id": str(community.get("community_id") or ""),
+        "title": str(community.get("title") or "")[: max(80, max_chars // 2)],
+    }
+    return json.dumps(minimal, ensure_ascii=False, separators=(",", ":"))[:max_chars]
 
 # ==================== 自动化点火测试 ====================
 if __name__ == "__main__":

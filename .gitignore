@@ -67,3 +67,10 @@ Thumbs.db
 # Generated local inventory dumps
 structure.txt
 LOG.MD
+
+# Local experiment caches and private authoring intermediates
+.tmp/
+eval/runtime/
+eval/results/
+eval/third_party/
+submission/word_work/

@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core.workspace import SoulDriveWorkspace
 from core.workspace_crypto import (
@@ -99,6 +100,34 @@ class WorkspaceCryptoTests(unittest.TestCase):
         self.assertEqual(rotated_payload["version"], 2)
         self.assertEqual(previous_keys.workspace_data_key, rotated_keys.workspace_data_key)
         self.assertEqual(previous_keys.document_key, rotated_keys.document_key)
+
+    def test_keystore_rotation_keeps_old_payload_when_flush_fails(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "old-passphrase")
+            keystore = Path(workspace.keystore_path)
+            original = keystore.read_bytes()
+            with patch("core.workspace_crypto.os.fsync", side_effect=OSError("keystore disk full")):
+                with self.assertRaisesRegex(OSError, "keystore disk full"):
+                    rotate_passphrase(workspace, "old-passphrase", "new-passphrase")
+
+            self.assertEqual(keystore.read_bytes(), original)
+            self.assertEqual(len(unlock_keystore(workspace, "old-passphrase").workspace_data_key), 32)
+            self.assertEqual(list(keystore.parent.glob(f".{keystore.name}.*.tmp")), [])
+
+    def test_keystore_rotation_keeps_old_payload_when_replace_fails(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "old-passphrase")
+            keystore = Path(workspace.keystore_path)
+            original = keystore.read_bytes()
+            with patch("core.workspace_crypto.os.replace", side_effect=OSError("keystore replace denied")):
+                with self.assertRaisesRegex(OSError, "keystore replace denied"):
+                    rotate_passphrase(workspace, "old-passphrase", "new-passphrase")
+
+            self.assertEqual(keystore.read_bytes(), original)
+            self.assertEqual(len(unlock_keystore(workspace, "old-passphrase").workspace_data_key), 32)
+            self.assertEqual(list(keystore.parent.glob(f".{keystore.name}.*.tmp")), [])
 
 
 if __name__ == "__main__":

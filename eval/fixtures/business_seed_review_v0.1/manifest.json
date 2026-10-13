@@ -1,0 +1,75 @@
+{
+  "schema_version": "souldrive_business_seed_review_manifest_v0.1",
+  "created_at": "2026-10-08",
+  "review_status": "pending_review",
+  "scope_review_status": "user_confirmed",
+  "scope_reviewed_at": "2026-10-08",
+  "authorization": "用户同意生成 30 条待审核种子，并确认场景范围基本符合、全部保留；未批准金标准、来源许可、指标、划分、冻结、训练或调参。",
+  "sample_count": 30,
+  "task_counts": {"cross_document_synthesis": 10, "paper_review": 8, "experiment_compare": 6, "memory_conflict": 6},
+  "usage_policy": {"allow_quality_scoring": false, "allow_prompt_tuning": false, "allow_training": false, "allow_freezing": false, "allow_external_release": false},
+  "assumptions": [
+    "只引用既有开发语料的四份文档元数据，不读取 sealed 标签，不修改既有任何冻结样本。",
+    "文献问题的主题锚点来自现有 manifest；页码、正文支持和答案由人工审核补齐，当前没有 gold。",
+    "实验与记忆场景是仓库单测/规则样本的合成合同场景，不是论文实测或真实用户记忆。",
+    "项目绑定、同名展示、条件变化等变体均为待确认的合成设置，不写入真实项目。",
+    "这些样本由已暴露的开发材料派生，不能作为新的独立 held-out 成绩。"
+  ],
+  "manual_review_required": ["来源使用许可", "任务与业务贴合度", "具体证据页码和段落", "合成输入及单位定义", "gold 与标签全集", "指标与 baseline", "模板隔离和集合划分"],
+  "sources": [
+    {
+      "id": "rag-survey", "kind": "public_document", "origin_split": "dev",
+      "document_id": "RAGCN-93128a5b23df",
+      "path": "runtime/workspace/data/source_materials/rag_cn/02_面向知识密集型任务的检索增强生成技术综述.pdf",
+      "sha256": "93128a5b23dface4cf3cee44ad38a64ed4e592a70f6de01f7f4ba9e7d8c4b1aa",
+      "metadata_locator": "eval/fixtures/rag_cn_raw_v0.1/manifest.json documents[RAGCN-93128a5b23df]",
+      "topic_anchors": ["2.1 RAG 范式", "2.2 系统流程", "3.3 检索与生成的协同机制", "4.5 GraphRAG"],
+      "license_status": "not_verified"
+    },
+    {
+      "id": "rag-bimsa", "kind": "public_document", "origin_split": "dev",
+      "document_id": "RAGCN-8f9f13630d1f",
+      "path": "runtime/workspace/data/source_materials/rag_cn/03_检索增强生成_BIMSA.pdf",
+      "sha256": "8f9f13630d1f18f40bea58e6f5083eedd289c320b8cefc5b470bf9be239e3f7d",
+      "metadata_locator": "eval/fixtures/rag_cn_raw_v0.1/manifest.json documents[RAGCN-8f9f13630d1f]",
+      "topic_anchors": ["2、评价指标", "3、基础实验", "4.1、稀疏检索方式BM25", "4.2、混合检索——BM25+向量召回", "4.3、加上Rerank"],
+      "license_status": "not_verified"
+    },
+    {
+      "id": "rag-modules", "kind": "public_document", "origin_split": "dev",
+      "document_id": "RAGCN-78800d7cb3c0",
+      "path": "runtime/workspace/data/source_materials/rag_cn/04_RAG技术解析_让AI更可靠的知识调用系统.pdf",
+      "sha256": "78800d7cb3c03f3f51de24e4a57818e5f3e49226436c44cd088d445f1f2b35a2",
+      "metadata_locator": "eval/fixtures/rag_cn_raw_v0.1/manifest.json documents[RAGCN-78800d7cb3c0]",
+      "topic_anchors": ["二、RAG 的三大核心模块", "2. 检索融合（Retrieval Fusion）：信息整合", "四、RAG 的应用与挑战"],
+      "license_status": "not_verified"
+    },
+    {
+      "id": "graphrag-intro", "kind": "public_document", "origin_split": "dev",
+      "document_id": "RAGCN-7da648f9c564",
+      "path": "runtime/workspace/data/source_materials/rag_cn/07_GraphRAG原理源码及应用介绍_Gitee.pdf",
+      "sha256": "7da648f9c564aff8ed57d6a7a843bba7930784bf4af9eaa15b367971bc53a690",
+      "metadata_locator": "eval/fixtures/rag_cn_raw_v0.1/manifest.json documents[RAGCN-7da648f9c564]",
+      "topic_anchors": ["1. graphrag的原理介绍", "3. graphrag的源码剖析", "4. graphrag适配国内大模型"],
+      "license_status": "not_verified"
+    },
+    {
+      "id": "experiment-ledger-fixture", "kind": "repository_synthetic_fixture", "origin_split": "existing_contract_test",
+      "path": "tests/test_experiment_ledger.py", "sha256": "adb4055ae2f11bbc43cc02e6dc7d4eb7e3c83c73cd5361dbf20ff0c41823f1ee",
+      "metadata_locator": "_defaults; test_metric_import_and_comparison_are_traceable_and_gated",
+      "license_status": "not_verified"
+    },
+    {
+      "id": "memory-quality-fixture", "kind": "repository_synthetic_fixture", "origin_split": "existing_contract_test",
+      "path": "eval/memory_quality_v0.1.jsonl", "sha256": "7fe7e49e2dda4c4cb353432eefd6148bcaf44c53890616fcf1cc1481f2db74cc",
+      "metadata_locator": "MEM-SCOPE-001; MEM-WORKFLOW-001; MEM-UPDATE-001; MEM-TEMPORAL-001; MEM-CONFLICT-001; MEM-CONSTRAINT-001",
+      "license_status": "not_verified"
+    },
+    {
+      "id": "workflow-role-fixture", "kind": "repository_synthetic_fixture", "origin_split": "existing_contract_test",
+      "path": "eval/workflow_role_quality_v0.1.jsonl", "sha256": "c38b553da19daae443c6e34876e18cc78ef3a19446f427c6de4f4351569e5870",
+      "metadata_locator": "ROLE-PAPER-READY-001; ROLE-PAPER-GATE-001; ROLE-EXPERIMENT-READY-001; ROLE-EXPERIMENT-GATE-001",
+      "license_status": "not_verified"
+    }
+  ]
+}

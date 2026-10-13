@@ -624,6 +624,7 @@ async fn skill_api_request(
     method: String,
     path: String,
     body: Option<String>,
+    idempotency_key: Option<String>,
 ) -> Result<SkillApiResponse, String> {
     let method = method.to_ascii_uppercase();
     if !allowed_skill_api_request(&method, &path) {
@@ -642,6 +643,9 @@ async fn skill_api_request(
             )
             .header("X-SoulDrive-Token", api_token)
             .timeout(std::time::Duration::from_secs(120));
+        if let Some(idempotency_key) = idempotency_key {
+            request = request.header("Idempotency-Key", idempotency_key);
+        }
         if let Some(body) = body {
             request = request.header("Content-Type", "application/json").body(body);
         }
@@ -735,6 +739,16 @@ fn open_in_editor(path: String) -> Result<String, String> {
     }
 }
 
+fn apply_development_workspace_environment(command: &mut Command) {
+    if !cfg!(debug_assertions) {
+        // A release Tauri process must not inherit development unlock state
+        // from the shell that launched it.
+        command
+            .env_remove("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK")
+            .env_remove("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE");
+    }
+}
+
 fn spawn_backend<R: Runtime>(
     app: &impl Manager<R>,
     api_token: &str,
@@ -781,8 +795,6 @@ fn spawn_backend<R: Runtime>(
             .env("SOULDRIVE_WORKSPACE", &workspace_root)
             .env("SOULDRIVE_WORKSPACE_MODE", &workspace_mode)
             .env("SOULDRIVE_PC_ONLY", "1")
-            .env("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK", "1")
-            .env("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE", "88888888")
             .env("SOULDRIVE_WATCH_REMOVABLE", watch_removable)
             .env("SOULDRIVE_CHAT_PROVIDER", "ollama")
             .env("SOULDRIVE_OLLAMA_MODEL", "qwen3.5:9b")
@@ -799,10 +811,12 @@ fn spawn_backend<R: Runtime>(
             )
             .env("SOULDRIVE_SESSION_COMPACTION_THRESHOLD", "16")
             .env("SOULDRIVE_MAX_BODY_BYTES", "16777216")
-            .current_dir(&runtime_root)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
+
+        apply_development_workspace_environment(&mut command);
+        command.current_dir(&runtime_root);
 
         #[cfg(windows)]
         command.creation_flags(CREATE_NO_WINDOW);
@@ -822,8 +836,6 @@ fn spawn_backend<R: Runtime>(
         .env("SOULDRIVE_WORKSPACE", &workspace_root)
         .env("SOULDRIVE_WORKSPACE_MODE", &workspace_mode)
         .env("SOULDRIVE_PC_ONLY", "1")
-        .env("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK", "1")
-        .env("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE", "88888888")
         .env("SOULDRIVE_WATCH_REMOVABLE", watch_removable)
         .env("SOULDRIVE_CHAT_PROVIDER", "ollama")
         .env("SOULDRIVE_OLLAMA_MODEL", "qwen3.5:9b")
@@ -840,10 +852,12 @@ fn spawn_backend<R: Runtime>(
         )
         .env("SOULDRIVE_SESSION_COMPACTION_THRESHOLD", "16")
         .env("SOULDRIVE_MAX_BODY_BYTES", "16777216")
-        .current_dir(&runtime_root)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+
+    apply_development_workspace_environment(&mut command);
+    command.current_dir(&runtime_root);
 
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
@@ -1172,4 +1186,47 @@ fn generate_api_token() -> String {
         .map(|byte| format!("{:02x}", byte))
         .collect::<String>();
     format!("souldrive-{token}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::apply_development_workspace_environment;
+    use std::process::Command;
+
+    #[test]
+    fn backend_environment_matches_build_profile() {
+        let mut command = Command::new("cmd.exe");
+        command
+            .args(["/C", "set"])
+            .env("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK", "inherited")
+            .env("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE", "inherited");
+        apply_development_workspace_environment(&mut command);
+        let output = command
+            .output()
+            .expect("cmd.exe should be available on Windows");
+        assert!(output.status.success());
+        let environment = String::from_utf8_lossy(&output.stdout);
+        if cfg!(debug_assertions) {
+            assert!(environment.contains("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK=inherited"));
+            assert!(environment.contains("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE=inherited"));
+        } else {
+            assert!(!environment.contains("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK="));
+            assert!(!environment.contains("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE="));
+        }
+    }
+
+    #[test]
+    fn backend_environment_does_not_inject_a_development_unlock() {
+        let mut command = Command::new("cmd.exe");
+        command
+            .args(["/C", "set"])
+            .env_clear()
+            .env("SOULDRIVE_TEST_SENTINEL", "1");
+        apply_development_workspace_environment(&mut command);
+        let output = command.output().expect("cmd.exe should be available on Windows");
+        assert!(output.status.success());
+        let environment = String::from_utf8_lossy(&output.stdout);
+        assert!(!environment.contains("SOULDRIVE_DEV_BYPASS_WORKSPACE_LOCK="));
+        assert!(!environment.contains("SOULDRIVE_DEV_WORKSPACE_PASSPHRASE="));
+    }
 }

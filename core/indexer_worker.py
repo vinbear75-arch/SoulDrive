@@ -14,6 +14,8 @@ def main(argv: list[str] | None = None):
     parser.add_argument("drive_auth_level", nargs="?")
     parser.add_argument("--workspace-path", dest="workspace_path")
     parser.add_argument("--auth-level", dest="auth_level")
+    parser.add_argument("--run-id", dest="run_id")
+    parser.add_argument("--idempotency-key", dest="idempotency_key")
     args = parser.parse_args(argv)
 
     indexer = DriveIndexer()
@@ -24,14 +26,30 @@ def main(argv: list[str] | None = None):
             workspace = SoulDriveWorkspace(str(Path(args.workspace_path).resolve())).ensure()
             use_workspace_runtime_state(workspace.root_path)
             restore_workspace_keys(workspace.root_path, os.environ.get(WORKSPACE_DATA_KEY_ENV))
-            indexer.sync_workspace(workspace, auth_level)
+            kwargs = {
+                key: value
+                for key, value in {
+                    "run_id": args.run_id,
+                    "idempotency_key": args.idempotency_key,
+                }.items()
+                if value
+            }
+            indexer.sync_workspace(workspace, auth_level, **kwargs)
         else:
             if not args.drive_path:
                 parser.error("drive_path is required unless --workspace-path is provided")
             workspace = SoulDriveWorkspace.from_drive(args.drive_path).ensure()
             use_workspace_runtime_state(workspace.root_path)
             restore_workspace_keys(workspace.root_path, os.environ.get(WORKSPACE_DATA_KEY_ENV))
-            indexer.sync_workspace(workspace, auth_level)
+            kwargs = {
+                key: value
+                for key, value in {
+                    "run_id": args.run_id,
+                    "idempotency_key": args.idempotency_key,
+                }.items()
+                if value
+            }
+            indexer.sync_workspace(workspace, auth_level, **kwargs)
     finally:
         indexer.close()
     return 0

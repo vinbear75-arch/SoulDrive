@@ -1,12 +1,18 @@
 import hashlib
 import json
+import logging
 import os
 import time
 import uuid
 from typing import Any
 
+from core.atomic_file import atomic_write_text
 from core.enterprise_security import sanitize_payload
+from core.local_file_lock import local_file_lock
 from core.paths import local_data_root
+
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_AUDIT_PATH: str | None = None
@@ -37,34 +43,28 @@ class AuditLogger:
         trace_id: str | None = None,
     ) -> dict[str, Any]:
         os.makedirs(os.path.dirname(self.audit_path), exist_ok=True)
-        previous_hash = self._read_last_hash()
         sanitized_payload = self._sanitize_payload(payload or {})
-        event = {
-            "event_id": str(uuid.uuid4()),
-            "trace_id": trace_id or sanitized_payload.get("trace_id") or str(uuid.uuid4()),
-            "event_type": event_type,
-            "timestamp": time.time(),
-            "previous_hash": previous_hash,
-            "payload": sanitized_payload,
-        }
-        event["event_hash"] = self._hash_event(event)
+        with local_file_lock(f"{self.audit_path}.lock"):
+            previous_hash = self._read_last_hash()
+            event = {
+                "event_id": str(uuid.uuid4()),
+                "trace_id": trace_id or sanitized_payload.get("trace_id") or str(uuid.uuid4()),
+                "event_type": event_type,
+                "timestamp": time.time(),
+                "previous_hash": previous_hash,
+                "payload": sanitized_payload,
+            }
+            event["event_hash"] = self._hash_event(event)
 
-        with open(self.audit_path, "a", encoding="utf-8") as file:
-            file.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+            with open(self.audit_path, "a", encoding="utf-8") as file:
+                file.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+                file.flush()
+                os.fsync(file.fileno())
 
-        self._write_state(event["event_hash"])
-        return event
+            self._write_state(event["event_hash"])
+            return event
 
     def _read_last_hash(self) -> str:
-        if os.path.exists(self.state_path):
-            try:
-                with open(self.state_path, "r", encoding="utf-8") as file:
-                    state = json.load(file)
-                if state.get("last_event_hash"):
-                    return str(state["last_event_hash"])
-            except Exception:
-                pass
-
         if not os.path.exists(self.audit_path):
             return "GENESIS"
 
@@ -79,9 +79,14 @@ class AuditLogger:
 
         try:
             payload = json.loads(last_line)
-            return str(payload.get("event_hash") or payload.get("hash") or "GENESIS")
-        except Exception:
-            return "GENESIS"
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("audit log tail is invalid") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("audit log tail is invalid")
+        last_hash = payload.get("event_hash") or payload.get("hash")
+        if not last_hash:
+            raise ValueError("audit log tail is invalid")
+        return str(last_hash)
 
     def _hash_event(self, event: dict[str, Any]) -> str:
         payload = {key: value for key, value in event.items() if key not in ("hash", "event_hash")}
@@ -89,9 +94,10 @@ class AuditLogger:
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def _write_state(self, last_event_hash: str):
-        os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
-        with open(self.state_path, "w", encoding="utf-8") as file:
-            json.dump({"last_event_hash": last_event_hash}, file, ensure_ascii=False, indent=2)
+        atomic_write_text(
+            self.state_path,
+            json.dumps({"last_event_hash": last_event_hash}, ensure_ascii=False, indent=2),
+        )
 
     def _sanitize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         sanitized = sanitize_payload(payload)
@@ -188,6 +194,39 @@ def append_audit_event(
     state_path: str | os.PathLike[str] | None = None,
 ) -> dict[str, Any]:
     return AuditLogger(audit_path, state_path).append_event(event_type, payload, trace_id)
+
+
+def append_audit_event_best_effort(
+    audit_logger: Any,
+    event_type: str,
+    payload: dict[str, Any] | None = None,
+    *,
+    trace_id: str | None = None,
+) -> bool:
+    """Write observability without making the business operation fail.
+
+    The local audit file is a valuable diagnostic sink, but it is not the
+    authorization or state-transition mechanism.  Callers must still expose
+    their own authorization failures and business errors; this helper only
+    prevents an audit I/O failure from masquerading as one of those errors.
+    """
+    try:
+        if trace_id is None:
+            audit_logger.append_event(event_type, payload)
+        else:
+            audit_logger.append_event(event_type, payload, trace_id=trace_id)
+    except Exception:
+        try:
+            from core.observability import runtime_metrics
+
+            runtime_metrics.increment("audit_failures")
+        except Exception:
+            pass
+        # Do not include the exception text or payload: both can contain
+        # user-provided query text, local paths, or secrets.
+        logger.error("Best-effort audit event write failed: %s", event_type)
+        return False
+    return True
 
 
 def default_audit_path() -> str:

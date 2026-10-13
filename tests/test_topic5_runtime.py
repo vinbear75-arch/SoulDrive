@@ -19,6 +19,7 @@ from core.topic5_runtime import (
 )
 from core import mcp_server
 from core.enterprise_security import SlidingWindowRateLimiter
+from core.project_catalog import ProjectCatalog
 from core.workspace import SoulDriveWorkspace
 from core.workspace import SoulDriveWorkspace
 import core.runtime_state as runtime_state
@@ -30,6 +31,27 @@ def _wav(path: Path):
         handle.setsampwidth(2)
         handle.setframerate(16000)
         handle.writeframes(b"\0\0" * 160)
+
+
+def test_runtime_event_confidence_rejects_non_finite_values():
+    raw_events = [{"event_id": "bad-confidence", "modality": "ui", "confidence": float("inf")}]
+
+    fused = Topic5Runtime._fused_events(
+        raw_events,
+        "",
+        [],
+        "",
+        [],
+        "",
+        "",
+        0,
+        0,
+    )
+    public = Topic5Runtime._public_events(raw_events, [], [], "", "", 0)
+
+    fused_event = next(item for item in fused if item["event_id"] == "bad-confidence")
+    assert fused_event["confidence"] == 0.0
+    assert public[0]["confidence"] == 0.0
 
 
 def test_runtime_rejects_network_media_reference(tmp_path):
@@ -760,6 +782,36 @@ def test_runtime_warmup_endpoint_is_token_protected_and_uses_runtime(tmp_path, m
     assert audit_events[0][0] == "multimodal.runtime_warmup"
 
 
+def test_runtime_warmup_stays_successful_when_audit_fails(monkeypatch):
+    class FakeRuntime:
+        def warmup_vlm(self):
+            return {
+                "schema_version": "souldrive_topic5_runtime_warmup_v0.1",
+                "status": "pass",
+                "already_loaded": False,
+                "latency_ms": {"total": 12.0},
+                "policy": {"side_effect": "none"},
+            }
+
+    class FailingAudit:
+        def append_event(self, *_args, **_kwargs):
+            raise OSError("audit sink unavailable")
+
+    monkeypatch.setattr(mcp_server, "require_workspace_mounted", lambda: None)
+    monkeypatch.setattr(mcp_server, "require_software_unlock", lambda: None)
+    monkeypatch.setattr(mcp_server, "get_topic5_runtime", lambda: FakeRuntime())
+    monkeypatch.setattr(mcp_server, "current_audit_logger", lambda: FailingAudit())
+    monkeypatch.setenv("SOULDRIVE_API_TOKEN", "runtime-audit-token")
+
+    response = TestClient(mcp_server.app).post(
+        "/multimodal/runtime/warmup",
+        headers={"X-SoulDrive-Token": "runtime-audit-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "pass"
+
+
 def test_runtime_perception_warmup_endpoint_is_token_protected_and_audited(monkeypatch):
     calls = []
     audit_events = []
@@ -882,6 +934,11 @@ def test_runtime_upload_forwards_selected_region_and_visual_permission(tmp_path,
 def test_runtime_upload_forwards_event_timing_and_project_scope(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp_server, "rate_limiter", SlidingWindowRateLimiter(limit=1000))
     workspace = SoulDriveWorkspace(str(tmp_path)).ensure()
+    catalog = ProjectCatalog(workspace)
+    try:
+        catalog.create_project("项目 A", project_id="project-a")
+    finally:
+        catalog.close()
     calls = []
 
     class FakeRuntime:
@@ -922,6 +979,48 @@ def test_runtime_upload_forwards_event_timing_and_project_scope(tmp_path, monkey
     assert calls[0]["event_time_origin_ms"] == 1_800_000_000_000
     assert calls[0]["audio_start_ms"] == 400
     assert calls[0]["image_start_ms"] == 1400
+
+
+def test_runtime_infer_rejects_unknown_project_scope(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "rate_limiter", SlidingWindowRateLimiter(limit=1000))
+    workspace = SoulDriveWorkspace(str(tmp_path)).ensure()
+    monkeypatch.setattr(mcp_server, "require_workspace_mounted", lambda: None)
+    monkeypatch.setattr(mcp_server, "require_software_unlock", lambda: None)
+    monkeypatch.setattr(mcp_server, "current_workspace", lambda: workspace)
+    with patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "runtime-scope-token"}, clear=False):
+        response = TestClient(mcp_server.app).post(
+            "/multimodal/runtime/infer",
+            headers={"X-SoulDrive-Token": "runtime-scope-token"},
+            json={
+                "speech_text": "总结当前选区",
+                "project_id": "project-does-not-exist",
+                "run_ocr": False,
+                "run_vlm": False,
+            },
+        )
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "unknown project"
+
+
+def test_runtime_upload_rejects_unknown_project_scope(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "rate_limiter", SlidingWindowRateLimiter(limit=1000))
+    workspace = SoulDriveWorkspace(str(tmp_path)).ensure()
+    monkeypatch.setattr(mcp_server, "require_workspace_mounted", lambda: None)
+    monkeypatch.setattr(mcp_server, "require_software_unlock", lambda: None)
+    monkeypatch.setattr(mcp_server, "current_workspace", lambda: workspace)
+    with patch.dict("os.environ", {"SOULDRIVE_API_TOKEN": "runtime-upload-scope-token"}, clear=False):
+        response = TestClient(mcp_server.app).post(
+            "/multimodal/runtime/infer-upload",
+            headers={"X-SoulDrive-Token": "runtime-upload-scope-token"},
+            data={
+                "speech_text": "总结当前选区",
+                "project_id": "project-does-not-exist",
+            },
+        )
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "unknown project"
 
 
 def test_chat_perception_event_accepts_interval_without_legacy_timestamp():

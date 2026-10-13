@@ -1,5 +1,6 @@
 import io
 import json
+import math
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -188,6 +189,8 @@ class LocalImageOcrParser:
         try:
             confidence = float(value)
         except (TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(confidence):
             return 0.0
         return round(max(0.0, min(confidence, 1.0)), 6)
 

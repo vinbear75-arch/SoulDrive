@@ -1,9 +1,13 @@
 import unittest
 
-from core.learning_validator import validate_learning_candidates
+from core.learning_validator import _confidence, validate_learning_candidates
 
 
 class LearningValidatorTests(unittest.TestCase):
+    def test_learning_confidence_rejects_non_finite_values(self):
+        self.assertEqual(_confidence(float("nan")), 0.0)
+        self.assertEqual(_confidence(float("inf")), 0.0)
+
     def test_rejects_candidate_when_evidence_is_not_in_source_message(self):
         messages = [{"role": "user", "content": "Please remember that I prefer review before saving."}]
         candidates = [
@@ -35,6 +39,70 @@ class LearningValidatorTests(unittest.TestCase):
                 "source_message_indexes": [0],
             }
         ]
+
+        self.assertEqual(validate_learning_candidates(candidates, messages), [])
+
+    def test_project_constraint_requires_user_evidence(self):
+        messages = [{"role": "user", "content": "本项目必须先完成证据核对，再生成交付物。"}]
+        candidates = [{
+            "asset_type": "memory",
+            "subtype": "project_constraint",
+            "title": "项目交付约束",
+            "content": "本项目必须先完成证据核对，再生成交付物。",
+            "evidence": ["本项目必须先完成证据核对，再生成交付物。"],
+            "confidence": 0.95,
+            "selected_by_default": True,
+            "source_message_indexes": [0],
+        }]
+
+        [candidate] = validate_learning_candidates(candidates, messages)
+
+        self.assertEqual(candidate["subtype"], "project_constraint")
+        self.assertEqual(candidate["write_gate"]["decision"], "review")
+
+    def test_project_constraint_rejects_assistant_only_evidence(self):
+        messages = [{"role": "assistant", "content": "本项目必须先完成证据核对，再生成交付物。"}]
+        candidates = [{
+            "asset_type": "memory",
+            "subtype": "project_constraint",
+            "title": "项目交付约束",
+            "content": "本项目必须先完成证据核对，再生成交付物。",
+            "evidence": ["本项目必须先完成证据核对，再生成交付物。"],
+            "confidence": 0.95,
+            "selected_by_default": True,
+            "source_message_indexes": [0],
+        }]
+
+        self.assertEqual(validate_learning_candidates(candidates, messages), [])
+
+    def test_workflow_fact_requires_explicit_workflow_namespace(self):
+        messages = [{"role": "user", "content": "这个流程每次都先核对章节证据。"}]
+        candidates = [{
+            "asset_type": "memory",
+            "subtype": "workflow_fact",
+            "title": "未绑定窗口流程",
+            "content": "这个流程每次都先核对章节证据。",
+            "evidence": ["这个流程每次都先核对章节证据。"],
+            "confidence": 0.95,
+            "selected_by_default": True,
+            "source_message_indexes": [0],
+        }]
+
+        self.assertEqual(validate_learning_candidates(candidates, messages), [])
+
+    def test_workflow_fact_rejects_unknown_workflow_namespace(self):
+        messages = [{"role": "user", "content": "这个流程每次都先核对章节证据。"}]
+        candidates = [{
+            "asset_type": "memory",
+            "subtype": "workflow_fact",
+            "workflow_id": "unknown_window",
+            "title": "未知窗口事实",
+            "content": "这个流程每次都先核对章节证据。",
+            "evidence": ["这个流程每次都先核对章节证据。"],
+            "confidence": 0.95,
+            "selected_by_default": True,
+            "source_message_indexes": [0],
+        }]
 
         self.assertEqual(validate_learning_candidates(candidates, messages), [])
 

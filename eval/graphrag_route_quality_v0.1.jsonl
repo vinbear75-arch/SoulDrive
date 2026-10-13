@@ -1,0 +1,4 @@
+{"schema_version":"souldrive_graphrag_route_quality_v0.1","id":"ROUTE-HYBRID-001","query":"RAG 的核心思想是什么？","expected_mode":"hybrid","expected_use_graph":false}
+{"schema_version":"souldrive_graphrag_route_quality_v0.1","id":"ROUTE-LOCAL-001","query":"GraphRAG 中实体之间的影响链和上下游关系是什么？","expected_mode":"local","expected_use_graph":true,"required_signals":["影响链","上下游"]}
+{"schema_version":"souldrive_graphrag_route_quality_v0.1","id":"ROUTE-GLOBAL-001","query":"请总结这些论文关于检索纠错的共同思路。","expected_mode":"global","expected_use_graph":true,"required_signals":["共同思路"]}
+{"schema_version":"souldrive_graphrag_route_quality_v0.1","id":"ROUTE-PRECEDENCE-001","query":"请分析本项目整体方案中实体A和实体B的影响链。","expected_mode":"local","expected_use_graph":true,"required_signals":["影响链"]}

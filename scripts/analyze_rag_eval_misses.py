@@ -53,8 +53,17 @@ def analyze_result_files(dataset_path: Path, results_path: Path, top_k: int = DE
         evidence = result.evidence[:top_k]
         hit_sources = [
             source
-            for source in record.expected_sources
-            if any(eval_rag.source_matches(item.get("source_filename"), source) for item in evidence)
+            for index, source in enumerate(record.expected_sources)
+            if any(
+                eval_rag.evidence_matches_expected_source(
+                    item,
+                    source,
+                    record.expected_document_ids[index]
+                    if record.expected_document_ids
+                    else None,
+                )
+                for item in evidence
+            )
         ]
         missing_sources = [source for source in record.expected_sources if source not in hit_sources]
         if not missing_sources:
@@ -65,9 +74,12 @@ def analyze_result_files(dataset_path: Path, results_path: Path, top_k: int = DE
             "type": record.type,
             "question": record.question,
             "expected_sources": record.expected_sources,
+            "expected_document_ids": record.expected_document_ids,
+            "document_identity_required": bool(record.expected_document_ids),
             "hit_sources": hit_sources,
             "missed_sources": missing_sources,
             "top_sources": [str(item.get("source_filename") or "") for item in evidence],
+            "top_document_ids": [eval_rag.evidence_document_id(item) for item in evidence],
         }
         misses.append(sample)
         misses_by_type[record.type] += 1

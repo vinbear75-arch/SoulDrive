@@ -114,6 +114,129 @@ class IndexerScopeTests(unittest.TestCase):
             workspace_path=workspace.root_path,
         )
 
+    def test_graphrag_global_index_reads_chunk_scope_before_first_write(self):
+        class FakeGraphStore:
+            def get_graph_snapshot(self):
+                return {
+                    "documents": [{
+                        "source_filename": "project-a.pdf",
+                        "title": "项目 A",
+                        "summary": "A",
+                        "keywords": [],
+                        "chunk_ids": ["chunk-a"],
+                        "project_id": "",
+                    }],
+                    "entities": [],
+                    "relationships": [],
+                }
+
+            def close(self):
+                return None
+
+        class FakeKnowledgeBase:
+            def metadata_for_chunk_ids(self, chunk_ids):
+                self.requested_chunk_ids = list(chunk_ids)
+                return {"chunk-a": {"project_id": "project-a"}}
+
+        class RecordingBuilder:
+            calls = []
+
+            def __init__(self, _graph_store, **kwargs):
+                self.kwargs = kwargs
+                self.__class__.calls.append(dict(kwargs))
+
+            def build(self):
+                return {
+                    "status": "completed",
+                    "algorithm": "test",
+                    "document_count": 0,
+                    "entity_count": 0,
+                    "relationship_count": 0,
+                    "community_count": 0,
+                    "target_range_ok": True,
+                }
+
+        indexer = DriveIndexer()
+        indexer.workspace = SimpleNamespace(
+            root_path="workspace",
+            graph_db_path="graph.db",
+            secure_graph_store_path="secure-graph.db",
+        )
+        indexer.kb = FakeKnowledgeBase()
+        graph_store = FakeGraphStore()
+        with patch("core.indexer.get_workspace_keys", return_value=None), patch(
+            "core.graph_db.LocalGraphDB", return_value=graph_store
+        ), patch("core.graph_rag.GraphRAGBuilder", RecordingBuilder):
+            result = indexer._build_graphrag_index("HARDWARE_PLUS_PASSWORD")
+
+        global_calls = [
+            call for call in RecordingBuilder.calls
+            if call.get("index_name") == "global_shared"
+        ]
+        self.assertTrue(global_calls)
+        self.assertEqual(
+            global_calls[0].get("chunk_project_ids"),
+            {"chunk-a": {"project_id": "project-a"}},
+        )
+        all_projects_calls = [
+            call for call in RecordingBuilder.calls
+            if call.get("index_name") == "all_projects"
+        ]
+        self.assertTrue(all_projects_calls)
+        self.assertEqual(
+            all_projects_calls[0].get("chunk_project_ids"),
+            {"chunk-a": "project-a"},
+        )
+        self.assertEqual(result["all_projects"]["status"], "completed")
+        self.assertTrue(result["all_projects"]["scope_manifest_complete"])
+        self.assertEqual(result["all_projects"]["scope_metadata_count"], 1)
+        self.assertEqual(result["all_projects"]["project_ids"], ["project-a"])
+
+    def test_graphrag_build_marks_project_failure_as_degraded(self):
+        class FakeGraphStore:
+            def get_graph_snapshot(self):
+                return {
+                    "documents": [{"source_filename": "project-a.pdf", "chunk_ids": ["chunk-a"]}],
+                    "entities": [],
+                    "relationships": [],
+                }
+
+            def close(self):
+                return None
+
+        class FakeKnowledgeBase:
+            def metadata_for_chunk_ids(self, _chunk_ids):
+                return {"chunk-a": {"project_id": "project-a"}}
+
+        class Builder:
+            def __init__(self, _graph_store, **kwargs):
+                self.project_id = kwargs.get("project_id")
+
+            def build(self):
+                if self.project_id:
+                    raise RuntimeError("project graph failed secret=graph-token")
+                return {"status": "completed", "algorithm": "test"}
+
+        indexer = DriveIndexer()
+        indexer.workspace = SimpleNamespace(
+            root_path="workspace",
+            graph_db_path="graph.db",
+            secure_graph_store_path="secure-graph.db",
+        )
+        indexer.kb = FakeKnowledgeBase()
+        with patch("core.indexer.get_workspace_keys", return_value=None), patch(
+            "core.graph_db.LocalGraphDB", return_value=FakeGraphStore()
+        ), patch("core.graph_rag.GraphRAGBuilder", Builder):
+            result = indexer._build_graphrag_index("HARDWARE_PLUS_PASSWORD")
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["failed_project_ids"], ["project-a"])
+        project_observation = result["project_indexes"][0]
+        self.assertNotIn("error", project_observation)
+        self.assertEqual(project_observation["error_type"], "RuntimeError")
+        self.assertEqual(project_observation["error_chars"], len("project graph failed secret=graph-token"))
+        self.assertNotIn("graph-token", str(result))
+
     def test_catalog_lookup_accepts_sha256_registration_after_md5_miss(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             document = Path(temp_dir) / "report.txt"
@@ -172,6 +295,28 @@ class IndexerScopeTests(unittest.TestCase):
         })
 
         self.assertTrue(indexer._document_index_is_current("abc"))
+
+    def test_document_index_rebuilds_when_new_hash_has_stale_previous_records(self):
+        indexer = DriveIndexer()
+        indexer.kb = _StaleIndexKnowledgeBase()
+
+        self.assertEqual(
+            indexer._document_index_status(
+                "new-hash",
+                "report.pdf",
+                "D:/papers/report.pdf",
+            ),
+            "stale_cleanup",
+        )
+
+    def test_document_index_rebuilds_when_derived_projection_is_incomplete(self):
+        indexer = DriveIndexer()
+        indexer.kb = _IncompleteDerivedIndexKnowledgeBase()
+
+        self.assertEqual(
+            indexer._document_index_status("abc", "report.pdf"),
+            "parent_store_incomplete",
+        )
 
     def test_same_content_different_sources_are_indexed_independently(self):
         indexer = DriveIndexer()
@@ -269,6 +414,22 @@ class IndexerScopeTests(unittest.TestCase):
             [(["abc_parent_0_child_0"], ["abc_parent_0"])],
         )
 
+    def test_stale_cleanup_does_not_delete_same_named_foreign_project_records(self):
+        indexer = DriveIndexer()
+        indexer.kb = _CrossProjectStaleCleanupKnowledgeBase()
+
+        indexer._delete_previous_chunks(
+            "scheme.pdf",
+            "D:/papers/project-a/scheme.pdf",
+            preserve_ids={"new-child"},
+            project_id="project-a",
+        )
+
+        self.assertEqual(
+            indexer.kb.deleted_records,
+            [(["old-project-a"], ["old-parent-a"])],
+        )
+
     def test_sync_workspace_records_indexing_observability(self):
         original_state_path = runtime_state.STATE_PATH
         try:
@@ -297,12 +458,20 @@ class IndexerScopeTests(unittest.TestCase):
                 ), patch.object(
                     indexer, "_catalog_item_for_document", return_value=catalog_item
                 ) as catalog_lookup:
-                    indexer.sync_workspace(workspace, auth_level="BASIC")
+                    indexer.sync_workspace(
+                        workspace,
+                        auth_level="BASIC",
+                        run_id="api-index-run",
+                        idempotency_key="api-index-key",
+                    )
                     state = runtime_state.get_runtime_state()
         finally:
             runtime_state.STATE_PATH = original_state_path
 
         observability = state["indexing"]["observability"]
+        self.assertEqual(state["indexing"]["run_id"], "api-index-run")
+        self.assertEqual(state["indexing"]["idempotency_key"], "api-index-key")
+        self.assertEqual(state["indexing"]["status"], "completed")
         self.assertEqual(observability["schema_version"], "indexing_observability_v4")
         self.assertEqual(len(observability["documents"]), 1)
         self.assertEqual(observability["documents"][0]["source_filename"], "scheme.pdf")
@@ -359,6 +528,57 @@ class IndexerScopeTests(unittest.TestCase):
 class _FakeKnowledgeBase:
     def __init__(self, payload):
         self.collection = _FakeCollection(payload)
+
+
+class _StaleIndexKnowledgeBase:
+    def __init__(self):
+        self.collection = _StaleIndexCollection()
+        self.embedding_model_name = "bge-small-zh-v1.5"
+
+
+class _IncompleteDerivedIndexKnowledgeBase:
+    embedding_model_name = "bge-small-zh-v1.5"
+
+    def __init__(self):
+        self.collection = _FakeCollection({
+            "ids": ["child"],
+            "metadatas": [{
+                "document_hash": "abc",
+                "source_filename": "report.pdf",
+                "metadata_schema_version": INDEX_METADATA_SCHEMA_VERSION,
+                "embedding_model_name": "bge-small-zh-v1.5",
+                "page": 1,
+            }],
+        })
+
+    def check_index_consistency(self, _document_hash, _source_filename):
+        return "parent_store_incomplete"
+
+
+class _StaleIndexCollection:
+    def get(self, where=None, include=None):
+        _ = include
+        if where == {"document_hash": "new-hash"}:
+            return {
+                "ids": ["new-child"],
+                "metadatas": [{
+                    "document_hash": "new-hash",
+                    "source_filename": "report.pdf",
+                    "source_path": "D:/papers/report.pdf",
+                    "metadata_schema_version": INDEX_METADATA_SCHEMA_VERSION,
+                    "embedding_model_name": "bge-small-zh-v1.5",
+                    "page": 1,
+                }],
+            }
+        if where and "source_path" in where:
+            return {
+                "ids": ["old-child", "new-child"],
+                "metadatas": [
+                    {"document_hash": "old-hash", "source_filename": "report.pdf"},
+                    {"document_hash": "new-hash", "source_filename": "report.pdf"},
+                ],
+            }
+        return {"ids": [], "metadatas": []}
 
 
 class _IngestRecordingKnowledgeBase:
@@ -480,6 +700,35 @@ class _LegacyStaleCleanupCollection:
 class _LegacyStaleCleanupKnowledgeBase:
     def __init__(self):
         self.collection = _LegacyStaleCleanupCollection()
+        self.deleted_records = []
+
+    def delete_index_records(self, *, child_ids, parent_ids):
+        self.deleted_records.append((child_ids, parent_ids))
+
+
+class _CrossProjectStaleCleanupCollection:
+    def get(self, where=None, include=None):
+        _ = include
+        if where and "source_path" in where:
+            return {
+                "ids": ["old-project-a", "new-child"],
+                "metadatas": [
+                    {"parent_id": "old-parent-a", "project_id": "project-a"},
+                    {"parent_id": "new-parent", "project_id": "project-a"},
+                ],
+            }
+        return {
+            "ids": ["old-project-a", "old-project-b"],
+            "metadatas": [
+                {"parent_id": "old-parent-a", "project_id": "project-a"},
+                {"parent_id": "old-parent-b", "project_id": "project-b"},
+            ],
+        }
+
+
+class _CrossProjectStaleCleanupKnowledgeBase:
+    def __init__(self):
+        self.collection = _CrossProjectStaleCleanupCollection()
         self.deleted_records = []
 
     def delete_index_records(self, *, child_ids, parent_ids):

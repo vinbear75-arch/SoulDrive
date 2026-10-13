@@ -4,6 +4,8 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from core.atomic_file import atomic_write_text
+
 WORKSPACE_DIR = "SoulDrive"
 WORKSPACE_MANIFEST = "workspace.json"
 WORKSPACE_VERSION = 1
@@ -195,7 +197,7 @@ class SoulDriveWorkspace:
                 "history": "runtime/history",
             },
         }
-        manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_text(manifest, json.dumps(payload, ensure_ascii=False, indent=2))
 
     def diagnose(self):
         root = Path(self.root_path)

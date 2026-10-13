@@ -1,10 +1,11 @@
 import json
+import math
 import re
 from typing import Any
 
 
 VALID_ASSET_TYPES = {"memory", "skill"}
-VALID_MEMORY_SUBTYPES = {"user_preference", "project_fact", "workflow_fact"}
+VALID_MEMORY_SUBTYPES = {"user_preference", "project_constraint", "project_fact", "workflow_fact"}
 VALID_SKILL_SUBTYPES = {"sop", "troubleshooting", "template", "pitfall"}
 
 
@@ -41,14 +42,14 @@ def parse_reflection_response(raw: str, messages: list[dict[str, str]]) -> list[
 
 def build_reflection_prompt(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     transcript = "\n".join(
-        f"[{index}] { _normalized_role(message.get('role')) }: {message.get('content')}"
+        f"[{index}] { _normalized_role(message.get('role')) }: {_escape_transcript_text(message.get('content'))}"
         for index, message in enumerate(messages or [])
     )
     system = (
         "你是 SoulDrive 的任务后反思器。"
         "只允许从给定 transcript 中提取可长期复用的候选 memory 或 skill。"
         "不要推断 transcript 中没有明确支持的信息。"
-        "用户偏好和项目事实必须来自 user 消息。"
+        "用户偏好、项目约束和项目事实必须来自 user 消息。"
         "skill 可以来自完整对话，但必须带上来源消息索引。"
         "输出 JSON，格式为 {\"candidates\": [...]}。"
     )
@@ -58,6 +59,11 @@ def build_reflection_prompt(messages: list[dict[str, str]]) -> list[dict[str, st
         f"<transcript>\n{transcript}\n</transcript>"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def _escape_transcript_text(value: Any) -> str:
+    """Keep conversation text data from recreating reflection prompt markup."""
+    return str(value or "").replace("<", "＜").replace(">", "＞")
 
 
 def _build_memory_candidate(content: str, index: int) -> dict[str, Any] | None:
@@ -117,7 +123,7 @@ def _normalize_candidate(item: Any, messages: list[dict[str, str]]) -> dict[str,
     content = str(item.get("content") or "").strip()
     if not title or not content or not evidence or not source_indexes:
         return None
-    if asset_type == "memory" and subtype in {"user_preference", "project_fact"}:
+    if asset_type == "memory" and subtype in {"user_preference", "project_constraint", "project_fact"}:
         if not any(_normalized_role(messages[index].get("role")) == "user" for index in source_indexes):
             return None
 
@@ -166,10 +172,24 @@ def _normalized_role(role: Any) -> str:
 
 
 def _detect_memory_subtype(content: str) -> str | None:
+    project_constraint_markers = (
+        "本项目必须",
+        "本项目不得",
+        "本项目不要",
+        "项目必须",
+        "项目不得",
+        "项目不要",
+        "项目约束",
+        "项目要求",
+        "工作区必须",
+        "工作区不得",
+    )
     preference_markers = ("我希望", "我不希望", "不要", "偏好", "以后", "关闭前", "集中审核", "记忆", "保存", "审核", "弹窗")
     project_markers = ("项目", "工作区", "分支", "仓库", "workspace", "main 分支", "学习闭环", "RAG")
     workflow_markers = ("流程", "步骤", "习惯", "做法", "每次", "通常")
 
+    if any(marker in content for marker in project_constraint_markers):
+        return "project_constraint"
     if any(marker in content for marker in preference_markers):
         return "user_preference"
     if any(marker in content for marker in project_markers):
@@ -196,6 +216,8 @@ def _memory_title(subtype: str, content: str) -> str:
         if "关闭前" in content and "审核" in content:
             return "关闭前集中审核记忆"
         return "用户长期偏好"
+    if subtype == "project_constraint":
+        return "项目约束"
     if subtype == "project_fact":
         return "项目事实"
     return "工作流事实"
@@ -243,4 +265,6 @@ def _clamp_confidence(value: Any) -> float:
         confidence = float(value)
     except (TypeError, ValueError):
         confidence = 0.0
+    if not math.isfinite(confidence):
+        return 0.0
     return max(0.0, min(confidence, 1.0))

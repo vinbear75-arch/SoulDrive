@@ -55,9 +55,15 @@ class RagContextTests(unittest.TestCase):
         )
 
         self.assertIn("【Agent 状态栏】", status)
-        self.assertIn("trace-123", status)
+        self.assertNotIn("trace-123", status)
         self.assertIn("evidence_count: 3", status)
         self.assertIn("数据安全", status)
+
+    def test_agent_status_bar_is_stable_when_audit_trace_changes(self):
+        first = build_agent_status_bar({"trace_id": "trace-a", "evidence_count": 1})
+        second = build_agent_status_bar({"trace_id": "trace-b", "evidence_count": 1})
+
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":

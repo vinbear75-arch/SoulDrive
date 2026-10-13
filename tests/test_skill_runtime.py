@@ -70,6 +70,61 @@ class SkillRuntimeTests(unittest.TestCase):
 
         self.assertEqual(match["skill_id"], "skill_en_tdd")
 
+    def test_match_skills_keeps_procedural_memory_inside_bound_workflow(self):
+        meeting_skill = normalize_skill_payload(
+            {
+                "skill_id": "skill_meeting_actions",
+                "title": "Meeting actions",
+                "content": "Extract meeting decisions and action items.",
+                "workflow_ids": ["meeting_actions"],
+            }
+        )
+
+        self.assertEqual(
+            match_skills(
+                "Extract meeting decisions and action items",
+                [meeting_skill],
+                workflow_id="paper_review",
+            ),
+            [],
+        )
+        self.assertEqual(
+            match_skills(
+                "Extract meeting decisions and action items",
+                [meeting_skill],
+            ),
+            [],
+        )
+        matches = match_skills(
+            "Extract meeting decisions and action items",
+            [meeting_skill],
+            workflow_id="meeting_actions",
+        )
+        self.assertEqual([item["skill_id"] for item in matches], ["skill_meeting_actions"])
+
+    def test_unknown_skill_workflow_scope_does_not_become_global(self):
+        unknown_scope_skill = normalize_skill_payload(
+            {
+                "skill_id": "skill_unknown_scope",
+                "title": "Unknown scope skill",
+                "content": "Extract workflow decisions.",
+                "workflow_ids": ["unknown_window"],
+            }
+        )
+
+        self.assertEqual(
+            match_skills(
+                "Extract workflow decisions",
+                [unknown_scope_skill],
+                workflow_id="paper_review",
+            ),
+            [],
+        )
+        self.assertEqual(
+            match_skills("Extract workflow decisions", [unknown_scope_skill]),
+            [],
+        )
+
     def test_match_skills_keeps_different_skill_ids_with_same_title(self):
         skills = [
             normalize_skill_payload(

@@ -16,6 +16,16 @@ test("schedule cards expose editing and preserve the configured start time", () 
   assert.match(app, /提前 10 分钟声音提醒：/);
 });
 
+test("schedule creation updates the rail immediately and exposes seven-day history", () => {
+  assert.match(app, /schedules\/history\?days=7&limit=100/);
+  assert.match(app, /近 7 天历史/);
+  assert.match(app, /schedule-history-dialog/);
+  assert.match(app, /按创建时间保留最近 7 天/);
+  assert.match(app, /setProjectScheduleArtifacts\(\(current\) => \[/);
+  assert.match(app, /setScheduleHistory\(\(current\) => \[/);
+  assert.match(app, /30-second poll is only reconciliation/);
+});
+
 test("schedule reminder opens a centered in-app card and attempts an unlocked tone", () => {
   assert.match(app, /schedule-reminder-backdrop/);
   assert.match(app, /还有 10 分钟就要开始这一项日程了/);
@@ -36,4 +46,10 @@ test("started schedules leave the top rail and open a one-time started notice", 
   assert.match(app, /scheduleStartedNotifiedRef/);
   assert.match(app, /日程已开始/);
   assert.match(app, /scheduleReminderPhase === "started"/);
+});
+
+test("calendar export exposes a replay-safe local file result", () => {
+  assert.match(app, /output_path\?: string; replayed\?: boolean/);
+  assert.match(app, /日程导出请求已回放，未重复写入本地 \.ics 文件/);
+  assert.match(app, /日程已导出为本地 \.ics 文件/);
 });

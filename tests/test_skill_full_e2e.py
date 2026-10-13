@@ -280,7 +280,7 @@ class SkillFullE2ETests(unittest.TestCase):
                 self.keys,
                 style_skill_lookup=mcp_server._presentation_style_skill,
             )
-            task = service.create_task(
+            plan_task = service.create_plan(
                 {
                     "source_filenames": ["RAG.pdf"],
                     "title": "Skill 证据汇报",
@@ -288,8 +288,13 @@ class SkillFullE2ETests(unittest.TestCase):
                     "style_skill_id": skill_id,
                 }
             )
-            completed = service.run_task(task["task_id"])
-            public_task = service.get_task(task["task_id"])
+            planned = service.run_task(plan_task["task_id"])
+            generation_task = service.confirm_plan(
+                plan_task["task_id"],
+                planned["result"]["plan_digest"],
+            )
+            completed = service.run_task(generation_task["task_id"])
+            public_task = service.get_task(generation_task["task_id"])
 
         self.assertEqual(completed["status"], "completed")
         result = completed["result"]

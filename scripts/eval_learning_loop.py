@@ -79,13 +79,20 @@ def run_seeded_runtime(records: list[dict]) -> list[dict]:
             if asset.get("asset_type") == "skill"
         ]
         capsule = build_memory_capsule(memories)
-        skill_matches = match_skills(record.get("query") or "", skills, top_k=2)
+        workflow_id = str(record.get("workflow_id") or "").strip() or None
+        skill_matches = match_skills(
+            record.get("query") or "",
+            skills,
+            top_k=2,
+            workflow_id=workflow_id,
+        )
         skill_execution = None
         if skill_matches:
             skill_execution = create_skill_execution_plan(
                 skill_matches[0]["skill"],
                 record.get("query") or "",
                 matched_score=skill_matches[0]["score"],
+                workflow_id=workflow_id,
             )
 
         answer = _seeded_runtime_answer(capsule, skill_matches, skill_execution)
@@ -94,12 +101,14 @@ def run_seeded_runtime(records: list[dict]) -> list[dict]:
             {
                 "id": record["id"],
                 "metric": record["metric"],
+                "workflow_id": workflow_id,
                 "answer": answer,
                 "score": score,
                 "learning_recall_at_k": int(bool(capsule["items"])) + int(bool(skill_matches)),
                 "memory_capsule_hit_rate": 1.0 if capsule["items"] else 0.0,
                 "skill_match_precision": 1.0 if skill_matches else 0.0,
                 "skill_execution_plan_rate": 1.0 if skill_execution else 0.0,
+                "matched_skill_ids": [str(item.get("title") or "") for item in skill_matches],
                 "latency_ms": int((time.time() - started) * 1000),
             }
         )

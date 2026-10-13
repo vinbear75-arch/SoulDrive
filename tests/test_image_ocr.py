@@ -11,6 +11,12 @@ from core.image_ocr import LocalImageOcrParser
 
 
 class ImageOcrTests(unittest.TestCase):
+    def test_ocr_confidence_rejects_non_finite_values(self):
+        parser = LocalImageOcrParser(engine_factory=lambda: None)
+
+        self.assertEqual(parser._confidence(float("nan")), 0.0)
+        self.assertEqual(parser._confidence(float("inf")), 0.0)
+
     def test_parser_returns_ordered_text_with_normalized_regions_and_metrics(self):
         output = SimpleNamespace(
             txts=("第二行", "第一行"),

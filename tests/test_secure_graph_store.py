@@ -1,5 +1,7 @@
 import tempfile
+import threading
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,6 +14,40 @@ from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class SecureGraphStoreTests(unittest.TestCase):
+    def test_shared_secure_graph_connection_serializes_concurrent_index_writes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = SecureGraphStore(
+                str(Path(temp_dir) / "secure_graph.sqlite"),
+                SimpleNamespace(graph_key=b"g" * 32),
+            )
+            start = threading.Barrier(4)
+            errors = []
+
+            def worker(worker_id):
+                try:
+                    start.wait(timeout=5)
+                    for index in range(12):
+                        store.add_entity(
+                            f"entity-{worker_id}-{index}",
+                            "test",
+                            "concurrent graph entity",
+                            chunk_ids=[f"chunk-{worker_id}-{index}"],
+                        )
+                except BaseException as exc:  # pragma: no cover - asserted below
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=worker, args=(worker_id,)) for worker_id in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=10)
+            entities = store.get_all_entities()
+            store.close()
+
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(errors, [])
+        self.assertEqual(len(entities), 48)
+
     def test_graph_extractor_passes_chunk_provenance_to_store(self):
         store = _RecordingGraphStore()
         extractor = object.__new__(GraphExtractor)
@@ -120,6 +156,131 @@ class SecureGraphStoreTests(unittest.TestCase):
                 store.close()
 
         self.assertEqual(project_chunks, ["current-1"])
+
+    def test_secure_graph_snapshot_keeps_entity_attributes_by_chunk(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureGraphStore(workspace.secure_graph_store_path, keys)
+            try:
+                store.add_entity("同名实体", "项目 A 类型", "项目 A 描述", chunk_ids=["a-1"])
+                store.add_entity("同名实体", "项目 B 类型", "项目 B 描述", chunk_ids=["b-1"])
+                entity = store.get_graph_snapshot()["entities"][0]
+            finally:
+                store.close()
+
+        self.assertEqual(
+            entity["source_attributes"],
+            [
+                {"chunk_id": "a-1", "type": "项目 A 类型", "description": "项目 A 描述"},
+                {"chunk_id": "b-1", "type": "项目 B 类型", "description": "项目 B 描述"},
+            ],
+        )
+
+    def test_secure_graph_chunk_pruning_removes_entity_attribute_provenance(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureGraphStore(workspace.secure_graph_store_path, keys)
+            try:
+                store.add_entity("同名实体", "项目 A 类型", "项目 A 描述", chunk_ids=["a-1"])
+                store.add_entity("同名实体", "项目 B 类型", "项目 B 描述", chunk_ids=["b-1"])
+                store.remove_chunk_ids(["a-1"])
+                entity = store.get_graph_snapshot()["entities"][0]
+            finally:
+                store.close()
+
+        self.assertEqual(entity["source_attributes"], [
+            {"chunk_id": "b-1", "type": "项目 B 类型", "description": "项目 B 描述"},
+        ])
+
+    def test_secure_remove_project_derives_chunk_ids_when_caller_omits_them(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureGraphStore(workspace.secure_graph_store_path, keys)
+            try:
+                store.add_document("project.pdf", "项目", "项目", chunk_ids=["project-1"], project_id="project-a")
+                store.add_document("global.pdf", "全局", "全局", chunk_ids=["global-1"], project_id="")
+                store.add_entity("共享实体", "概念", "共享", chunk_ids=["project-1", "global-1"])
+                store.add_entity("关联实体", "概念", "关联", chunk_ids=["project-1", "global-1"])
+                store.add_relationship(
+                    "共享实体",
+                    "关联实体",
+                    "关联",
+                    evidence_chunk_ids=["project-1", "global-1"],
+                )
+
+                store.remove_project("project-a")
+                snapshot = store.get_graph_snapshot()
+            finally:
+                store.close()
+
+        self.assertEqual([item["project_id"] for item in snapshot["documents"]], [""])
+        self.assertTrue(all(item["chunk_ids"] == ["global-1"] for item in snapshot["entities"]))
+        self.assertEqual(snapshot["relationships"][0]["chunk_ids"], ["global-1"])
+
+    def test_secure_graph_documents_keep_same_source_filename_per_project(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureGraphStore(workspace.secure_graph_store_path, keys)
+            try:
+                store.add_document(
+                    "same.pdf",
+                    "项目 A 报告",
+                    "A",
+                    chunk_ids=["a-1"],
+                    project_id="project-a",
+                )
+                store.add_document(
+                    "same.pdf",
+                    "项目 B 报告",
+                    "B",
+                    chunk_ids=["b-1"],
+                    project_id="project-b",
+                )
+                documents = store.get_graph_snapshot()["documents"]
+            finally:
+                store.close()
+
+        self.assertEqual(
+            {(item["project_id"], item["title"], tuple(item["chunk_ids"])) for item in documents},
+            {
+                ("project-a", "项目 A 报告", ("a-1",)),
+                ("project-b", "项目 B 报告", ("b-1",)),
+            },
+        )
+        self.assertEqual(len({item["document_id"] for item in documents}), 2)
+        self.assertNotEqual(documents[0]["document_id"], documents[1]["document_id"])
+
+    def test_secure_graph_chunk_pruning_preserves_document_project_scope(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureGraphStore(workspace.secure_graph_store_path, keys)
+            try:
+                store.add_document(
+                    "scoped.pdf",
+                    "项目 A 报告",
+                    "A",
+                    chunk_ids=["keep", "drop"],
+                    project_id="project-a",
+                )
+                store.remove_chunk_ids(["drop"])
+                documents_after_prune = store.get_graph_snapshot()["documents"]
+                store.remove_project("project-a", ["keep"])
+                documents_after_project_removal = store.get_graph_snapshot()["documents"]
+            finally:
+                store.close()
+
+        self.assertEqual(documents_after_prune[0]["project_id"], "project-a")
+        self.assertEqual(documents_after_project_removal, [])
 
     def test_secure_graph_store_returns_context_without_plaintext_leak(self):
         with tempfile.TemporaryDirectory() as temp_dir:

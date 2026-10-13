@@ -1363,7 +1363,8 @@ class Topic5Runtime:
             if not text:
                 continue
             try:
-                confidence = max(0.0, min(float(scores[index]), 1.0))
+                raw_confidence = float(scores[index])
+                confidence = _bounded_unit(raw_confidence) if math.isfinite(raw_confidence) else 0.0
             except (IndexError, TypeError, ValueError):
                 confidence = 0.0
             region: dict[str, Any] = {"text": text[:1200], "confidence": round(confidence, 6)}
@@ -1493,7 +1494,8 @@ class Topic5Runtime:
             except (TypeError, ValueError):
                 end_ms = start_ms
             try:
-                confidence = max(0.0, min(float(raw.get("confidence", 1.0)), 1.0))
+                raw_confidence = float(raw.get("confidence", 1.0))
+                confidence = _bounded_unit(raw_confidence) if math.isfinite(raw_confidence) else 0.0
             except (TypeError, ValueError):
                 confidence = 1.0
             payload = dict(raw.get("payload")) if isinstance(raw.get("payload"), dict) else {}
@@ -1538,9 +1540,9 @@ class Topic5Runtime:
                 "end_ms": max(0, image_start_ms),
                 "confidence": round(
                     1.0 if target_id else (
-                        max((float(item.get("confidence", 0.0)) for item in candidates), default=0.0)
+                        max((_bounded_unit(item.get("confidence", 0.0)) for item in candidates), default=0.0)
                         if candidates else
-                        (sum(item["confidence"] for item in ocr_regions) / len(ocr_regions) if ocr_regions else 0.5)
+                        (sum(_bounded_unit(item.get("confidence", 0.0)) for item in ocr_regions) / len(ocr_regions) if ocr_regions else 0.5)
                     ),
                     6,
                 ),
@@ -1571,7 +1573,8 @@ class Topic5Runtime:
                     end_ms = start_ms
                 end_ms = max(start_ms, end_ms)
                 try:
-                    confidence = max(0.0, min(float(raw.get("confidence", 1.0)), 1.0))
+                    raw_confidence = float(raw.get("confidence", 1.0))
+                    confidence = _bounded_unit(raw_confidence) if math.isfinite(raw_confidence) else 0.0
                 except (TypeError, ValueError):
                     confidence = 1.0
                 timestamp_ms = _public_event_time(start_ms, event_time_origin_ms)
@@ -1628,9 +1631,9 @@ class Topic5Runtime:
                 "end_ms": _public_event_time(image_start_ms, event_time_origin_ms),
                 "confidence": round(
                     1.0 if target_id else (
-                        max((float(item.get("confidence", 0.0)) for item in grounding_candidates), default=0.0)
+                        max((_bounded_unit(item.get("confidence", 0.0)) for item in grounding_candidates), default=0.0)
                         if grounding_candidates else
-                        (sum(item["confidence"] for item in ocr_regions) / len(ocr_regions) if ocr_regions else 0.5)
+                        (sum(_bounded_unit(item.get("confidence", 0.0)) for item in ocr_regions) / len(ocr_regions) if ocr_regions else 0.5)
                     ),
                     6,
                 ),

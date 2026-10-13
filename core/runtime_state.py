@@ -3,11 +3,23 @@ import json
 import os
 import time
 from pathlib import Path
-from core.audit_log import AuditLogger, default_audit_logger
+from core.atomic_file import atomic_write_text
+from core.audit_log import AuditLogger, append_audit_event_best_effort, default_audit_logger
 from core.paths import local_data_root
 from core.workspace import SoulDriveWorkspace
 
 STATE_PATH: str | None = None
+
+_INDEXING_STATUS_ORDER = {
+    "queued": 1,
+    "scanning": 2,
+    "indexing": 3,
+    "idle": 4,
+    "completed": 4,
+    "failed": 4,
+    "blocked": 4,
+}
+_INDEXING_TERMINAL_STATUSES = frozenset({"idle", "completed", "failed", "blocked"})
 
 DEFAULT_STATE = {
     "locked": True,
@@ -23,12 +35,16 @@ DEFAULT_STATE = {
     "indexing": {
         "status": "idle",
         "run_id": None,
+        "worker_pid": None,
+        "worker_started_at": None,
         "total_files": 0,
         "discovered_files": 0,
         "skipped_files": 0,
         "succeeded_files": 0,
         "processed_files": 0,
         "current_file": None,
+        "current_document_id": None,
+        "current_project_id": None,
         "failures": [],
         "failure_summary": {},
         "chunk_count": 0,
@@ -114,10 +130,10 @@ def set_runtime_state(**updates):
     state.update(updates)
     state["updated_at"] = time.time()
 
-    temp_path = f"{path}.tmp"
-    with open(temp_path, "w", encoding="utf-8") as file:
-        json.dump(state, file, ensure_ascii=False, indent=2)
-    os.replace(temp_path, path)
+    atomic_write_text(
+        Path(path),
+        json.dumps(state, ensure_ascii=False, indent=2),
+    )
     return state
 
 
@@ -165,12 +181,16 @@ def unlock_runtime(
     if not preserve_completed_index:
         updates["indexing"] = copy.deepcopy(DEFAULT_STATE["indexing"])
     state = set_runtime_state(**updates)
-    audit_logger.append_event("runtime.unlock", {
-        "auth_level": "HARDWARE_ONLY",
-        "hardware_sn_hash": _hash_sensitive(hardware_sn),
-        "active_drive": active_drive,
-        "reason": "workspace passphrase required",
-    })
+    append_audit_event_best_effort(
+        audit_logger,
+        "runtime.unlock",
+        {
+            "auth_level": "HARDWARE_ONLY",
+            "hardware_sn_hash": _hash_sensitive(hardware_sn),
+            "active_drive": active_drive,
+            "reason": "workspace passphrase required",
+        },
+    )
     return state
 
 
@@ -183,7 +203,11 @@ def mark_software_unlocked(reason: str = "workspace unlocked"):
         software_unlocked=True,
         security_reason=reason,
     )
-    _audit_logger_for_workspace_path(state.get("workspace_path")).append_event("security.unlock_succeeded", {})
+    append_audit_event_best_effort(
+        _audit_logger_for_workspace_path(state.get("workspace_path")),
+        "security.unlock_succeeded",
+        {},
+    )
     return state
 
 
@@ -196,9 +220,11 @@ def mark_software_locked(reason: str = "workspace passphrase required"):
         software_unlocked=False,
         security_reason=reason,
     )
-    _audit_logger_for_workspace_path(previous_state.get("workspace_path")).append_event("security.software_locked", {
-        "reason": reason,
-    })
+    append_audit_event_best_effort(
+        _audit_logger_for_workspace_path(previous_state.get("workspace_path")),
+        "security.software_locked",
+        {"reason": reason},
+    )
     return state
 
 
@@ -219,12 +245,16 @@ def lock_runtime(reason: str = "storage device removed"):
         indexing={
             "status": "locked",
             "run_id": None,
+            "worker_pid": None,
+            "worker_started_at": None,
             "total_files": 0,
             "discovered_files": 0,
             "skipped_files": 0,
             "succeeded_files": 0,
             "processed_files": 0,
             "current_file": None,
+            "current_document_id": None,
+            "current_project_id": None,
             "failures": [],
             "failure_summary": {},
             "chunk_count": 0,
@@ -234,9 +264,7 @@ def lock_runtime(reason: str = "storage device removed"):
             "observability": copy.deepcopy(DEFAULT_STATE["indexing"]["observability"]),
         },
     )
-    audit_logger.append_event("runtime.lock", {
-        "reason": reason,
-    })
+    append_audit_event_best_effort(audit_logger, "runtime.lock", {"reason": reason})
     return state
 
 
@@ -256,9 +284,38 @@ def _audit_logger_for_workspace_path(workspace_path: str | None):
         return default_audit_logger
 
 
-def update_indexing_status(**updates):
+def update_indexing_status(*, expected_run_id: str | None = None, **updates):
     state = get_runtime_state()
     indexing = copy.deepcopy(DEFAULT_STATE["indexing"])
     indexing.update(state.get("indexing") or {})
+    if expected_run_id is not None:
+        expected = str(expected_run_id)
+        current = str(indexing.get("run_id") or "")
+        incoming = str(updates.get("run_id") or "")
+        can_initialize = not current and incoming == expected and indexing.get("status") != "locked"
+        if current != expected and not can_initialize:
+            # An old worker may finish after a newer run has claimed the state.
+            # Ignore its late event rather than letting it close or corrupt the
+            # newer run.  The caller can inspect the unchanged state if needed.
+            return state
+    incoming_status = str(updates.get("status") or "").strip()
+    current_status = str(indexing.get("status") or "").strip()
+    current_run_id = str(indexing.get("run_id") or "")
+    incoming_run_id = str(updates.get("run_id") or current_run_id)
+    if incoming_status and current_run_id and incoming_run_id == current_run_id:
+        current_order = _INDEXING_STATUS_ORDER.get(current_status)
+        incoming_order = _INDEXING_STATUS_ORDER.get(incoming_status)
+        if current_order is not None and incoming_order is not None:
+            if current_order > incoming_order:
+                return state
+            if current_status in _INDEXING_TERMINAL_STATUSES and incoming_status != current_status:
+                return state
+    if "current_file" in updates:
+        if not updates["current_file"]:
+            updates["current_document_id"] = None
+            updates["current_project_id"] = None
+        else:
+            updates.setdefault("current_document_id", None)
+            updates.setdefault("current_project_id", None)
     indexing.update(updates)
     return set_runtime_state(indexing=indexing)

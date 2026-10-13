@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core.project_skill_installer import (
     SkillInstallError,
@@ -148,6 +149,218 @@ class ProjectSkillInstallerTests(unittest.TestCase):
             inbox_path.mkdir(exist_ok=True)
             shutil.copytree(Path(skills_path) / result["skill_name"], inbox_path / result["skill_name"])
             self.assertEqual(list_skill_inbox(skills_path), [])
+
+    def test_reinstalling_identical_pending_skill_replays_without_replacing_entry(self):
+        api_root = "https://api.github.com/repos/acme/research/contents/skills/meeting?ref=main"
+        api_file = "https://api.github.com/repos/acme/research/contents/skills/meeting/SKILL.md?ref=main"
+        raw_file = "https://raw.githubusercontent.com/acme/research/main/skills/meeting/SKILL.md"
+        responses = {
+            api_root: json.dumps([{"type": "file", "path": "skills/meeting/SKILL.md", "url": api_file}]).encode(),
+            api_file: json.dumps({"type": "file", "path": "skills/meeting/SKILL.md", "download_url": raw_file}).encode(),
+            raw_file: b"---\nname: Meeting Notes\ndescription: Extract decisions and action items\n---\n1. Extract decisions\n",
+        }
+
+        def opener(request, timeout=0):
+            return _Response(responses[request.full_url])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_path = str(Path(temp_dir) / "skills")
+            first = install_skill_to_inbox(
+                skills_path,
+                "acme/research/skills/meeting",
+                opener=opener,
+            )
+            manifest_path = Path(first["path"]) / "install_manifest.json"
+            first_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            replay = install_skill_to_inbox(
+                skills_path,
+                "acme/research/skills/meeting",
+                opener=opener,
+            )
+
+            self.assertFalse(first["replayed"])
+            self.assertTrue(replay["replayed"])
+            self.assertEqual(replay["path"], first["path"])
+            self.assertEqual(
+                json.loads(manifest_path.read_text(encoding="utf-8")),
+                first_manifest,
+            )
+            self.assertEqual(len(list_skill_inbox(skills_path)), 1)
+
+    def test_reactivating_a_moved_skill_replays_without_requiring_inbox(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_path = Path(temp_dir) / "skills"
+            pending = skills_path / ".inbox" / "replay-skill"
+            pending.mkdir(parents=True)
+            (pending / "SKILL.md").write_text(
+                "---\nname: Replay Skill\ndescription: Verify activation replay\n---\n",
+                encoding="utf-8",
+            )
+            (pending / "install_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "souldrive_project_skill_inbox_v1",
+                        "skill_name": "replay-skill",
+                        "skill_title": "Replay Skill",
+                        "description": "Verify activation replay",
+                        "source": "acme/research/skills/replay-skill",
+                        "target": "conversation",
+                        "files": ["SKILL.md"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            first = activate_skill_from_inbox(str(skills_path), "replay-skill")
+            adapter_before = (skills_path / "replay-skill" / "souldrive_skill.json").read_text(
+                encoding="utf-8"
+            )
+            replay = activate_skill_from_inbox(str(skills_path), "replay-skill")
+
+            self.assertFalse(first["replayed"])
+            self.assertTrue(replay["replayed"])
+            self.assertEqual(replay["path"], first["path"])
+            self.assertEqual(
+                (skills_path / "replay-skill" / "souldrive_skill.json").read_text(
+                    encoding="utf-8"
+                ),
+                adapter_before,
+            )
+            self.assertFalse(pending.exists())
+
+    def test_approving_a_manifested_skill_replays_review_marker(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_path = Path(temp_dir) / "skills"
+            pending = skills_path / ".inbox" / "review-replay"
+            pending.mkdir(parents=True)
+            (pending / "SKILL.md").write_text(
+                "---\nname: Review Replay\ndescription: Verify review replay\n---\n",
+                encoding="utf-8",
+            )
+            manifest_path = pending / "install_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "souldrive_project_skill_inbox_v1",
+                        "skill_name": "review-replay",
+                        "skill_title": "Review Replay",
+                        "description": "Verify review replay",
+                        "source": "acme/research/skills/review-replay",
+                        "target": "conversation",
+                        "files": ["SKILL.md"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            first = approve_skill_from_inbox(str(skills_path), "review-replay")
+            adapter_before = (pending / "souldrive_skill.json").read_text(encoding="utf-8")
+            replay = approve_skill_from_inbox(str(skills_path), "review-replay")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertFalse(first["replayed"])
+            self.assertTrue(replay["replayed"])
+            self.assertEqual(
+                (pending / "souldrive_skill.json").read_text(encoding="utf-8"),
+                adapter_before,
+            )
+            self.assertEqual(manifest["review_status"], "adapter_ready")
+            self.assertIn("reviewed_at", manifest)
+
+    def test_review_marker_failure_preserves_previous_manifest(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_path = Path(temp_dir) / "skills"
+            pending = skills_path / ".inbox" / "review-failure"
+            pending.mkdir(parents=True)
+            (pending / "SKILL.md").write_text(
+                "---\nname: Review Failure\ndescription: Preserve the review manifest\n---\n",
+                encoding="utf-8",
+            )
+            manifest_path = pending / "install_manifest.json"
+            original = {
+                "schema_version": "souldrive_project_skill_inbox_v1",
+                "skill_name": "review-failure",
+                "skill_title": "Review Failure",
+                "description": "Preserve the review manifest",
+                "source": "acme/research/skills/review-failure",
+                "target": "conversation",
+                "files": ["SKILL.md"],
+            }
+            manifest_path.write_text(json.dumps(original), encoding="utf-8")
+
+            calls = 0
+
+            def fail_on_review(_file):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("disk full")
+
+            with patch("core.atomic_file.os.fsync", side_effect=fail_on_review):
+                with self.assertRaises(OSError):
+                    approve_skill_from_inbox(str(skills_path), "review-failure")
+
+            self.assertEqual(json.loads(manifest_path.read_text(encoding="utf-8")), original)
+            self.assertEqual(list(pending.glob(".install_manifest.json.*.tmp")), [])
+
+    def test_activation_adapter_failure_keeps_skill_in_review_inbox(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_path = Path(temp_dir) / "skills"
+            pending = skills_path / ".inbox" / "activation-failure"
+            pending.mkdir(parents=True)
+            (pending / "SKILL.md").write_text(
+                "---\nname: Activation Failure\ndescription: Keep the inbox entry recoverable\n---\n",
+                encoding="utf-8",
+            )
+            (pending / "install_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "souldrive_project_skill_inbox_v1",
+                        "skill_name": "activation-failure",
+                        "skill_title": "Activation Failure",
+                        "description": "Keep the inbox entry recoverable",
+                        "source": "acme/research/skills/activation-failure",
+                        "target": "conversation",
+                        "files": ["SKILL.md"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            calls = 0
+
+            def fail_after_compile(_file):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("adapter replace not durable")
+
+            with patch("core.atomic_file.os.fsync", side_effect=fail_after_compile):
+                with self.assertRaises(OSError):
+                    activate_skill_from_inbox(str(skills_path), "activation-failure")
+
+            self.assertTrue(pending.is_dir())
+            self.assertFalse((skills_path / "activation-failure").exists())
+            self.assertEqual(list(pending.glob(".souldrive_skill.json.*.tmp")), [])
+
+    def test_presentation_adapter_failure_leaves_no_partial_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_path = Path(temp_dir) / "skills"
+            skill_dir = skills_path / "presentation-failure"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\nname: Presentation Failure\ndescription: Build a local deck\n---\n",
+                encoding="utf-8",
+            )
+
+            with patch("core.atomic_file.os.replace", side_effect=OSError("replace denied")):
+                with self.assertRaises(OSError):
+                    ensure_project_skill_presentation_adapter(
+                        str(skills_path), "presentation-failure/SKILL.md"
+                    )
+
+            self.assertFalse((skill_dir / "presentation_style.json").exists())
+            self.assertEqual(list(skill_dir.glob(".presentation_style.json.*.tmp")), [])
 
     def test_approved_slide_preset_gets_compiled_adapter_without_executable_resources(self):
         with tempfile.TemporaryDirectory() as temp_dir:

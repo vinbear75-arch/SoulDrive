@@ -7,6 +7,7 @@ from core.knowledge_base import _reranker_passage
 from core.retrieval import SearchCandidate
 from core.reranker import (
     LocalReranker,
+    _normalize_reranker_scores,
     preferred_reranker_model_name,
     reranker_runtime_diagnostics,
 )
@@ -69,14 +70,54 @@ class RerankerTests(unittest.TestCase):
             reranker_dir = model_dir / "mmarco-mMiniLMv2-L6-H384-v1"
             reranker_dir.mkdir(parents=True)
             with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
-                "sentence_transformers.CrossEncoder",
-                FakeCrossEncoder,
+                "core.reranker._load_cross_encoder",
+                return_value=FakeCrossEncoder,
             ):
                 reranker = LocalReranker()
                 self.assertTrue(reranker.ready)
                 scores = reranker.score("GraphRAG 是什么", ["GraphRAG local search improves QA"])
 
         self.assertEqual(scores, [0.91])
+
+    def test_broken_optional_cross_encoder_degrades_to_disabled_reranker(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            model_dir = Path(temp_dir)
+            (model_dir / "mmarco-mMiniLMv2-L6-H384-v1").mkdir(parents=True)
+            with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
+                "core.reranker._load_cross_encoder",
+                side_effect=ImportError("optional reranker unavailable"),
+            ):
+                reranker = LocalReranker()
+
+        self.assertFalse(reranker.ready)
+        self.assertEqual(reranker.score("query", ["passage"]), [0.0])
+
+    def test_local_reranker_normalizes_raw_logits_for_hybrid_ranking(self):
+        class FakeCrossEncoder:
+            def __init__(self, model_path, max_length=None, device="cpu", local_files_only=True):
+                self.model_path = model_path
+
+            def predict(self, pairs):
+                return [-2.0, 1.0, 4.0][: len(pairs)]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            model_dir = Path(temp_dir)
+            reranker_dir = model_dir / "mmarco-mMiniLMv2-L6-H384-v1"
+            reranker_dir.mkdir(parents=True)
+            with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
+                "core.reranker._load_cross_encoder",
+                return_value=FakeCrossEncoder,
+            ):
+                reranker = LocalReranker()
+                scores = reranker.score("GraphRAG 是什么", ["a", "b", "c"])
+
+        self.assertEqual(scores[0], 0.0)
+        self.assertAlmostEqual(scores[1], 0.5)
+        self.assertEqual(scores[2], 1.0)
+
+    def test_normalize_reranker_scores_preserves_probability_outputs(self):
+        self.assertEqual(_normalize_reranker_scores([0.1, 0.9]), [0.1, 0.9])
+        self.assertEqual(_normalize_reranker_scores([float("nan"), float("inf")]), [0.0, 0.0])
 
     def test_local_reranker_uses_available_runtime_device(self):
         captured = {}
@@ -93,8 +134,8 @@ class RerankerTests(unittest.TestCase):
             reranker_dir = model_dir / "mmarco-mMiniLMv2-L6-H384-v1"
             reranker_dir.mkdir(parents=True)
             with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
-                "sentence_transformers.CrossEncoder",
-                FakeCrossEncoder,
+                "core.reranker._load_cross_encoder",
+                return_value=FakeCrossEncoder,
             ), patch("core.reranker._runtime_device", return_value="cuda"):
                 reranker = LocalReranker()
                 self.assertTrue(reranker.ready)
@@ -116,8 +157,8 @@ class RerankerTests(unittest.TestCase):
             model_dir = Path(temp_dir)
             (model_dir / "Qwen3-Reranker-0.6B").mkdir(parents=True)
             with patch.dict("os.environ", {"SOULDRIVE_MODEL_DIR": str(model_dir)}), patch(
-                "sentence_transformers.CrossEncoder",
-                FakeCrossEncoder,
+                "core.reranker._load_cross_encoder",
+                return_value=FakeCrossEncoder,
             ):
                 reranker = LocalReranker()
                 scores = reranker.score("适用范围是什么", ["本办法适用于境内企业。"])

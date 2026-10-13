@@ -19,6 +19,52 @@ MAX_SCRIPT_OUTPUT_BYTES = 256 * 1024
 MAX_SCRIPT_ARGS = 12
 MAX_SCRIPT_ARG_BYTES = 2048
 INSTALL_SCRIPT_TOKENS = {"install", "setup", "bootstrap", "uninstall", "remove"}
+SUPPORTED_WORKFLOW_IDS = frozenset({"paper_review", "experiment_compare", "meeting_actions"})
+
+
+def _workflow_scope_tokens(value: Any) -> tuple[list[str], bool]:
+    """Return normalized workflow tokens and whether the scope shape is invalid."""
+    if value is None or value == "":
+        return [], False
+    if isinstance(value, str):
+        raw_values = re.split(r"[,;\n]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        return [], True
+    tokens = [
+        str(raw_value or "").strip().strip("[](){}\"'").casefold()
+        for raw_value in raw_values
+        if str(raw_value or "").strip().strip("[](){}\"'")
+    ]
+    return tokens, any(token not in SUPPORTED_WORKFLOW_IDS for token in tokens)
+
+
+def normalize_skill_workflow_ids(value: Any) -> list[str]:
+    """Normalize the optional workflow scope of a procedural Skill."""
+    raw_values, _invalid = _workflow_scope_tokens(value)
+    normalized: list[str] = []
+    for workflow_id in raw_values:
+        if workflow_id in SUPPORTED_WORKFLOW_IDS and workflow_id not in normalized:
+            normalized.append(workflow_id)
+    return normalized
+
+
+def is_skill_visible_in_workflow(skill: dict[str, Any] | None, workflow_id: str | None) -> bool:
+    """Return whether a Skill may participate in the current conversation window.
+
+    An unscoped Skill remains reusable across windows. A scoped Skill is
+    fail-closed when the caller has no matching workflow context.
+    """
+    scope_value = (skill or {}).get("workflow_ids")
+    if not scope_value:
+        scope_value = (skill or {}).get("workflow_id")
+    _scope_tokens, scope_invalid = _workflow_scope_tokens(scope_value)
+    if bool((skill or {}).get("workflow_scope_invalid")) or scope_invalid:
+        return False
+    allowed_workflows = normalize_skill_workflow_ids(scope_value)
+    requested_workflow = str(workflow_id or "").strip().casefold()
+    return not allowed_workflows or requested_workflow in allowed_workflows
 
 
 def normalize_skill_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -38,6 +84,9 @@ def normalize_skill_payload(payload: dict[str, Any]) -> dict[str, Any]:
             re.I,
         ) else "conversation"
 
+    workflow_scope = normalized.get("workflow_ids") or normalized.get("workflow_id")
+    _workflow_scope, workflow_scope_invalid = _workflow_scope_tokens(workflow_scope)
+    workflow_scope_invalid = bool(normalized.get("workflow_scope_invalid")) or workflow_scope_invalid
     normalized.update(
         {
             "title": title,
@@ -65,12 +114,21 @@ def normalize_skill_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "adapter_path": str(normalized.get("adapter_path") or "").strip()[:260],
             "adapter_schema": str(normalized.get("adapter_schema") or "").strip()[:80],
             "raw_source_digest": str(normalized.get("raw_source_digest") or "").strip()[:128],
+            "workflow_ids": normalize_skill_workflow_ids(workflow_scope),
+            "workflow_scope_invalid": workflow_scope_invalid,
         }
     )
     return normalized
 
 
-def match_skills(query: str, skills: list[dict[str, Any]], top_k: int = 3, min_score: float = 0.25) -> list[dict[str, Any]]:
+def match_skills(
+    query: str,
+    skills: list[dict[str, Any]],
+    top_k: int = 3,
+    min_score: float = 0.25,
+    *,
+    workflow_id: str | None = None,
+) -> list[dict[str, Any]]:
     query_terms = _terms(query)
     if not query_terms:
         return []
@@ -78,6 +136,8 @@ def match_skills(query: str, skills: list[dict[str, Any]], top_k: int = 3, min_s
     matches = []
     for skill in skills or []:
         normalized_skill = normalize_skill_payload(skill)
+        if not is_skill_visible_in_workflow(normalized_skill, workflow_id):
+            continue
         skill_terms = _terms(_skill_text(normalized_skill))
         trigger_terms = _terms(" ".join(normalized_skill.get("triggers") or []))
         if not skill_terms:
@@ -116,8 +176,12 @@ def create_skill_execution_plan(
     *,
     matched_score: float = 0.0,
     inputs: dict[str, Any] | None = None,
+    workflow_id: str | None = None,
+    project_id: str | None = None,
 ) -> dict[str, Any]:
     normalized_skill = normalize_skill_payload(skill)
+    if not is_skill_visible_in_workflow(normalized_skill, workflow_id):
+        raise ValueError("Skill is not available in the current workflow window")
     safe_resources = [
         item for item in normalized_skill.get("resource_manifest") or []
         if item.get("kind") != "script"
@@ -125,6 +189,9 @@ def create_skill_execution_plan(
     return {
         "skill_id": normalized_skill.get("skill_id") or normalized_skill.get("asset_id") or "",
         "skill_title": normalized_skill.get("title") or "",
+        "project_id": str(project_id or "").strip() or None,
+        "workflow_id": str(workflow_id or "").strip() or None,
+        "workflow_ids": list(normalized_skill.get("workflow_ids") or []),
         "status": "planned",
         "query": str(query or ""),
         "matched_score": matched_score,

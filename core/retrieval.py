@@ -203,7 +203,7 @@ def bm25_rank(query: str, candidates: list[SearchCandidate]) -> list[RankedCandi
             RankedCandidate(candidate=candidate, score=score)
             for candidate, score in zip(candidates, scores)
         ],
-        key=lambda item: item.score,
+        key=lambda item: (item.score, str(item.candidate.id)),
         reverse=True,
     )
 
@@ -249,6 +249,18 @@ def rank_hybrid_candidates(
             })
         return []
 
+    # Retrieval backends and rerankers are external numeric boundaries.  A
+    # non-finite value must not poison ranking, diagnostics, or citation score
+    # serialization.
+    for candidate in candidates:
+        candidate.graph_score = _finite_score(candidate.graph_score)
+        candidate.rerank_score = _finite_score(candidate.rerank_score)
+        if candidate.vector_distance is not None:
+            candidate.vector_distance = _finite_score(
+                candidate.vector_distance,
+                default=None,
+            )
+
     query_intent = classify_query_intent(query)
     search_queries = [str(query or "").strip()]
     search_queries.extend(str(variant or "").strip() for variant in query_variants or [])
@@ -282,7 +294,7 @@ def rank_hybrid_candidates(
         candidate.id
         for candidate in sorted(
             candidates,
-            key=lambda item: sparse_rrf_scores.get(item.id, 0.0),
+            key=lambda item: (sparse_rrf_scores.get(item.id, 0.0), str(item.id)),
             reverse=True,
         )
         if sparse_rrf_scores.get(candidate.id, 0.0) > 0
@@ -295,7 +307,10 @@ def rank_hybrid_candidates(
         candidate.id
         for candidate in sorted(
             candidates,
-            key=lambda item: item.dense_rank if item.dense_rank is not None else 10**9,
+            key=lambda item: (
+                item.dense_rank if item.dense_rank is not None else 10**9,
+                str(item.id),
+            ),
         )
         if candidate.dense_rank is not None
     ]
@@ -310,7 +325,7 @@ def rank_hybrid_candidates(
         candidate.id
         for candidate in sorted(
             candidates,
-            key=lambda item: source_scores.get(item.id, 0.0),
+            key=lambda item: (source_scores.get(item.id, 0.0), str(item.id)),
             reverse=True,
         )
         if source_scores.get(candidate.id, 0.0) >= 0.55
@@ -334,8 +349,14 @@ def rank_hybrid_candidates(
         source_profile_score = _bounded_score(
             (candidate.metadata or {}).get("_source_profile_score")
         )
-        knowledge_weight = float((candidate.metadata or {}).get("_knowledge_weight") or 1.0)
-        project_focus_weight = float((candidate.metadata or {}).get("_project_focus_weight") or 1.0)
+        knowledge_weight = _finite_score(
+            (candidate.metadata or {}).get("_knowledge_weight") or 1.0,
+            default=1.0,
+        )
+        project_focus_weight = _finite_score(
+            (candidate.metadata or {}).get("_project_focus_weight") or 1.0,
+            default=1.0,
+        )
         candidate.rrf_score = rrf_scores.get(candidate.id, 0.0)
         candidate.rerank_score = combined_rerank
         base_score = (
@@ -367,6 +388,7 @@ def rank_hybrid_candidates(
             candidate.final_score,
             candidate.keyword_score,
             -1 * (candidate.vector_distance or 0.0),
+            str(candidate.id),
         ),
         reverse=True,
     )
@@ -438,7 +460,7 @@ def build_citations(
             "visual_asset_count": len(visual_assets),
             "visual_assets": visual_assets,
             "visual_asset_captions": [item["caption"] for item in visual_assets],
-            "score": round(candidate.final_score, 6),
+            "score": round(_finite_score(candidate.final_score), 6),
             "breakdown": candidate.score_breakdown,
             "snippet": snippet,
             "support_score": support["score"],
@@ -522,10 +544,16 @@ def _support_summary(query: str, content: str, max_chars: int) -> str:
 
 
 def _bounded_score(value: Any) -> float:
+    parsed = _finite_score(value)
+    return max(0.0, min(1.0, parsed))
+
+
+def _finite_score(value: Any, *, default: Any = 0.0) -> Any:
     try:
-        return max(0.0, min(1.0, float(value)))
+        parsed = float(value)
     except (TypeError, ValueError):
-        return 0.0
+        return default
+    return parsed if math.isfinite(parsed) else default
 
 
 def _compact_match(query: str, content: str) -> float:
@@ -564,6 +592,24 @@ def source_identity(metadata: dict[str, Any], fallback: str = "") -> str:
 def source_key(metadata: dict[str, Any], fallback: str = "") -> str:
     """Stable deduplication key; display labels remain human-readable."""
     return str(metadata.get("document_id") or source_identity(metadata, fallback))
+
+
+def source_diversity_key(metadata: dict[str, Any], fallback: str = "") -> str:
+    """Identify a logical source without collapsing same-named scoped assets."""
+    metadata = metadata or {}
+    identity = next(
+        (
+            str(metadata.get(field) or "").strip()
+            for field in ("asset_version_id", "document_id", "asset_id")
+            if str(metadata.get(field) or "").strip()
+        ),
+        source_identity(metadata, fallback).strip(),
+    )
+    if not identity:
+        return ""
+    project_id = str(metadata.get("project_id") or "").strip()
+    scope = f"project:{project_id}" if project_id else "global"
+    return f"{scope}:{identity}"
 
 
 def _source_match_score(query: str, metadata: dict[str, Any]) -> float:
@@ -870,7 +916,25 @@ def _structure_match_score(
             + str(metadata.get("child_excerpt") or candidate.content[:500])
         )
         if any(reference and reference in clause_space for reference in intent.clause_references):
-            score = 1.0
+            # A quoted decimal section such as “2.1 RAG 范式” carries both a
+            # section number and a title.  Do not let a different section
+            # with the same number receive an exact structural match merely
+            # because its normalized clause text contains “21”.
+            decimal_section_query = bool(
+                _DECIMAL_SECTION_PATTERN.search(query)
+                or _NUMBERED_SECTION_PATTERN.search(query)
+            )
+            has_quoted_section_title = any(
+                re.match(r"\d+(?:[.．]\d+){1,3}", topic)
+                or re.match(r"\d+[.．、)]", topic)
+                for topic in _quoted_section_topics(query)
+            )
+            if not (
+                decimal_section_query
+                and has_quoted_section_title
+                and not section_route["matched_topic_indexes"]
+            ):
+                score = 1.0
 
     if intent.prefers_table:
         if content_kind == "table":
@@ -954,7 +1018,7 @@ def _select_diverse_sources(candidates: list[SearchCandidate], top_k: int) -> li
         return candidates[:top_k]
 
     def candidate_source_key(candidate: SearchCandidate) -> str:
-        return source_key(candidate.metadata or {}, candidate.id)
+        return source_diversity_key(candidate.metadata or {}, candidate.id)
 
     selected: list[SearchCandidate] = []
     deferred: list[SearchCandidate] = []
@@ -1052,7 +1116,7 @@ def _select_source_covered_candidates(
         for candidate in candidates:
             if id(candidate) in selected_ids:
                 continue
-            source = source_key(candidate.metadata or {}, candidate.id)
+            source = source_diversity_key(candidate.metadata or {}, candidate.id)
             if source in seen_sources:
                 continue
             score = _source_group_relevance_score(candidate, query_group)
@@ -1089,18 +1153,52 @@ def _select_source_covered_candidates(
         )
         selected.append(best)
         selected_ids.add(id(best))
-        seen_sources.add(source_key(best.metadata or {}, best.id))
+        seen_sources.add(source_diversity_key(best.metadata or {}, best.id))
         if len(selected) >= top_k:
             return selected[:top_k]
 
     remaining = [candidate for candidate in candidates if id(candidate) not in selected_ids]
     if len(selected) < top_k:
+        covered_remaining = [
+            candidate
+            for candidate in remaining
+            if any(
+                _source_group_relevance_score(candidate, query_group)
+                >= SOURCE_EVIDENCE_COVERAGE_FLOOR
+                for query_group in source_query_groups
+            )
+        ]
         selected.extend(
-            _select_diverse_sources(remaining, top_k=top_k - len(selected))
+            _select_diverse_sources(covered_remaining, top_k=top_k - len(selected))
         )
     # Keep the reserved candidates first so parent expansion cannot consume all
     # slots with duplicate chunks from one side of a comparison.
     return selected[:top_k]
+
+
+def _single_section_route_source(
+    candidates: list[SearchCandidate],
+    intent: QueryIntent,
+) -> str:
+    """Return a unique source selected by a high-confidence section route.
+
+    A structural lookup without an explicit document title should remain
+    source-cohesive when the section router identifies exactly one source.
+    Ambiguous routes and multi-source questions deliberately return no source
+    so ordinary hybrid ranking remains in control.
+    """
+    if intent.requires_source_diversity:
+        return ""
+    routed_sources = {
+        source_diversity_key(candidate.metadata or {}, candidate.id)
+        for candidate in candidates
+        if str((candidate.metadata or {}).get("_section_route_mode") or "").strip()
+        in {"exact_node", "heading_fallback"}
+        and _bounded_score((candidate.metadata or {}).get("_section_route_coverage"))
+        >= 0.99
+        and source_diversity_key(candidate.metadata or {}, candidate.id)
+    }
+    return next(iter(routed_sources)) if len(routed_sources) == 1 else ""
 
 
 def _select_ranked_evidence(
@@ -1117,6 +1215,39 @@ def _select_ranked_evidence(
         return []
 
     ordered_candidates, redundant_count = _defer_redundant_candidates(candidates)
+    section_route_source = _single_section_route_source(ordered_candidates, intent)
+    if section_route_source:
+        cohesive = [
+            candidate
+            for candidate in ordered_candidates
+            if source_diversity_key(candidate.metadata or {}, candidate.id) == section_route_source
+        ]
+        cohesive.sort(
+            key=lambda candidate: (
+                _bounded_score((candidate.metadata or {}).get("_section_route_exact_coverage")),
+                _bounded_score((candidate.metadata or {}).get("_section_route_coverage")),
+                1
+                if str((candidate.metadata or {}).get("_section_route_mode") or "")
+                == "exact_node"
+                else 0,
+                candidate.final_score,
+                candidate.keyword_score,
+                str(candidate.id),
+            ),
+            reverse=True,
+        )
+        selected = cohesive[:top_k]
+        if selected:
+            _record_selection_diagnostics(
+                diagnostics,
+                intent,
+                candidates,
+                selected,
+                redundant_count,
+                source_query_groups,
+                section_route_source=section_route_source,
+            )
+            return selected
     source_hints = _query_source_hints(query)
     if len(source_hints) == 1 and not intent.requires_source_diversity:
         exact_source = [
@@ -1244,6 +1375,7 @@ def _record_selection_diagnostics(
     selected: list[SearchCandidate],
     redundant_count: int,
     source_query_groups: list[list[str]] | None = None,
+    section_route_source: str = "",
 ) -> None:
     if diagnostics is None:
         return
@@ -1253,7 +1385,7 @@ def _record_selection_diagnostics(
         metadata = candidate.metadata or {}
         content_kind = str(metadata.get("content_kind") or "unknown")
         content_kind_counts[content_kind] = content_kind_counts.get(content_kind, 0) + 1
-        source = source_identity(metadata)
+        source = source_diversity_key(metadata)
         if source:
             sources.add(source)
 
@@ -1284,6 +1416,8 @@ def _record_selection_diagnostics(
             )
             for query_group in source_query_groups or []
         ),
+        "section_route_source_gate": bool(section_route_source),
+        "section_route_source": section_route_source,
     })
 
 
@@ -1297,7 +1431,7 @@ def _select_with_source_cap(
     source_counts: dict[str, int] = {}
 
     for candidate in candidates:
-        source = source_identity(candidate.metadata or {}, candidate.id)
+        source = source_diversity_key(candidate.metadata or {}, candidate.id)
         if source_counts.get(source, 0) >= max_per_source:
             deferred.append(candidate)
             continue

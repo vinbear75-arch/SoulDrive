@@ -514,6 +514,8 @@ def _bounded_confidence(value: Any) -> float:
         number = float(value)
     except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(number):
+        return 0.0
     return round(max(0.0, min(number, 1.0)), 6)
 
 

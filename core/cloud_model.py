@@ -186,6 +186,7 @@ class OpenAICompatibleChatModel:
         repeat_penalty=1.1,
         max_tokens=900,
         stop=None,
+        seed=None,
         response_format=None,
     ):
         del repeat_penalty
@@ -199,6 +200,8 @@ class OpenAICompatibleChatModel:
         }
         if stop:
             payload["stop"] = stop
+        if seed is not None:
+            payload["seed"] = seed
         if response_format:
             payload["response_format"] = response_format
         if stream:

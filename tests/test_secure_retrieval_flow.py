@@ -4,7 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.knowledge_base import LocalKnowledgeBase
+from core.knowledge_base import (
+    LocalKnowledgeBase,
+    _evaluate_project_candidates,
+    _project_candidate_relevance,
+)
 from core.rag_engine import RAGEngine
 from core.retrieval import SearchCandidate
 from core.security_context import clear_workspace_keys, set_workspace_keys
@@ -13,6 +17,69 @@ from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class SecureRetrievalFlowTests(unittest.TestCase):
+    def test_project_relevance_rejects_non_finite_dense_distance(self):
+        candidate = SearchCandidate(
+            id="invalid-dense-score",
+            content="实验指标相关说明，数据集版本一致。",
+            metadata={"source_filename": "noise.md", "project_id": "p1"},
+            vector_distance=float("nan"),
+        )
+
+        score = _project_candidate_relevance("实验指标在什么条件下可以比较？", candidate)
+
+        self.assertLess(score, 1.0)
+
+    def test_project_relevance_uses_dense_similarity_for_paraphrased_evidence(self):
+        candidate = SearchCandidate(
+            id="experiment-alpha",
+            content="两个实验只有在指标定义、单位、数据集版本、数据划分和评测脚本兼容时才允许计算数值差异。",
+            metadata={"source_filename": "experiment.md", "project_id": "p1"},
+            vector_distance=0.493,
+        )
+
+        score = _project_candidate_relevance("实验指标在什么条件下可以比较？", candidate)
+
+        self.assertGreaterEqual(score, 0.34)
+
+    def test_project_relevance_recovers_a_semantic_hit_with_multiple_query_anchors(self):
+        candidate = SearchCandidate(
+            id="mail-policy",
+            content="项目安全方案 邮件仅生成草案，发送前需要用户确认。",
+            metadata={"source_filename": "security.md", "project_id": "p1"},
+            dense_rank=1,
+            vector_distance=0.7777778,
+        )
+        noise = SearchCandidate(
+            id="unrelated",
+            content="项目安全方案 研发流程和预算审批。",
+            metadata={"source_filename": "plan.md", "project_id": "p1"},
+            dense_rank=2,
+            vector_distance=1.0,
+        )
+
+        evaluation = _evaluate_project_candidates(
+            "邮件发送是否自动执行？ 当前项目标识：p1",
+            [candidate, noise],
+        )
+
+        self.assertTrue(evaluation["relevant"])
+        self.assertTrue(evaluation["recovery"]["eligible"])
+
+    def test_project_relevance_keeps_explicit_comparison_source_anchor(self):
+        candidate = SearchCandidate(
+            id="plan-a",
+            content="甲方案采用本地加密和设备验证。",
+            metadata={
+                "source_filename": "plan-a.md",
+                "document_title": "甲方案",
+                "project_id": "p1",
+            },
+        )
+
+        score = _project_candidate_relevance("比较甲方案和乙方案在安全策略上的差异", candidate)
+
+        self.assertGreaterEqual(score, 0.34)
+
     def test_project_fallback_when_project_candidates_are_not_relevant(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -44,6 +111,47 @@ class SecureRetrievalFlowTests(unittest.TestCase):
 
         self.assertEqual({item["source_filename"] for item in result["metadatas"]}, {"global.pdf"})
         self.assertEqual(result["observability"]["project_focus"]["route"], "global_fallback")
+
+    def test_unbound_search_uses_only_global_documents_without_explicit_cross_project_scope(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "doc-project-a",
+                        [_FakeChunk(
+                            "zero trust project A private evidence",
+                            {"source_filename": "project-a.pdf", "page": 1, "project_id": "p1"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-project-b",
+                        [_FakeChunk(
+                            "zero trust project B private evidence",
+                            {"source_filename": "project-b.pdf", "page": 1, "project_id": "p2"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "doc-global",
+                        [_FakeChunk(
+                            "zero trust global policy evidence",
+                            {"source_filename": "global.pdf", "page": 1},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "zero trust policy",
+                        top_k=3,
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual(
+            {item["source_filename"] for item in result["metadatas"]},
+            {"global.pdf"},
+        )
+        self.assertTrue(result["observability"]["project_focus"]["unbound_global_only"])
 
     def test_project_noise_does_not_block_relevant_global_evidence(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -210,7 +318,7 @@ class SecureRetrievalFlowTests(unittest.TestCase):
                 "global_fallback",
             )
 
-    def test_new_project_session_without_document_selection_combines_global_and_visual_evidence(self):
+    def test_new_project_session_without_document_selection_ignores_unrelated_visual_evidence(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
             (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
@@ -228,8 +336,7 @@ class SecureRetrievalFlowTests(unittest.TestCase):
                     engine.kb = kb
                     engine.graph_db = None
                     engine.llm = _StaticRagLlm(
-                        "文档说明 zero trust policy requires device verification。[E1] "
-                        "当前授权截图显示本地项目界面。[V1]"
+                        "文档说明 zero trust policy requires device verification。[E1]"
                     )
                     engine.audit_logger = _NoopAuditLogger()
                     engine.runtime_config = SimpleNamespace(
@@ -262,7 +369,7 @@ class SecureRetrievalFlowTests(unittest.TestCase):
 
         self.assertIn("global-rag.pdf", output)
         self.assertIn("[E1]", output)
-        self.assertIn("[V1]", output)
+        self.assertNotIn("[V1]", output)
         self.assertNotIn("请选择要处理的文档", output)
         retrieved = next(payload for event_type, payload in engine.audit_logger.events if event_type == "rag.retrieved")
         self.assertEqual(retrieved["retrieval_observability"]["project_focus"]["route"], "global_fallback")
@@ -500,6 +607,38 @@ class SecureRetrievalFlowTests(unittest.TestCase):
         self.assertEqual(result["observability"]["project_focus"]["indexed_candidate_count"], 2)
         self.assertIn(result["observability"]["project_focus"]["route"], {"project_first", "project_first_with_global"})
 
+    def test_retrieval_observability_counts_same_named_scoped_sources_by_identity(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                try:
+                    kb.ingest_chunks(
+                        "document-a",
+                        [_FakeChunk(
+                            "zero trust architecture project A evidence",
+                            {"source_filename": "report.pdf", "page": 1, "project_id": "project-a"},
+                        )],
+                    )
+                    kb.ingest_chunks(
+                        "document-b",
+                        [_FakeChunk(
+                            "zero trust architecture project B evidence",
+                            {"source_filename": "report.pdf", "page": 1, "project_id": "project-b"},
+                        )],
+                    )
+                    result = kb.search_with_evidence(
+                        "比较两个项目的 zero trust architecture",
+                        top_k=2,
+                        project_id="project-a",
+                    )
+                finally:
+                    kb.close()
+
+        self.assertEqual(result["observability"]["quality_signals"]["evidence_source_count"], 2)
+        self.assertEqual(result["observability"]["stage_counts"]["final_sources"], 2)
+
     def test_cross_project_comparison_explicitly_uses_global_scope(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -515,6 +654,7 @@ class SecureRetrievalFlowTests(unittest.TestCase):
 
         self.assertEqual({item["project_id"] for item in result["metadatas"]}, {"p1", "p2"})
         self.assertEqual(result["observability"]["project_focus"]["route"], "global_explicit")
+        self.assertFalse(result["observability"]["comparison_source_reservation_active"])
 
     def test_secure_retrieval_decrypts_only_merged_candidate_text(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -561,7 +701,7 @@ class SecureRetrievalFlowTests(unittest.TestCase):
         self.assertLessEqual(len(set(loaded_ids)), 4)
         self.assertEqual(result["metadatas"][0]["source_filename"], "policy.pdf")
         self.assertEqual(result["observability"]["schema_version"], "retrieval_observability_v1")
-        self.assertEqual(result["observability"]["schema_revision"], 3)
+        self.assertEqual(result["observability"]["schema_revision"], 5)
         self.assertEqual(result["observability"]["stage_counts"]["final"], 1)
         self.assertEqual(result["observability"]["query_intent"], "factual_lookup")
         self.assertIn("redundant_deferred_count", result["observability"]["ranking"])
@@ -660,6 +800,68 @@ class SecureRetrievalFlowTests(unittest.TestCase):
             {"selected.pdf"},
         )
         self.assertEqual(result["observability"]["stage_counts"]["graph"], 0)
+
+    def test_selected_document_scope_uses_document_id_for_duplicate_names(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            embedding_model_path = Path(workspace.models_path) / "bge-small-zh-v1.5"
+            embedding_model_path.mkdir(parents=True, exist_ok=True)
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, keys)
+            try:
+                with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                    try:
+                        kb.ingest_chunks(
+                            "doc-object-a",
+                            [_FakeChunk(
+                                "zero trust duplicate object A evidence",
+                                {
+                                    "document_id": "secure_object-a",
+                                    "source_filename": "same-name.pdf",
+                                    "page": 1,
+                                    "chunk_index": 0,
+                                },
+                            )],
+                        )
+                        kb.ingest_chunks(
+                            "doc-object-b",
+                            [_FakeChunk(
+                                "zero trust duplicate object B evidence",
+                                {
+                                    "document_id": "secure_object-b",
+                                    "source_filename": "same-name.pdf",
+                                    "page": 1,
+                                    "chunk_index": 0,
+                                },
+                            )],
+                        )
+
+                        class ExplodingGraphStore:
+                            def recall_chunk_ids(self, *args, **kwargs):
+                                raise AssertionError("selected document retrieval must skip GraphRAG")
+
+                        result = kb.search_with_evidence(
+                            "zero trust duplicate object evidence",
+                            graph_db=ExplodingGraphStore(),
+                            top_k=2,
+                            document_names=["same-name.pdf"],
+                            document_ids=["object-b"],
+                        )
+                    finally:
+                        kb.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
+        self.assertEqual(
+            {item["document_id"] for item in result["metadatas"]},
+            {"secure_object-b"},
+        )
+        self.assertNotIn("object-a", " ".join(result["documents"]))
+        self.assertEqual(result["observability"]["stage_counts"]["graph"], 0)
+        self.assertEqual(result["observability"]["document_scope"]["mode"], "document_id")
+        self.assertEqual(result["observability"]["document_scope"]["requested_id_count"], 1)
 
     def test_candidate_merge_preserves_graph_score_for_existing_dense_candidate(self):
         kb = object.__new__(LocalKnowledgeBase)
@@ -766,14 +968,16 @@ class _FakeGraphStore:
     def __init__(self, chunk_id):
         self.chunk_id = chunk_id
 
-    def recall_chunk_ids(self, query, limit=40):
-        _ = query
+    def recall_chunk_ids(self, query, limit=40, project_id=None, global_only=False):
+        _ = query, project_id, global_only
         return [self.chunk_id][:limit]
 
-    def get_all_entities(self):
+    def get_all_entities(self, project_id=None, global_only=False):
+        _ = project_id, global_only
         return []
 
-    def get_subgraph(self, entity_name, depth=1):
+    def get_subgraph(self, entity_name, depth=1, project_id=None, global_only=False):
+        _ = entity_name, depth, project_id, global_only
         return []
 
 

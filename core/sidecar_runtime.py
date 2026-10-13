@@ -8,7 +8,7 @@ from pathlib import Path
 
 import uvicorn
 
-from core.audit_log import default_audit_logger
+from core.audit_log import append_audit_event_best_effort, default_audit_logger
 from core.paths import app_root
 from core.runtime_config import api_host, api_port
 from core.runtime_state import lock_runtime, mark_software_unlocked, unlock_runtime, use_workspace_runtime_state
@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None):
                 if development_workspace_bypass_enabled()
                 else "local PC workspace initialized; waiting for passphrase unlock"
             )
-            audit_logger.append_event("sidecar.started", {
+            append_audit_event_best_effort(audit_logger, "sidecar.started", {
                 "host": host,
                 "port": port,
                 "workspace": "local-pc",
@@ -239,7 +239,7 @@ def main(argv: list[str] | None = None):
             watcher = UDriveWatcher()
             watcher.start()
             startup_log("removable workspace watcher started")
-            audit_logger.append_event("sidecar.started", {
+            append_audit_event_best_effort(audit_logger, "sidecar.started", {
                 "host": host,
                 "port": port,
                 "workspace": "removable-watch",
@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None):
         else:
             lock_runtime("waiting for removable SoulDrive workspace")
             startup_log("removable workspace watcher disabled; API remains locked without a mounted workspace")
-            audit_logger.append_event("sidecar.started", {
+            append_audit_event_best_effort(audit_logger, "sidecar.started", {
                 "host": host,
                 "port": port,
                 "workspace": "locked-no-removable-watch",
@@ -277,7 +277,7 @@ def main(argv: list[str] | None = None):
 
         def request_shutdown(signum, frame):
             _ = frame
-            audit_logger.append_event("sidecar.signal", {"signal": signum})
+            append_audit_event_best_effort(audit_logger, "sidecar.signal", {"signal": signum})
             request_server_shutdown(f"signal {signum}")
 
         signal.signal(signal.SIGTERM, request_shutdown)
@@ -297,7 +297,7 @@ def main(argv: list[str] | None = None):
         if watcher is not None:
             watcher.stop()
         startup_log("sidecar stopped")
-        audit_logger.append_event("sidecar.stopped", {})
+        append_audit_event_best_effort(audit_logger, "sidecar.stopped", {})
 
 
 if __name__ == "__main__":

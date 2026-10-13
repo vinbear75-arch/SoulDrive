@@ -5,6 +5,8 @@ import json
 import os
 import time
 import sqlite3
+import threading
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +14,26 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from core.document_types import document_media_type, is_supported_document
+from core.local_file_lock import local_file_lock
 from core.secure_object_store import SecureObjectStore
+
+
+def _synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
+def _cross_instance_synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with local_file_lock(self._manifest_lock_path):
+            return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class SecureDocumentStore:
@@ -20,7 +41,9 @@ class SecureDocumentStore:
         self.workspace = workspace
         self.keys = keys
         self.object_store = SecureObjectStore(Path(workspace.documents_path), keys.document_key, purpose="documents")
-        self.conn = sqlite3.connect(workspace.document_manifest_path, check_same_thread=False)
+        self._lock = threading.RLock()
+        self._manifest_lock_path = f"{workspace.document_manifest_path}.lock"
+        self.conn = sqlite3.connect(workspace.document_manifest_path, check_same_thread=False, timeout=30)
         self._init_schema()
 
     def _init_schema(self):
@@ -39,6 +62,8 @@ class SecureDocumentStore:
         )
         self.conn.commit()
 
+    @_cross_instance_synchronized
+    @_synchronized
     def import_document(self, source_path: str) -> dict:
         source = Path(source_path)
         display_name = source.name or "unknown"
@@ -83,6 +108,8 @@ class SecureDocumentStore:
             "media_type": document_media_type(display_name),
         }
 
+    @_cross_instance_synchronized
+    @_synchronized
     def import_document_bytes(self, display_name: str, payload: bytes, *, modified_at: float | None = None) -> dict:
         display_name = Path(display_name).name or "unknown"
 
@@ -123,6 +150,7 @@ class SecureDocumentStore:
             "media_type": document_media_type(display_name),
         }
 
+    @_synchronized
     def list_documents(self) -> list[dict[str, Any]]:
         return [
             {
@@ -135,6 +163,7 @@ class SecureDocumentStore:
             for document in self.iter_documents()
         ]
 
+    @_synchronized
     def iter_documents(self) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             """
@@ -160,27 +189,59 @@ class SecureDocumentStore:
             )
         return documents
 
+    @_synchronized
     def read_document_bytes(self, object_id: str) -> bytes:
         return self.object_store.read_bytes(object_id)
 
+    @_synchronized
+    def documents_named(self, name: str) -> list[dict[str, Any]]:
+        return [document for document in self.iter_documents() if document["name"] == name]
+
+    @_synchronized
     def read_document_named(self, name: str) -> bytes | None:
-        for document in self.iter_documents():
-            if document["name"] == name:
-                return self.read_document_bytes(document["object_id"])
+        matches = self.documents_named(name)
+        if len(matches) > 1:
+            raise ValueError("同名文档不唯一，请先使用文档 ID 或删除重复文档")
+        if matches:
+            return self.read_document_bytes(matches[0]["object_id"])
         return None
 
+    @_synchronized
     def delete_document(self, name: str) -> bytes | None:
         """Delete one managed document and return its plaintext only for index cleanup."""
+        matches = self.documents_named(name)
+        if len(matches) > 1:
+            raise ValueError("同名文档不唯一，请先使用文档 ID 或删除重复文档")
+        if matches:
+            return self.delete_document_object(matches[0]["object_id"])
+        return None
+
+    @_synchronized
+    def delete_document_object(self, object_id: str) -> bytes | None:
         for document in self.iter_documents():
-            if document["name"] != name:
+            if document["object_id"] != object_id:
                 continue
-            payload = self.read_document_bytes(document["object_id"])
-            self.object_store.delete(document["object_id"])
-            self.conn.execute("DELETE FROM documents WHERE object_id = ?", (document["object_id"],))
-            self.conn.commit()
+            payload = self.read_document_bytes(object_id)
+            try:
+                self.object_store.delete(object_id)
+                self.conn.execute("DELETE FROM documents WHERE object_id = ?", (object_id,))
+                self._commit_document_manifest()
+            except Exception:
+                self.conn.rollback()
+                try:
+                    self.object_store.write_bytes(object_id, payload)
+                except Exception as restore_exc:
+                    raise RuntimeError(
+                        "document deletion failed and the encrypted object could not be restored"
+                    ) from restore_exc
+                raise
             return payload
         return None
 
+    def _commit_document_manifest(self) -> None:
+        self.conn.commit()
+
+    @_synchronized
     def close(self):
         self.conn.close()
 

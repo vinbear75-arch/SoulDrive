@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core.enterprise_policy import ensure_policy_file, load_policy, production_policy, validate_policy_for_production
 
@@ -23,6 +24,16 @@ class EnterprisePolicyTests(unittest.TestCase):
         self.assertTrue(policy.disable_network_update)
         self.assertTrue(policy.allow_lite_mode)
         self.assertEqual(policy.max_chat_top_k, 8)
+
+    def test_policy_creation_failure_leaves_no_partial_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "enterprise-policy.json"
+            with patch("core.atomic_file.os.fsync", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    ensure_policy_file(path)
+
+            self.assertFalse(path.exists())
+            self.assertEqual(list(path.parent.glob(".enterprise-policy.json.*.tmp")), [])
 
     def test_load_policy_bounds_enterprise_limits(self):
         with tempfile.TemporaryDirectory() as temp_dir:

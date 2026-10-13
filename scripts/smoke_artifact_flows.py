@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import shutil
 import sqlite3
 import sys
@@ -22,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 from core.email_connector import send_confirmed_email
 from core.presentation_service import PresentationService, find_wps_presentation_executable, verify_pptx
-from core.project_skill_installer import approve_skill_from_inbox, install_skill_to_inbox, list_skill_inbox
+from core.project_skill_installer import activate_skill_from_inbox, approve_skill_from_inbox, install_skill_to_inbox, list_skill_inbox
 from core.project_skills import discover_project_skills
 from core.workspace import SoulDriveWorkspace
 from core.workspace_crypto import initialize_keystore, unlock_keystore
@@ -50,7 +51,9 @@ def _skill_opener(request, timeout=0):
 def run(output_path: Path) -> dict:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     presentation_copy = output_path.with_suffix(".pptx")
-    with tempfile.TemporaryDirectory() as temp_dir:
+    with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
+        os.environ, {"SOULDRIVE_PRESENTATION_RENDERER": "openxml"}
+    ):
         workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
         initialize_keystore(workspace, "smoke-passphrase")
         keys = unlock_keystore(workspace, "smoke-passphrase")
@@ -68,7 +71,7 @@ def run(output_path: Path) -> dict:
         connection.close()
 
         presentation = PresentationService(workspace, keys)
-        task = presentation.create_task(
+        task = presentation.create_plan(
             {
                 "source_filenames": ["smoke-paper.md"],
                 "title": "SoulDrive 本地科研汇报",
@@ -77,9 +80,23 @@ def run(output_path: Path) -> dict:
                 "open_in_wps": False,
             }
         )
-        task_result = presentation.run_task(task["task_id"])
+        planned = presentation.run_task(task["task_id"])
+        plan_result = planned["result"]
+        no_pptx_before_confirmation = not any(Path(workspace.presentations_path).glob("*.pptx"))
+        generation = presentation.confirm_plan(task["task_id"], plan_result["plan_digest"])
+        task_result = presentation.run_task(generation["task_id"])
         result = task_result["result"]
         generated = Path(result["output_path"])
+        generated_digest = hashlib.sha256(generated.read_bytes()).hexdigest()
+        reopened = PresentationService(workspace, keys)
+        replayed_generation = reopened.confirm_plan(task["task_id"], plan_result["plan_digest"])
+        confirmation_replayed_same_task = replayed_generation["task_id"] == generation["task_id"]
+        replayed = reopened.run_task(generation["task_id"])
+        reopened_result_unchanged = (
+            replayed["result"] == result
+            and hashlib.sha256(generated.read_bytes()).hexdigest() == generated_digest
+        )
+        reopened_task_status = reopened.get_task(generation["task_id"])["status"]
         shutil.copy2(generated, presentation_copy)
         ppt_report = verify_pptx(presentation_copy, result["slide_count"])
 
@@ -120,6 +137,8 @@ def run(output_path: Path) -> dict:
         )
         inbox_before = list_skill_inbox(skills_path)
         approved = approve_skill_from_inbox(skills_path, installed["skill_name"])
+        skills_before_activation = discover_project_skills(skills_path)
+        activated = activate_skill_from_inbox(skills_path, installed["skill_name"])
         active_skills = discover_project_skills(skills_path)
 
     report = {
@@ -134,7 +153,24 @@ def run(output_path: Path) -> dict:
             "authorization_code_exposed": "not-written-to-result" in json.dumps(email_result),
         },
         "ppt": {
-            "status": "pass" if task_result["status"] == "completed" and ppt_report["valid"] else "fail",
+            "status": "pass" if (
+                planned["status"] == "completed"
+                and plan_result["phase"] == "outline_review"
+                and no_pptx_before_confirmation
+                and task_result["status"] == "completed"
+                and ppt_report["valid"]
+                and confirmation_replayed_same_task
+                and reopened_result_unchanged
+                and reopened_task_status == "completed"
+            ) else "fail",
+            "outline_review_phase": plan_result["phase"],
+            "plan_task_id": task["task_id"],
+            "plan_digest": plan_result["plan_digest"],
+            "generation_task_id": generation["task_id"],
+            "no_pptx_before_confirmation": no_pptx_before_confirmation,
+            "confirmation_replayed_same_task": confirmation_replayed_same_task,
+            "reopened_result_unchanged": reopened_result_unchanged,
+            "reopened_task_status": reopened_task_status,
             "renderer": result["renderer"],
             "slide_count": result["slide_count"],
             "outline_source": result["outline_source"],
@@ -149,10 +185,17 @@ def run(output_path: Path) -> dict:
             "wps_open_requested": False,
         },
         "skill": {
-            "status": "pass" if approved["status"] == "approved" and active_skills else "fail",
+            "status": "pass" if (
+                approved["status"] == "pending_review"
+                and not skills_before_activation
+                and activated["status"] == "active"
+                and active_skills
+            ) else "fail",
             "download_status": installed["status"],
             "inbox_count_before_approval": len(inbox_before),
             "approval_status": approved["status"],
+            "active_before_activation": bool(skills_before_activation),
+            "activation_status": activated["status"],
             "active_skill_title": active_skills[0]["title"] if active_skills else None,
             "scripts_auto_executed": False,
         },

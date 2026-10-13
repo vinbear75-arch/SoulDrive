@@ -3,7 +3,8 @@ import json
 import re
 from pathlib import Path
 
-from core.skill_runtime import normalize_skill_payload
+from core.atomic_file import atomic_write_text
+from core.skill_runtime import normalize_skill_payload, normalize_skill_workflow_ids
 
 
 MAX_RESOURCE_FILES = 48
@@ -15,8 +16,13 @@ ADAPTER_SCHEMA = "souldrive_skill_adapter_v1"
 SKILL_TARGETS = {"conversation", "presentation"}
 
 
-def discover_project_skills(skills_path: str) -> list[dict]:
+def discover_project_skills(
+    skills_path: str,
+    *,
+    project_id: str | None = None,
+) -> list[dict]:
     root = Path(skills_path).resolve()
+    normalized_project_id = str(project_id or "").strip() or None
     if not root.is_dir():
         return []
     files = sorted({*root.glob("*.md"), *root.glob("**/SKILL.md")})[:100]
@@ -33,7 +39,7 @@ def discover_project_skills(skills_path: str) -> list[dict]:
         raw_content = resolved.read_text(encoding="utf-8", errors="replace").strip()
         if not raw_content:
             continue
-        title, description = _front_matter(raw_content)
+        title, description, _workflow_value = _front_matter(raw_content)
         adapter = compile_local_skill_adapter(resolved, title=title, description=description)
         resource_manifest = _resource_manifest(resolved, root)
         presentation_style = _presentation_style(resolved.parent) if adapter["target"] == "presentation" else {}
@@ -54,6 +60,10 @@ def discover_project_skills(skills_path: str) -> list[dict]:
             "triggers": adapter["triggers"],
             "tags": ["project", "local-file", adapter["target"]],
             "target": adapter["target"],
+            "workflow_ids": list(adapter.get("workflow_ids") or []),
+            "workflow_scope_invalid": bool(adapter.get("workflow_scope_invalid")),
+            "scope": "project" if normalized_project_id else "global",
+            "project_id": normalized_project_id,
             "compatibility_status": adapter["compatibility_status"],
             "adapter_path": ADAPTER_NAME,
             "adapter_schema": ADAPTER_SCHEMA,
@@ -82,7 +92,10 @@ def compile_local_skill_adapter(
 ) -> dict:
     """Compile and cache the short contract consumed by the local model."""
     raw_content = skill_file.read_text(encoding="utf-8", errors="replace").strip()
-    raw_title, raw_description = _front_matter(raw_content)
+    raw_title, raw_description, raw_workflow_value = _front_matter(raw_content)
+    scope_probe = normalize_skill_payload({"workflow_ids": raw_workflow_value})
+    raw_workflow_ids = list(scope_probe.get("workflow_ids") or [])
+    workflow_scope_invalid = bool(scope_probe.get("workflow_scope_invalid"))
     title = title or raw_title or skill_file.parent.name
     description = description or raw_description or title
     source_sha256 = hashlib.sha256(raw_content.encode("utf-8")).hexdigest()
@@ -102,6 +115,8 @@ def compile_local_skill_adapter(
         and str(cached.get("source_sha256") or "").startswith("builtin-")
         and cached.get("title") == title
         and cached.get("target") == selected_target
+        and normalize_skill_workflow_ids(cached.get("workflow_ids")) == raw_workflow_ids
+        and bool(cached.get("workflow_scope_invalid")) == workflow_scope_invalid
     ):
         return cached
     if (
@@ -109,6 +124,8 @@ def compile_local_skill_adapter(
         and cached.get("schema_version") == ADAPTER_SCHEMA
         and cached.get("source_sha256") == source_sha256
         and cached.get("target") == selected_target
+        and normalize_skill_workflow_ids(cached.get("workflow_ids")) == raw_workflow_ids
+        and bool(cached.get("workflow_scope_invalid")) == workflow_scope_invalid
         and (selected_target != "presentation" or isinstance(cached.get("presentation_contract"), dict))
     ):
         return cached
@@ -117,6 +134,7 @@ def compile_local_skill_adapter(
         "title": title,
         "content": raw_content,
         "applicability": description,
+        "workflow_ids": raw_workflow_value,
     })
     steps = _compact_steps(normalized.get("steps") or [], description)
     if selected_target == "presentation":
@@ -136,6 +154,8 @@ def compile_local_skill_adapter(
         "title": title,
         "intent": title,
         "applicability": description[:500],
+        "workflow_ids": raw_workflow_ids,
+        "workflow_scope_invalid": workflow_scope_invalid,
         "triggers": [item for item in normalized.get("triggers") or [] if len(item) <= 80][:12],
         "steps": steps,
         "content": "\n".join(f"{index}. {step}" for index, step in enumerate(steps, 1)),
@@ -143,9 +163,7 @@ def compile_local_skill_adapter(
         "success_criteria": success_criteria,
         "presentation_contract": presentation_contract,
     }
-    temporary = adapter_path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(adapter, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(adapter_path)
+    atomic_write_text(adapter_path, json.dumps(adapter, ensure_ascii=False, indent=2) + "\n")
     return adapter
 
 
@@ -222,12 +240,17 @@ def _canonical_skill_rank(record: dict) -> tuple:
     return (not exact_name, looks_temporary, len(Path(source_path).parts), len(source_path), source_path.casefold())
 
 
-def _front_matter(content: str) -> tuple[str, str]:
+def _front_matter(content: str) -> tuple[str, str, str]:
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.S)
     if not match:
-        return "", ""
+        return "", "", []
     fields = dict(re.findall(r"^([\w-]+):\s*[\"']?(.+?)[\"']?\s*$", match.group(1), re.M))
-    return fields.get("name", "").strip(), fields.get("description", "").strip()
+    workflow_value = fields.get("workflow_ids") or fields.get("workflows") or ""
+    return (
+        fields.get("name", "").strip(),
+        fields.get("description", "").strip(),
+        workflow_value,
+    )
 
 
 def _resource_manifest(skill_file: Path, root: Path) -> list[dict]:

@@ -149,6 +149,33 @@ class KnowledgeBasePathTests(unittest.TestCase):
         self.assertEqual(candidates[0].metadata["_source_profile_rank"], 1)
         self.assertEqual(candidates[0].metadata["_source_profile_score"], 1.0)
 
+    def test_source_profiles_keep_same_named_sources_separate_across_projects(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb._source_profile_cache = None
+        kb._source_candidate_records = lambda: [
+            (
+                "project-a-child",
+                "project A report evidence",
+                {"source_filename": "report.pdf", "project_id": "project-a"},
+            ),
+            (
+                "project-b-child",
+                "project B report evidence",
+                {"source_filename": "report.pdf", "project_id": "project-b"},
+            ),
+        ]
+
+        profiles = kb._source_profile_records()
+
+        self.assertEqual(len(profiles), 2)
+        self.assertEqual(
+            {
+                records[0][2]["project_id"]
+                for records in (entry["records"] for entry in profiles.values())
+            },
+            {"project-a", "project-b"},
+        )
+
     def test_workspace_can_bound_expensive_rerank_candidate_pool_explicitly(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -380,6 +407,38 @@ class KnowledgeBasePathTests(unittest.TestCase):
             "formal_two_paragraph_boundary_window",
         )
 
+    def test_section_route_parent_context_keeps_local_child_evidence(self):
+        query = "请梳理资料中“2.1 RAG 范式”的背景和方法。"
+        parent_content = (
+            "# 2 基本原理与系统架构\n"
+            "前置背景内容。" * 30
+            + "\n2.1 RAG 范式\nRAG 通过检索外部知识辅助生成。"
+        )
+        target_start = parent_content.index("2.1 RAG 范式")
+        target_end = len(parent_content)
+        candidate = SearchCandidate(
+            id="section-child",
+            content="2.1 RAG 范式\nRAG 通过检索外部知识辅助生成。",
+            metadata={
+                "source_filename": "rag.pdf",
+                "_section_route_mode": "heading_fallback",
+                "_section_route_coverage": 1.0,
+                "child_start_char": target_start,
+                "child_end_char": target_end,
+                "content_kind": "prose",
+            },
+        )
+
+        context, metadata = _select_parent_context(
+            parent_content,
+            candidate,
+            classify_query_intent(query),
+        )
+
+        self.assertIn("2.1 RAG 范式", context)
+        self.assertNotIn("前置背景内容。前置背景内容。前置背景内容。", context)
+        self.assertEqual(metadata["context_expansion_mode"], "section_route_child_window")
+
     def test_persistent_client_disables_chroma_anonymized_telemetry(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch("chromadb.PersistentClient") as persistent_client:
@@ -583,6 +642,18 @@ class KnowledgeBasePathTests(unittest.TestCase):
         self.assertNotIn("child_ids", chunk.metadata)
         self.assertEqual(kb._source_candidate_cache, {"stale": True})
 
+    def test_index_consistency_detects_missing_parent_projection(self):
+        kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
+        kb.collection = _ConsistencyCollection()
+        kb.parent_store = _MissingParentStore()
+        kb.secure_store = None
+        kb.keyword_index = None
+
+        self.assertEqual(
+            kb.check_index_consistency("doc-hash", "scheme.pdf"),
+            "parent_store_incomplete",
+        )
+
     def test_delete_document_indexes_removes_local_graph_provenance(self):
         kb = LocalKnowledgeBase.__new__(LocalKnowledgeBase)
         kb.secure_store = None
@@ -650,6 +721,25 @@ class _FakeParentStore:
         self.deleted_ids.extend(parent_ids)
         deleted = set(parent_ids)
         self.parent_ids = [parent_id for parent_id in self.parent_ids if parent_id not in deleted]
+
+
+class _MissingParentStore:
+    def get_parent(self, _parent_id):
+        return None
+
+
+class _ConsistencyCollection:
+    def get(self, where=None, include=None):
+        _ = where
+        _ = include
+        return {
+            "ids": ["child-1"],
+            "metadatas": [{
+                "document_hash": "doc-hash",
+                "source_filename": "scheme.pdf",
+                "parent_id": "parent-1",
+            }],
+        }
 
 
 class _FailingParentStore(_FakeParentStore):

@@ -2,14 +2,26 @@ import json
 import os
 import re
 import sqlite3
+import threading
+from functools import wraps
 from typing import Any
+
+
+def _synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class ParentDocumentStore:
     def __init__(self, db_path: str):
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._lock = threading.RLock()
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self._init_schema()
 
     def _init_schema(self):
@@ -23,6 +35,7 @@ class ParentDocumentStore:
         """)
         self.conn.commit()
 
+    @_synchronized
     def upsert_parent(self, parent_id: str, content: str, metadata: dict[str, Any]):
         cursor = self.conn.cursor()
         cursor.execute("""
@@ -31,6 +44,7 @@ class ParentDocumentStore:
         """, (parent_id, content, json.dumps(metadata, ensure_ascii=False)))
         self.conn.commit()
 
+    @_synchronized
     def get_parent(self, parent_id: str):
         cursor = self.conn.cursor()
         cursor.execute("""
@@ -46,6 +60,7 @@ class ParentDocumentStore:
             "metadata": json.loads(row[1]),
         }
 
+    @_synchronized
     def get_adjacent_parent(self, parent_id: str, offset: int = 1):
         match = re.match(r"^(.*)_parent_(\d+)$", str(parent_id or ""))
         if not match:
@@ -53,6 +68,7 @@ class ParentDocumentStore:
         target_id = f"{match.group(1)}_parent_{int(match.group(2)) + int(offset)}"
         return self.get_parent(target_id)
 
+    @_synchronized
     def delete_by_document_hash(self, document_hash: str):
         cursor = self.conn.cursor()
         cursor.execute("""
@@ -61,6 +77,7 @@ class ParentDocumentStore:
         """, (document_hash,))
         self.conn.commit()
 
+    @_synchronized
     def delete(self, parent_ids: list[str]):
         if not parent_ids:
             return
@@ -71,5 +88,6 @@ class ParentDocumentStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def close(self):
         self.conn.close()

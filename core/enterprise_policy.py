@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from core.atomic_file import atomic_write_text
 from core.paths import app_root
 
 
@@ -55,9 +56,9 @@ def ensure_policy_file(path: Path | None = None) -> Path:
     target = path or policy_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
-        target.write_text(
+        atomic_write_text(
+            target,
             json.dumps(default_policy().public_dict(), ensure_ascii=False, indent=2),
-            encoding="utf-8",
         )
     return target
 

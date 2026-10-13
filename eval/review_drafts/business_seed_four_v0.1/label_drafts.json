@@ -1,0 +1,188 @@
+{
+  "schema_version": "souldrive_business_seed_label_draft_v0.1",
+  "created_on": "2026-10-13",
+  "review_status": "pending_human_label_review",
+  "draft_only": true,
+  "scoring_allowed": false,
+  "training_allowed": false,
+  "tuning_allowed": false,
+  "freeze_allowed": false,
+  "split": null,
+  "candidate_prompt_adoption_scope": "independent_review_bundle_only",
+  "original_seed_modification_allowed": false,
+  "gold_labels_approved": false,
+  "authorization_scope": "仅为已确认来源与定位的4条候选支持项另建可审阅标签草案；不改原题、原source_refs、原gold或冻结集。",
+  "original_seed_path": "eval/fixtures/business_seed_review_v0.1/seeds.jsonl",
+  "original_seed_sha256": "ce12cad8be0c65a0df0f823d3520ef5fbf669f5e0d8eb46b7a64fb2e63c55424",
+  "original_manifest_sha256": "752f72c5fd3f39a26960c6333755af6e807758d06140c205d385e8070ac4612d",
+  "sources": {
+    "C02-BM25": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/haystack/6ca8349/bm25_retriever.py",
+      "version": "6ca8349091c09af89ec0090aa13cb22de1d88bfb",
+      "url": "https://github.com/deepset-ai/haystack/blob/6ca8349091c09af89ec0090aa13cb22de1d88bfb/haystack/components/retrievers/in_memory/bm25_retriever.py",
+      "sha256": "79c830b6405863e863bcf9786b7611af5984d19188f8653048ddd1bedbd7e465"
+    },
+    "C02-Joiner": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/haystack/6ca8349/document_joiner.py",
+      "version": "6ca8349091c09af89ec0090aa13cb22de1d88bfb",
+      "url": "https://github.com/deepset-ai/haystack/blob/6ca8349091c09af89ec0090aa13cb22de1d88bfb/haystack/components/joiners/document_joiner.py",
+      "sha256": "e47bdc6ac28e096d597982d366559e80ebe9bd81f395100804572595ff2f4af8"
+    },
+    "C03": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/graphiti/17ed4b7/README.md",
+      "version": "17ed4b707320f092b5e79bdbd9d45130c7f84259",
+      "url": "https://github.com/getzep/graphiti/blob/17ed4b707320f092b5e79bdbd9d45130c7f84259/README.md",
+      "sha256": "72c09aa0f12b7835f8c2919000788bca43306cf847269d4c3a7f35c957218689"
+    },
+    "C04": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/longmemeval/9e0b455/README.md",
+      "version": "9e0b455f4ef0e2ab8f2e582289761153549043fc",
+      "url": "https://github.com/xiaowu0162/LongMemEval/blob/9e0b455f4ef0e2ab8f2e582289761153549043fc/README.md",
+      "sha256": "c4ff45676683d9e2f7cf7d9099d26426f14635ec110dbb1da818d1019a142573"
+    },
+    "C06": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/temporal-python/b337550/README.md",
+      "version": "b3375504ee29bda57585a5eab7e11a7df39b3472",
+      "url": "https://github.com/temporalio/sdk-python/blob/b3375504ee29bda57585a5eab7e11a7df39b3472/README.md",
+      "sha256": "9a841dff876f7421351222243813d739f1a1e722b412e4cd1d81c4c211cb6d7d"
+    },
+    "C07": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/papers/LongMemEval-2410.10813v2.pdf",
+      "version": "2410.10813v2",
+      "url": "https://arxiv.org/abs/2410.10813v2",
+      "sha256": "05c5d055201466a241a56e082cdd02d39ad566fa04b3804891983e4e069a3fda"
+    },
+    "C08": {
+      "path": "build/source-review/2026-10-10-fixed-candidates/papers/Self-RAG-2310.11511v1.pdf",
+      "version": "2310.11511v1",
+      "url": "https://arxiv.org/abs/2310.11511v1",
+      "sha256": "d9eaa1398abac0df67a9d0933a5bf8b6d9d83d2e72da2a486073cd842dd52978"
+    },
+    "LOCAL-MEMORY-FIXTURE": {
+      "path": "eval/memory_quality_v0.1.jsonl",
+      "version": "souldrive_memory_quality_v0.1",
+      "sha256": "7fe7e49e2dda4c4cb353432eefd6148bcaf44c53890616fcf1cc1481f2db74cc"
+    },
+    "LOCAL-MEMORY-STORE": {
+      "path": "core/learning_store.py",
+      "version": "working-tree-snapshot-2026-10-13; HEAD=e9aa88c722c1a6ef61b25c191048caf1c0423da1; dirty",
+      "sha256": "17d4fa8e2a3c836840dfd1ec565e8e4a95c3c073486eb0b9ae4d4511e3fde5af"
+    }
+  },
+  "records": [
+    {
+      "id": "SEED-RAG-002",
+      "review_status": "pending_human_label_review",
+      "original_prompt": "结合 BIMSA 的检索优化章节和 RAG 技术解析的三大模块，说明混合检索、检索融合与重排各自位于哪里；若术语定义不同，不要强行画等号。",
+      "original_source_refs": ["rag-bimsa", "rag-modules"],
+      "candidate_prompt_proposal": "仅根据固定版本 Haystack 的 BM25Retriever、DocumentJoiner 和 Self-RAG v1，区分关键词召回、结果融合、按已有分数排序与生成支持性评价；混合检索或学习式重排未被所选材料证明的部分写待确认。",
+      "candidate_prompt_approved": true,
+      "adopted_prompt_field": "candidate_prompt_proposal",
+      "review_selected_source_refs": ["C02-BM25", "C02-Joiner", "C08"],
+      "gold_draft_scope": "新候选来源支持的机制说明，不是原BIMSA/三大模块题的最终答案。",
+      "labels_draft": {
+        "original_prompt_answerability": "unresolved_source_mismatch",
+        "candidate_source_support": "partial_mechanism_map",
+        "must_distinguish": ["关键词召回", "结果融合", "按已有分数排序", "生成支持性评价"],
+        "local_performance_claim_allowed": false
+      },
+      "gold_draft": {
+        "claims": [
+          {"id": "R2-1", "text": "BM25Retriever在文档库中按关键词查询召回文档；filters限制搜索空间，top_k限制返回数量。", "origin": "external_source", "evidence": [{"source": "C02-BM25", "locator": "lines 13-17,44-68,121-155"}]},
+          {"id": "R2-2", "text": "DocumentJoiner接收多份文档列表并输出合并列表；支持去重拼接、加权分数合并、RRF及基于分数分布的融合。它位于输入列表产生之后。", "origin": "external_source", "evidence": [{"source": "C02-Joiner", "locator": "lines 46-55,98-104,146-164"}]},
+          {"id": "R2-3", "text": "Joiner可按文档已有score降序排序并截取top_k；这一实现不能被称为已部署学习式重排模型。", "origin": "bounded_source_interpretation", "evidence": [{"source": "C02-Joiner", "locator": "lines 166-180"}]},
+          {"id": "R2-4", "text": "Self-RAG按需决定是否检索，并分别评价段落相关性、生成内容的证据支持性和回答有用性；这些训练得到的反思信号不能等同于BM25分数或Joiner融合分数。", "origin": "external_source", "evidence": [{"source": "C08", "locator": "PDF pages 1-4; Figure 1; Table 1; Algorithm 1"}]}
+        ],
+        "required_abstentions": ["不能用这些来源回答旧BIMSA材料的章节定义。", "所列BM25与Joiner文件本身不能证明已配置密集向量路由或学习式重排器。", "不填写SoulDrive的最优Top-K、Recall/nDCG、延迟或显存提升。"],
+        "unresolved": ["新题与材料范围已获准在独立审核包采用，但标签本身仍待审核，原题资料没有替换。", "若保留原题对混合检索和重排的完整要求，需要补充与其同题域的正文定位。"]
+      }
+    },
+    {
+      "id": "SEED-PAPER-001",
+      "review_status": "pending_human_label_review",
+      "original_prompt": "在论文精读窗口整理所选综述的研究问题、核心方法、实验结果、局限与复现及汇报提纲；没有对应证据的部分写待确认。",
+      "original_source_refs": ["rag-survey", "workflow-role-fixture"],
+      "candidate_prompt_proposal": "在论文精读窗口，仅根据已选中的LongMemEval研究论文2410.10813v2，整理研究问题、核心方法、实验结果、局限、复现及汇报提纲；未核验部分写待确认。",
+      "candidate_prompt_approved": true,
+      "adopted_prompt_field": "candidate_prompt_proposal",
+      "review_selected_source_refs": ["C07"],
+      "gold_draft_scope": "C07研究论文的有限页面精读草案；不把它冒充原题所选综述，也未更换选中文档。",
+      "labels_draft": {
+        "original_prompt_answerability": "unresolved_selected_asset_mismatch",
+        "paper_type": "benchmark_and_memory_design_research_not_survey",
+        "expected_sections": ["研究问题", "核心方法", "实验结果", "局限", "复现及汇报提纲"],
+        "local_reproduction_claim_allowed": false
+      },
+      "gold_draft": {
+        "claims": [
+          {"id": "P1-1", "text": "研究对象是聊天助手的长期交互记忆；基准含500个问题，覆盖信息抽取、多会话推理、知识更新、时间推理和未知问题拒答五类能力。五类能力不是七种问题类型的同义计数。", "origin": "external_source", "evidence": [{"source": "C07", "locator": "PDF pages 1-4; section 3.2; Table 1; Figure 1"}]},
+          {"id": "P1-2", "text": "论文将记忆系统分为索引、检索、读取三个阶段，并研究粒度、事实增强索引和时间感知查询等设计；时间信息包括显式时间表述与交互时间戳。", "origin": "external_source", "evidence": [{"source": "C07", "locator": "PDF pages 1-2,4; section 3.2"}]},
+          {"id": "P1-3", "text": "Table 4的LongMemEval_M时间推理子集、Value=Session、K=V+fact条件下，增加GPT-4o时间查询扩展后Recall@10由0.721变为0.797，但NDCG@10由0.782变为0.758。不能概括为每项指标均改善。", "origin": "external_source", "evidence": [{"source": "C07", "locator": "PDF page 10; Table 4; rows (2) K=V+fact and (2) w/ Query Expansion (M_T=GPT-4o)"}]},
+          {"id": "P1-4", "text": "Figure 6与section 5.5讨论oracle检索条件下的读取策略；文中指出没有CoN时JSON格式并不稳定优于自然语言。oracle结果不是端到端检索成绩，也不是SoulDrive结果。", "origin": "external_source", "evidence": [{"source": "C07", "locator": "PDF page 10; Figure 6; section 5.5"}]}
+        ],
+        "limitations_draft": ["当前只核验PDF第1-4、10页；这不是全文或附录的完整局限审查。", "上述结果限定于论文的数据、模型和实验设置，不能外推为本机8GB显存条件下的收益。"],
+        "reproduction_and_report_outline_draft": ["先确认固定论文/代码/数据版本与许可，再核对全文实验配置、随机种子及评测脚本；当前未运行作者代码。", "汇报顺序：问题与能力覆盖 -> 三阶段设计 -> Table 4条件化结果 -> oracle读取与端到端结果的区别 -> 局限及本地最小验证计划。"],
+        "required_abstentions": ["不把研究论文称为原题选中综述。", "未核验的完整配置、成本、统计显著性、复现结论写待确认。"],
+        "unresolved": ["独立审核包采用新题已获批准；标签仍待审核，原种子的selected_document_refs不替换。", "复现所需的全文/附录细节尚未逐项核验。"]
+      }
+    },
+    {
+      "id": "SEED-MEM-003",
+      "review_status": "pending_human_label_review",
+      "original_prompt": "模型版本已经从 v1 更新为 v2，现在问当前模型版本时应该使用什么？请不要把旧版本或过期缓存当作当前事实。",
+      "original_source_refs": ["memory-quality-fixture"],
+      "candidate_prompt_proposal": null,
+      "candidate_prompt_approved": false,
+      "gold_draft_scope": "原合成合同的当前版本标签；外部项目仅支持机制解释，不能替代本地预期。",
+      "labels_draft": {
+        "answerability": "answerable_after_successful_canonical_update",
+        "current_version": "v2",
+        "old_version_as_current_allowed": false,
+        "history_may_mention_v1_if_explicitly_historical": true,
+        "cache_fault_case_ready": false,
+        "external_exactly_once_claim_allowed": false
+      },
+      "gold_draft": {
+        "reference_answer": "在同一项目的更新成功并生效后，当前模型版本应为v2。v1只可作为明确标注的历史版本，不能由旧缓存覆盖当前事实。",
+        "claims": [
+          {"id": "M3-1", "text": "v2是该合成场景在成功更新后的当前版本标签，v1不得作为当前值；标签来自本地记忆合同，不是Graphiti或LongMemEval的实验结论。", "origin": "local_contract", "evidence": [{"source": "LOCAL-MEMORY-FIXTURE", "locator": "record MEM-UPDATE-001"}]},
+          {"id": "M3-2", "text": "Graphiti文档将事实有效期、历史保留与episode来源分开描述；LongMemEval的knowledge-update类型及日期/证据字段提供机制参考，但没有定义SoulDrive的缓存故障预期。", "origin": "external_source", "evidence": [{"source": "C03", "locator": "lines 62-76,119-129,140-146"}, {"source": "C04", "locator": "lines 81-88"}]},
+          {"id": "M3-3", "text": "Temporal的确定性、取消与失败处理是其工作流运行时合同，不能由此断言SoulDrive的多存储原子提交、自动故障恢复或跨主机exactly-once。", "origin": "bounded_source_interpretation", "evidence": [{"source": "C06", "locator": "lines 870-948"}]}
+        ],
+        "review_checks_draft": ["当前事实与历史叙述分别标注；不使用全文禁止出现v1的粗糙判据。", "来源与版本历史保留需要查本地事实记录；外部文档不能作为本地状态已存在的证据。", "若派生索引与事实源不同步，以权威活动记录为准的目标保留为待具体化合同，不捏造缓存失效运行。"],
+        "unresolved": ["旧缓存的注入、故障点、读取接口及逐样本预期尚未具体化，不能给该变体评分。", "本草案没有执行这条新业务种子或生成模型预测。"]
+      }
+    },
+    {
+      "id": "SEED-MEM-004",
+      "review_status": "pending_human_label_review",
+      "original_prompt": "在测试时钟 as_of=100 回忆历史模型版本，再在 as_of=300 回忆当前版本。更新在 valid_from=200 生效；两次读取不能混淆时间线。",
+      "original_source_refs": ["memory-quality-fixture"],
+      "candidate_prompt_proposal": null,
+      "candidate_prompt_approved": false,
+      "gold_draft_scope": "原合成有效时间合同；数字不映射为业务日期，不增设原题之外的查询样本。",
+      "labels_draft": {
+        "answerability": "answerable_under_existing_valid_time_contract",
+        "time_domain": "synthetic_valid_time_not_transaction_time",
+        "initial_valid_from": null,
+        "initial_valid_from_semantics": "unbounded_lower_valid_time_bound_in_current_store",
+        "update_valid_from": 200.0,
+        "expected_reads": [
+          {"as_of": 100.0, "version": "v1", "must_not_return_as_applicable": "v2"},
+          {"as_of": 300.0, "version": "v2", "must_not_return_as_applicable": "v1"}
+        ],
+        "historical_read_must_not_promote_old_fact_to_current": true
+      },
+      "gold_draft": {
+        "reference_answer": "按现有有效时间合同，as_of=100返回历史v1，as_of=300返回更新后的v2。初始valid_from未填写，在当前实现中表示下界不限；更新从200生效，旧版本在该边界失效。这些数字只是合成时钟，不证明真实过去时刻的系统知情状态。",
+        "claims": [
+          {"id": "M4-1", "text": "100对应v1、300对应v2的标签来自本地MEM-TEMPORAL-001合同，不来自论文的个人生活日期。", "origin": "local_contract", "evidence": [{"source": "LOCAL-MEMORY-FIXTURE", "locator": "record MEM-TEMPORAL-001"}]},
+          {"id": "M4-2", "text": "当前实现将缺省valid_from保存为NULL；有效区间筛选采用valid_from为空或不大于as_of、invalid_at为空或大于as_of。内容更新保留旧版并用新生效时间作为旧版失效边界。", "origin": "local_implementation_contract", "evidence": [{"source": "LOCAL-MEMORY-STORE", "locator": "lines 1081-1088,2524-2566,5006-5038"}]},
+          {"id": "M4-3", "text": "Graphiti提供有效期与历史事实机制参考；LongMemEval的时间能力包含显式时间与交互时间戳。两者不能替代本地NULL边界或合成时钟的定义。", "origin": "external_source", "evidence": [{"source": "C03", "locator": "lines 62-65,140-146"}, {"source": "C07", "locator": "PDF page 4; section 3.2 Temporal Reasoning"}]}
+        ],
+        "review_checks_draft": ["分别检查两次读取的适用版本，不把历史版本被引用解释为当前事实回退。", "有效时间与记录创建/更新时间分开解释；初始NULL不改填0或现实日期。", "历史读取不改变当前事实标签；新鲜度字段是否变化需原始记录的前后证据，不能只凭回答文本判断。"],
+        "unresolved": ["历史读取前后last_used_at等字段的验收观测尚未写入这条业务种子的setup，不能宣称已验证。", "本草案未冻结该标签，也未执行新种子的评分。"]
+      }
+    }
+  ]
+}

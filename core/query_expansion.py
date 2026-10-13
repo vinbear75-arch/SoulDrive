@@ -45,6 +45,25 @@ TERM_ALIASES = (
     ("HyDE", "hypothetical document embeddings zero-shot dense retrieval"),
 )
 
+_SOURCE_NOUN_PATTERN = re.compile(r"项目|方案|论文|文档|资料|报告|版本|实验|模型|方法")
+_SOURCE_COUNT_PATTERN = re.compile(
+    r"(?:两|二|多)(?:个|篇|份|类|种|项)?(?:项目|方案|论文|文档|资料|报告|版本|实验|模型|方法)"
+)
+_COMPARISON_PAIR_PATTERN = re.compile(
+    r"(?:对比|比较|compare|versus)\s*[^，,。；;：:？?\n]{1,80}?"
+    r"(?:与|和|及|\bvs\.?\b|\bversus\b)\s*"
+    r"[^，,。；;：:？?\n]{1,80}",
+    flags=re.IGNORECASE,
+)
+_COMPARISON_SUBJECT_PAIR_PATTERN = re.compile(
+    r"(?:对比|比较|compare|versus)\s*"
+    r"(?P<left>[^，,。；;：:？?\n]{2,80}?)\s*"
+    r"(?:与|和|及|\bvs\.?\b|\bversus\b)\s*"
+    r"(?P<right>[^，,。；;：:？?\n]{2,80}?)"
+    r"(?=\s*(?:的|在|之间|方面|上|中|有|是否|如何|[，,。；;：:？?]|$))",
+    flags=re.IGNORECASE,
+)
+
 
 def expand_query_variants(query: str, limit: int = 5) -> list[str]:
     base = (query or "").strip()
@@ -111,7 +130,14 @@ def split_comparison_query(query: str) -> list[str]:
         flags=re.IGNORECASE,
     )
     if not match:
-        return []
+        pair_match = _COMPARISON_SUBJECT_PAIR_PATTERN.search(base)
+        if not pair_match:
+            return []
+        left = _clean_comparison_subject(pair_match.group("left"))
+        right = _clean_comparison_subject(pair_match.group("right"))
+        if not left or not right:
+            return []
+        return [f"{left} 核心证据", f"{right} 核心证据"]
 
     return [
         f"{_clean_comparison_subject(match.group('left'))} 核心证据",
@@ -133,21 +159,11 @@ def comparison_query_groups(query: str) -> list[list[str]]:
 
 def query_requires_source_diversity(query: str) -> bool:
     normalized = (query or "").lower()
-    if any(
-        marker in normalized
-        for marker in (
-            "对比",
-            "比较",
-            "异同",
-            "差异",
-            "两类资料",
-            "两份资料",
-            "多份文档",
-            "compare",
-            "versus",
-            " vs ",
-        )
-    ):
+    if len(re.findall(r"《[^》]{2,120}》", normalized)) >= 2:
+        return True
+    if _SOURCE_COUNT_PATTERN.search(normalized) or _COMPARISON_PAIR_PATTERN.search(normalized):
+        return True
+    if any(marker in normalized for marker in ("异同", "差异")) and _SOURCE_NOUN_PATTERN.search(normalized):
         return True
 
     if "分别" not in normalized and "各自" not in normalized:
@@ -157,6 +173,8 @@ def query_requires_source_diversity(query: str) -> bool:
         marker in normalized
         for marker in (
             "两个方案",
+            "两个项目",
+            "两篇论文",
             "两种方案",
             "两类文档",
             "两份文档",

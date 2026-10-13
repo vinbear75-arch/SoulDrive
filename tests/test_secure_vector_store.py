@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,7 +11,49 @@ from core.workspace import SoulDriveWorkspace
 from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
+def _capture_exception(function, *args):
+    try:
+        function(*args)
+    except Exception as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return None
+
+
 class SecureVectorStoreTests(unittest.TestCase):
+    def test_shared_connection_concurrent_chunk_writes_are_complete(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                def write_batch(batch_index):
+                    start = batch_index * 20
+                    ids = [f"concurrent-child-{index}" for index in range(start, start + 20)]
+                    store.add_chunks(
+                        ids=ids,
+                        documents=[f"concurrent evidence {index}" for index in range(start, start + 20)],
+                        metadatas=[
+                            {"project_id": "concurrency", "source_filename": "concurrent.pdf"}
+                            for _ in ids
+                        ],
+                        embeddings=[[1.0, 0.0] for _ in ids],
+                    )
+
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    errors = [
+                        result
+                        for result in pool.map(
+                            lambda batch: _capture_exception(write_batch, batch),
+                            range(4),
+                        )
+                        if result is not None
+                    ]
+                self.assertEqual(errors, [])
+                self.assertEqual(store.count(), 80)
+            finally:
+                store.close()
+
     def test_dense_and_keyword_filters_are_applied_before_limit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
@@ -55,6 +98,71 @@ class SecureVectorStoreTests(unittest.TestCase):
         self.assertEqual([item.chunk_id for item in keyword], ["current-dense"])
         self.assertEqual([item.chunk_id for item in selected_dense], ["current-dense"])
         self.assertEqual([item.chunk_id for item in selected_keyword], ["current-dense"])
+
+    def test_dense_and_keyword_filters_can_select_one_duplicate_name_by_document_id(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["duplicate-a", "duplicate-b"],
+                    documents=[
+                        "same name object A evidence",
+                        "same name object B evidence",
+                    ],
+                    metadatas=[
+                        {
+                            "document_id": "secure_object-a",
+                            "source_filename": "same-name.txt",
+                        },
+                        {
+                            "document_id": "secure_object-b",
+                            "source_filename": "same-name.txt",
+                        },
+                    ],
+                    embeddings=[[1.0, 0.0], [0.9, 0.0]],
+                )
+                selected_dense = store.dense_candidates(
+                    [1.0, 0.0],
+                    limit=4,
+                    document_names=["same-name.txt"],
+                    document_ids=["object-b"],
+                )
+                selected_keyword = store.keyword_candidates(
+                    "same name object evidence",
+                    limit=4,
+                    document_names=["same-name.txt"],
+                    document_ids=["object-b"],
+                )
+            finally:
+                store.close()
+
+        self.assertEqual([item.chunk_id for item in selected_dense], ["duplicate-b"])
+        self.assertEqual([item.chunk_id for item in selected_keyword], ["duplicate-b"])
+
+    def test_keyword_search_uses_stable_chunk_id_tiebreaker_for_equal_scores(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            initialize_keystore(workspace, "secret-passphrase")
+            keys = unlock_keystore(workspace, "secret-passphrase")
+            store = SecureVectorStore(workspace.secure_vector_store_path, keys)
+            try:
+                store.add_chunks(
+                    ids=["chunk-b", "chunk-a"],
+                    documents=["same retrieval signal", "same retrieval signal"],
+                    metadatas=[
+                        {"source_filename": "b.pdf"},
+                        {"source_filename": "a.pdf"},
+                    ],
+                    embeddings=[[1.0, 0.0], [1.0, 0.0]],
+                )
+                results = store.keyword_search("retrieval signal", limit=2)
+            finally:
+                store.close()
+
+        self.assertEqual([item.doc_id for item in results], ["chunk-a", "chunk-b"])
 
     def test_dense_candidates_do_not_decrypt_chunk_text_until_loaded_by_id(self):
         with tempfile.TemporaryDirectory() as temp_dir:

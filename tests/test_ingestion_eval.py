@@ -345,6 +345,58 @@ class IngestionEvalTests(unittest.TestCase):
         self.assertEqual(report["document_coverage_rate"], 1.0)
         self.assertEqual(report["overall_ingestion_quality_rate"], 1.0)
 
+    def test_ingestion_eval_rejects_legacy_source_for_corpus_document_id(self):
+        records = [{
+            "id": "ING-ID-LEGACY",
+            "doc_id": "SDOC-001",
+            "source_filename": "安全治理标准.pdf",
+            "document_class": "government_standard",
+            "min_chunk_count": 1,
+            "required_metadata": ["page", "dynamic_chunk"],
+            "required_modalities": [],
+        }]
+        chunks = [{
+            "content": "旧版标准正文",
+            "metadata": {
+                "source_filename": "安全治理标准-旧版.pdf",
+                "document_id": "asset-runtime-old",
+                "page": 1,
+                "chunk_strategy": "dynamic_structure_overlap_v1",
+            },
+        }]
+
+        report = eval_ingestion.summarize(records, chunks)
+
+        self.assertTrue(report["rows"][0]["document_identity_required"])
+        self.assertEqual(report["rows"][0]["expected_document_id"], "SDOC-001")
+        self.assertEqual(report["rows"][0]["matched_chunk_count"], 0)
+        self.assertFalse(report["rows"][0]["pass"])
+
+    def test_ingestion_eval_does_not_compare_corpus_id_to_runtime_asset_id(self):
+        records = [{
+            "id": "ING-ID-RUNTIME",
+            "doc_id": "SDOC-001",
+            "source_filename": "安全治理标准.pdf",
+            "document_class": "government_standard",
+            "min_chunk_count": 1,
+            "required_metadata": ["page", "dynamic_chunk"],
+            "required_modalities": [],
+        }]
+        chunks = [{
+            "content": "当前标准正文",
+            "metadata": {
+                "source_filename": "安全治理标准.pdf",
+                "document_id": "asset-runtime-current",
+                "page": 1,
+                "chunk_strategy": "dynamic_structure_overlap_v1",
+            },
+        }]
+
+        report = eval_ingestion.summarize(records, chunks)
+
+        self.assertEqual(report["rows"][0]["matched_chunk_count"], 1)
+        self.assertTrue(report["rows"][0]["pass"])
+
     def test_eval_ingestion_cli_can_audit_dataset_only(self):
         stdout = StringIO()
         with redirect_stdout(stdout):

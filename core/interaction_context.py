@@ -15,6 +15,40 @@ SUPPORTED_MODALITIES = {
 }
 SUPPORTED_WORKFLOW_IDS = {"paper_review", "experiment_compare", "meeting_actions"}
 VISUAL_EVENT_MODALITIES = {"image", "image_region", "ocr_region"}
+RETRIEVAL_CONTEXT_REFERENCE_MARKERS = (
+    "这个",
+    "该",
+    "上述",
+    "前述",
+    "刚才",
+    "前面",
+    "这一",
+    "那一",
+    "这项",
+    "这类",
+    "这份",
+    "这篇",
+    "这条",
+    "该项",
+    "该功能",
+    "该方法",
+    "所选",
+    "选中的",
+    "这段",
+    "这句话",
+    "该段",
+)
+RETRIEVAL_CONTEXT_ENGLISH_REFERENCE_MARKERS = (
+    "this",
+    "that",
+    "it",
+    "these",
+    "those",
+    "above",
+    "earlier",
+    "selected",
+)
+RETRIEVAL_CONTEXT_SHORT_QUERY_MAX_CHARS = 6
 VISUAL_QUERY_MARKERS = (
     "截图",
     "屏幕",
@@ -220,6 +254,20 @@ def normalize_interaction_context(context: dict[str, Any] | None) -> dict[str, A
 
 def build_contextual_retrieval_query(query: str, context: dict[str, Any] | None) -> str:
     normalized = normalize_interaction_context(context)
+    base_query = _clean_text(query, 6000)
+    if not _should_include_content_retrieval_context(base_query, normalized):
+        # Project/document boundaries are already passed to the retriever as
+        # structured filters.  Keep ordinary standalone questions focused on
+        # the user's words so a changing screen selection cannot alter their
+        # first-pass dense/BM25 query.
+        project_id = (normalized.get("active_context") or {}).get("project_id")
+        if project_id:
+            return _clean_text(
+                f"{base_query}\n当前项目标识：{project_id}",
+                7800,
+            )
+        return base_query
+
     hints: list[str] = []
     active = normalized.get("active_context") or {}
     project_id = active.get("project_id")
@@ -264,10 +312,43 @@ def build_contextual_retrieval_query(query: str, context: dict[str, Any] | None)
         elif event.get("source_name"):
             hints.append(f"{event['modality']}来源：{event['source_name']}")
 
-    base_query = _clean_text(query, 6000)
     if not hints:
         return base_query
     return _clean_text(f"{base_query}\n" + "\n".join(hints), 7800)
+
+
+def _should_include_content_retrieval_context(
+    query: str,
+    normalized: dict[str, Any],
+) -> bool:
+    """Gate volatile interaction text before it reaches the retriever.
+
+    A screen selection or recent perception event is useful for a deictic
+    follow-up, but it is not a neutral synonym for an independent question.
+    Keeping the gate deterministic also prevents two sessions with different
+    stale screen events from silently taking different retrieval paths.
+    """
+    active = normalized.get("active_context") or {}
+    events = normalized.get("events") or []
+    has_content = bool(
+        active.get("selected_text")
+        or active.get("selected_region")
+        or any(event.get("text") or event.get("selected_text") for event in events)
+    )
+    if not has_content:
+        return False
+
+    compact_query = "".join(str(query or "").split()).casefold()
+    if len(compact_query) <= RETRIEVAL_CONTEXT_SHORT_QUERY_MAX_CHARS:
+        return True
+    if any(marker.casefold() in compact_query for marker in RETRIEVAL_CONTEXT_REFERENCE_MARKERS):
+        return True
+    if any(
+        re.search(rf"\b{re.escape(marker)}\b", str(query or "").casefold())
+        for marker in RETRIEVAL_CONTEXT_ENGLISH_REFERENCE_MARKERS
+    ):
+        return True
+    return is_visual_grounded_query(query, normalized)
 
 
 def build_visual_evidence(context: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -621,7 +702,13 @@ def build_interaction_context_text(context: dict[str, Any] | None) -> str:
     if events:
         lines.append("- 近期感知事件:")
         for index, event in enumerate(events[-6:], 1):
-            parts = [f"M{index}", event["modality"], f"t={event['timestamp_ms']}"]
+            parts = [f"M{index}", event["modality"]]
+            # The UI sends the current document as a heartbeat event. Its
+            # epoch timestamp changes on every question while the active
+            # document is already rendered above, so it must not perturb the
+            # model-visible prompt.
+            if event.get("source") != "active_document_context":
+                parts.append(f"t={event['timestamp_ms']}")
             if event.get("source_name"):
                 parts.append(f"来源={event['source_name']}")
             if event.get("source"):
@@ -660,7 +747,17 @@ def summarize_interaction_context(context: dict[str, Any] | None) -> dict[str, A
     summary: dict[str, Any] = {
         "history_count": len(normalized.get("history", [])),
         "event_counts": dict(sorted(event_counts.items())),
-        "has_active_document": bool(active.get("document_name")),
+        "has_active_document": bool(
+            active.get("document_name")
+            or active.get("document_names")
+            or active.get("document_ids")
+        ),
+        "active_document_count": max(
+            len(active.get("document_names") or []),
+            len(active.get("document_ids") or []),
+            1 if active.get("document_name") else 0,
+        ),
+        "active_document_id_count": len(active.get("document_ids") or []),
         "has_page_context": bool(active.get("page_number")),
         "has_selection": bool(active.get("selected_text")),
         "has_selected_region": bool(active.get("selected_region")),
@@ -885,6 +982,15 @@ def _normalize_active_context(value: Any) -> dict[str, Any]:
                 normalized_names.append(cleaned)
         if normalized_names:
             active["document_names"] = normalized_names
+    document_ids = value.get("document_ids")
+    if isinstance(document_ids, list):
+        normalized_ids = []
+        for item in document_ids[:12]:
+            cleaned = " ".join(str(item or "").strip().split())[:256]
+            if cleaned and cleaned not in normalized_ids:
+                normalized_ids.append(cleaned)
+        if normalized_ids:
+            active["document_ids"] = normalized_ids
     page_number = _as_positive_int(value.get("page_number"))
     if page_number is not None:
         active["page_number"] = page_number

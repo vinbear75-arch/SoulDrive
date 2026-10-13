@@ -132,6 +132,7 @@ def build_default_tool_registry(
     product_diagnostics_handler: Callable[[dict[str, Any]], Any] | None = None,
     audit_verify_handler: Callable[[dict[str, Any]], Any] | None = None,
     presentation_generate_handler: Callable[[dict[str, Any]], Any] | None = None,
+    presentation_confirm_handler: Callable[[dict[str, Any]], Any] | None = None,
 ):
     registry = ToolRegistry()
     registry.register(ToolSpec(
@@ -179,7 +180,7 @@ def build_default_tool_registry(
     if presentation_generate_handler is not None:
         registry.register(ToolSpec(
             name="souldrive.presentation_generate",
-            description="Generate an editable PPTX from selected indexed documents and optionally open it in WPS.",
+            description="Create a reviewable PPT outline from selected indexed documents; confirmation is required before PPTX generation.",
             input_schema={
                 "type": "object",
                 "properties": {
@@ -189,6 +190,12 @@ def build_default_tool_registry(
                         "minItems": 1,
                         "maxItems": 12,
                     },
+                    "source_document_ids": {
+                        "type": "array",
+                        "items": {"type": "string", "maxLength": 256},
+                        "maxItems": 12,
+                    },
+                    "request_id": {"type": "string", "maxLength": 128},
                     "project_id": {"type": "string", "maxLength": 128},
                     "source_version_ids": {
                         "type": "array",
@@ -199,11 +206,31 @@ def build_default_tool_registry(
                     "audience": {"type": "string", "enum": ["research", "technical", "government"]},
                     "max_slides": {"type": "integer", "minimum": 4, "maximum": 16},
                     "open_in_wps": {"type": "boolean"},
+                    "style_skill_id": {"type": "string", "maxLength": 128},
                 },
                 "required": ["source_filenames"],
                 "additionalProperties": False,
             },
             handler=presentation_generate_handler,
+            access_level="write",
+            mutates_state=True,
+            requires_unlocked_workspace=True,
+        ))
+    if presentation_confirm_handler is not None:
+        registry.register(ToolSpec(
+            name="souldrive.presentation_confirm",
+            description="Confirm the exact reviewed PPT outline digest and create its generation task.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "plan_task_id": {"type": "string", "maxLength": 128},
+                    "plan_digest": {"type": "string", "minLength": 16, "maxLength": 128},
+                    "project_id": {"type": "string", "maxLength": 128},
+                },
+                "required": ["plan_task_id", "plan_digest"],
+                "additionalProperties": False,
+            },
+            handler=presentation_confirm_handler,
             access_level="write",
             mutates_state=True,
             requires_unlocked_workspace=True,

@@ -1,9 +1,12 @@
+import hashlib
+import inspect
 import json
 import os
 import re
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import zipfile
@@ -11,20 +14,28 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Callable
 
+from core.audit_log import append_audit_event_best_effort
+from core.experiment_ledger import build_experiment_evidence, compare_experiment_runs
 from core.paths import PROJECT_ROOT, app_root
 from core.openxml_presentation import render_presentation
 from core.project_catalog import ProjectCatalog
 from core.secure_vector_store import SecureVectorStore
-from core.task_journal import TaskJournal
+from core.task_journal import TaskJournal, TaskPublicError, process_owner_id
 
 
-PRESENTATION_STEPS = (
+PRESENTATION_PLAN_STEPS = (
     "collect_evidence",
     "build_outline",
+)
+PRESENTATION_GENERATION_STEPS = (
+    "load_confirmed_plan",
     "render_pptx",
     "verify_pptx",
     "open_in_wps",
 )
+# Kept as an import-compatible name for callers that only inspect the old
+# constant; new tasks use one of the two phase-specific tuples above.
+PRESENTATION_STEPS = PRESENTATION_GENERATION_STEPS
 ALLOWED_AUDIENCES = {"research", "technical", "government"}
 SENTENCE_PATTERN = re.compile(r"[^。！？!?；;\n]{12,220}[。！？!?；;]?")
 NOISE_PATTERN = re.compile(
@@ -47,7 +58,7 @@ class PresentationService:
         *,
         audit_logger=None,
         outline_generator: Callable[[list[dict[str, Any]], dict[str, Any]], dict[str, Any]] | None = None,
-        style_skill_lookup: Callable[[str], dict[str, Any] | None] | None = None,
+        style_skill_lookup: Callable[..., dict[str, Any] | None] | None = None,
     ):
         self.workspace = workspace
         self.keys = keys
@@ -55,67 +66,160 @@ class PresentationService:
         self.outline_generator = outline_generator
         self.style_skill_lookup = style_skill_lookup
 
-    def create_task(self, request: dict[str, Any]) -> dict[str, Any]:
+    def create_plan(self, request: dict[str, Any]) -> dict[str, Any]:
         inputs = validate_presentation_request(request)
+        comparison = self._load_experiment_comparison(inputs)
+        if comparison is not None:
+            inputs["experiment_comparison"] = comparison
         if inputs.get("style_skill_id"):
-            style = self.style_skill_lookup(inputs["style_skill_id"]) if self.style_skill_lookup else None
+            style = None
+            if self.style_skill_lookup:
+                lookup_parameters = inspect.signature(self.style_skill_lookup).parameters.values()
+                accepts_project = any(
+                    parameter.kind == inspect.Parameter.VAR_POSITIONAL
+                    or parameter.kind == inspect.Parameter.VAR_KEYWORD
+                    for parameter in lookup_parameters
+                ) or len(inspect.signature(self.style_skill_lookup).parameters) >= 2
+                style = (
+                    self.style_skill_lookup(inputs["style_skill_id"], inputs.get("project_id"))
+                    if accepts_project
+                    else self.style_skill_lookup(inputs["style_skill_id"])
+                )
             if style is None:
                 raise ValueError("PPT 风格 Skill 不存在、未启用或不是模板类型")
             inputs["style_skill"] = style
-        task_id = f"task_{os.urandom(10).hex()}"
+        inputs["request_digest"] = _presentation_request_digest(inputs)
+        task_id = _stable_presentation_task_id("presentation.plan", inputs["request_id"])
         inputs["task_id"] = task_id
-        artifact_id = self._create_presentation_artifact(inputs)
-        if artifact_id:
-            inputs["artifact_id"] = artifact_id
         journal = TaskJournal(self.workspace, self.keys)
         try:
+            try:
+                existing = journal.get_task(task_id)
+            except KeyError:
+                existing = None
+            if existing is not None:
+                if existing["inputs"].get("request_digest") != inputs["request_digest"]:
+                    raise ValueError("request_id 已用于其他 PPT 计划，请更换 request_id")
+                replay = dict(existing)
+                replay["replayed"] = True
+                return replay
+            artifact_id = self._create_presentation_artifact(inputs)
+            if artifact_id:
+                inputs["artifact_id"] = artifact_id
             task = journal.create_task(
-                "presentation.generate",
+                "presentation.plan",
                 inputs,
-                PRESENTATION_STEPS,
+                PRESENTATION_PLAN_STEPS,
                 task_id=task_id,
+                idempotency_key=f"presentation.plan:{inputs['request_id']}",
+                repetition_inputs=_presentation_repetition_inputs(inputs),
             )
-            self._audit("presentation.task_created", task, {"source_count": len(inputs["source_filenames"])})
+            self._audit("presentation.plan_created", task, {"source_count": len(inputs["source_filenames"])})
             return task
         except Exception:
+            artifact_id = locals().get("artifact_id")
             if artifact_id:
-                self._record_artifact_failure(artifact_id, "task_creation_failed")
+                self._record_artifact_failure(str(artifact_id), "task_creation_failed")
             raise
         finally:
             journal.close()
 
-    def run_task(self, task_id: str) -> dict[str, Any]:
+    def _load_experiment_comparison(self, inputs: dict[str, Any]) -> dict[str, Any] | None:
+        if not inputs.get("baseline_run_id"):
+            return None
+        catalog = ProjectCatalog(self.workspace)
+        try:
+            comparison = compare_experiment_runs(catalog, inputs["baseline_run_id"], inputs["current_run_id"],
+                                                 project_id=inputs["project_id"])
+        finally:
+            catalog.close()
+        if comparison.get("status") != "comparable":
+            raise ValueError("所选实验运行不可比，请先核对项目、指标与数据版本")
+        if inputs.get("experiment_comparison") is not None and comparison != inputs["experiment_comparison"]:
+            raise ValueError("实验账本证据已变化，请重新生成并确认大纲")
+        return comparison
+
+    def create_task(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Compatibility entry point; generation now always starts with a plan."""
+        return self.create_plan(request)
+
+    def run_task(self, task_id: str, *, suppress_wps: bool = False) -> dict[str, Any]:
         started_at = time.monotonic()
         journal = TaskJournal(self.workspace, self.keys)
         try:
             journal.recover_orphaned_tasks()
-            task_inputs = journal.get_task(task_id)["inputs"]
-            handlers = {
-                "collect_evidence": self._collect_evidence_step,
-                "build_outline": self._build_outline_step,
-                "render_pptx": self._render_pptx_step,
-                "verify_pptx": self._verify_pptx_step,
-                "open_in_wps": self._open_in_wps_step,
-            }
-            result = journal.run_steps(
-                task_id,
-                f"{os.getpid()}:{uuid.uuid4().hex[:8]}",
-                handlers,
-                lambda outputs: self._build_presentation_result(
+            task = journal.get_task(task_id)
+            if task["status"] == "completed":
+                # A durable task can commit before its catalog projection (or
+                # audit sink) is available.  Replaying a terminal task must
+                # therefore repair the local artifact projection without
+                # re-running any side-effecting step.
+                self._sync_presentation_artifact(task.get("inputs") or {}, task)
+                return task
+            task_inputs = task["inputs"]
+            if task["kind"] == "presentation.plan":
+                handlers = {
+                    "collect_evidence": self._collect_evidence_step,
+                    "build_outline": self._build_outline_step,
+                }
+                result_builder = lambda outputs: self._build_plan_result(
                     task_inputs,
                     outputs,
                     round((time.monotonic() - started_at) * 1000, 1),
-                ),
+                )
+            elif task["kind"] == "presentation.generate":
+                if not task_inputs.get("plan_task_id"):
+                    raise ValueError("未确认的旧 PPT 任务不能继续，请先生成并确认新的大纲")
+                suppress_wps = suppress_wps or task["status"] in {"interrupted", "failed"}
+                handlers = {
+                    "load_confirmed_plan": self._load_confirmed_plan_step,
+                    "render_pptx": self._render_pptx_step,
+                    "verify_pptx": self._verify_pptx_step,
+                    "open_in_wps": (
+                        (lambda inputs, outputs, step_context: self._open_in_wps_step(
+                            {**inputs, "open_in_wps": False}, outputs, step_context
+                        ))
+                        if suppress_wps else self._open_in_wps_step
+                    ),
+                }
+                result_builder = lambda outputs: self._build_presentation_result(
+                    task_inputs,
+                    outputs,
+                    round((time.monotonic() - started_at) * 1000, 1),
+                )
+            else:
+                raise ValueError(f"unsupported presentation task kind: {task['kind']}")
+            result = journal.run_steps(
+                task_id,
+                process_owner_id(uuid.uuid4().hex[:8]),
+                handlers,
+                result_builder,
+                include_step_context=True,
             )
             self._sync_presentation_artifact(task_inputs, result)
-            event = "presentation.task_completed" if result["status"] == "completed" else "presentation.task_failed"
+            event = (
+                "presentation.task_completed"
+                if result["status"] == "completed"
+                else "presentation.task_cancelled"
+                if result["status"] == "cancelled"
+                else "presentation.task_failed"
+            )
             self._audit(event, result, {"error": result.get("error")})
             return result
         finally:
             journal.close()
 
     def resume_task(self, task_id: str) -> dict[str, Any]:
-        return self.run_task(task_id)
+        journal = TaskJournal(self.workspace, self.keys)
+        try:
+            task = journal.get_task(task_id)
+        finally:
+            journal.close()
+        if task["status"] == "completed":
+            return task
+        if task["status"] == "cancelled":
+            raise ValueError("cancelled task cannot be resumed")
+        return self.run_task(task_id, suppress_wps=True)
 
     def get_task(self, task_id: str) -> dict[str, Any]:
         journal = TaskJournal(self.workspace, self.keys)
@@ -125,13 +229,149 @@ class PresentationService:
         finally:
             journal.close()
 
-    def list_tasks(self, limit: int = 30) -> list[dict[str, Any]]:
+    def list_tasks(
+        self,
+        limit: int = 30,
+        *,
+        project_id: str | None = None,
+        global_only: bool = False,
+    ) -> list[dict[str, Any]]:
         journal = TaskJournal(self.workspace, self.keys)
         try:
             journal.recover_orphaned_tasks()
-            return journal.list_tasks(kind="presentation.generate", limit=limit)
+            safe_limit = max(1, min(int(limit), 100))
+            scoped_tasks = []
+            for kind in ("presentation.plan", "presentation.generate"):
+                scoped_tasks.extend(
+                    journal.list_tasks(
+                        kind=kind,
+                        limit=safe_limit,
+                        project_id=project_id,
+                        global_only=global_only,
+                    )
+                )
+            scoped_tasks.sort(
+                key=lambda task: (
+                    -float(task.get("updated_at") or 0.0),
+                    str(task.get("task_id") or ""),
+                )
+            )
+            return scoped_tasks[:safe_limit]
         finally:
             journal.close()
+
+    def request_cancel(self, task_id: str) -> dict[str, Any]:
+        journal = TaskJournal(self.workspace, self.keys)
+        try:
+            task = journal.request_cancel(task_id)
+        finally:
+            journal.close()
+        self._sync_presentation_artifact(task.get("inputs") or {}, task)
+        self._audit("presentation.task_cancel_requested", task, {"error": task.get("error")})
+        return self.get_task(task_id)
+
+    def confirm_plan(self, plan_task_id: str, plan_digest: str) -> dict[str, Any]:
+        journal = TaskJournal(self.workspace, self.keys)
+        try:
+            plan_task = journal.get_task(plan_task_id)
+            if plan_task["kind"] != "presentation.plan":
+                raise ValueError("只能确认 PPT 大纲任务")
+            if plan_task["status"] != "completed":
+                raise ValueError("PPT 大纲尚未完成，不能确认")
+            result = dict(plan_task.get("result") or {})
+            if str(result.get("plan_digest") or "") != str(plan_digest or ""):
+                raise ValueError("PPT 大纲已变化，请重新查看后确认")
+            inputs = dict(plan_task["inputs"])
+            generation_task_id = _stable_presentation_task_id(
+                "presentation.generate",
+                f"{plan_task_id}:{plan_digest}",
+            )
+            existing = None
+            try:
+                existing = journal.get_task(generation_task_id)
+            except KeyError:
+                pass
+            if existing is None:
+                self._load_experiment_comparison(inputs)
+                snapshot = dict(result.get("evidence_snapshot") or {})
+                current_records = collect_indexed_evidence(
+                    self.workspace,
+                    self.keys,
+                    list(inputs.get("source_filenames") or []),
+                    project_id=inputs.get("project_id"),
+                    source_version_ids=inputs.get("source_version_ids"),
+                    source_document_ids=inputs.get("source_document_ids"),
+                )
+                current_fingerprints = _source_fingerprints(
+                    current_records,
+                    list(inputs.get("source_filenames") or []),
+                    list(inputs.get("source_document_ids") or []),
+                )
+                if current_fingerprints != snapshot.get("source_fingerprints"):
+                    raise ValueError("所选证据已变化，请重新生成大纲")
+                generation_inputs = {
+                    key: inputs.get(key)
+                    for key in (
+                        "source_filenames", "source_document_ids", "source_version_ids", "title", "audience",
+                        "max_slides", "open_in_wps", "style_skill_id", "style_skill",
+                        "project_id",
+                        "baseline_run_id", "current_run_id", "experiment_comparison",
+                    )
+                }
+                generation_inputs.update({
+                    "task_id": generation_task_id,
+                    "generation_task_id": generation_task_id,
+                    "plan_task_id": plan_task_id,
+                    "request_id": inputs.get("request_id"),
+                    "plan_digest": plan_digest,
+                    "artifact_id": inputs.get("artifact_id"),
+                })
+                generation_task = journal.create_task(
+                    "presentation.generate",
+                    generation_inputs,
+                    PRESENTATION_GENERATION_STEPS,
+                    task_id=generation_task_id,
+                    idempotency_key=f"presentation.generate:{plan_task_id}:{plan_digest}",
+                    repetition_inputs=_presentation_repetition_inputs(
+                        inputs,
+                        plan_digest=plan_digest,
+                    ),
+                )
+            else:
+                # The journal may have committed immediately before the
+                # project catalog update.  Reuse the task, but still repair
+                # the confirmation marker after a process restart.
+                generation_task = existing
+        except sqlite3.IntegrityError:
+            generation_task = self.get_task(generation_task_id)
+        finally:
+            journal.close()
+
+        artifact_id = str(inputs.get("artifact_id") or "").strip()
+        if artifact_id:
+            catalog = ProjectCatalog(self.workspace)
+            try:
+                artifact = catalog.get_artifact(artifact_id)
+                if artifact is not None and artifact.get("confirmation_status") == "draft":
+                    catalog.set_artifact_status(artifact_id, "confirmed")
+                    catalog.update_artifact_provenance(
+                        artifact_id,
+                        confirmation_record_patch={
+                            "status": "confirmed",
+                            "mode": "explicit_outline_digest_confirmation",
+                            "plan_task_id": plan_task_id,
+                            "plan_digest": plan_digest,
+                            "generation_task_id": generation_task_id,
+                            "confirmed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        },
+                        change_summary="用户已确认实际 PPT 大纲摘要；生成任务获得执行资格。",
+                    )
+                elif artifact is not None and artifact.get("confirmation_status") not in {"confirmed"}:
+                    raise ValueError("PPT 大纲已被取消，不能恢复生成")
+            finally:
+                catalog.close()
+        self._audit("presentation.plan_confirmed", generation_task, {"plan_task_id": plan_task_id})
+        return self.get_task(generation_task_id)
 
     def _create_presentation_artifact(self, inputs: dict[str, Any]) -> str | None:
         project_id = str(inputs.get("project_id") or "").strip()
@@ -146,7 +386,10 @@ class PresentationService:
                 raise ValueError("unknown project")
             plan = {
                 "task_id": inputs["task_id"],
+                "request_id": inputs["request_id"],
+                "request_digest": inputs["request_digest"],
                 "source_filenames": list(inputs["source_filenames"]),
+                "source_document_ids": list(inputs.get("source_document_ids") or []),
                 "source_version_ids": list(inputs.get("source_version_ids") or []),
                 "title": inputs.get("title") or "",
                 "audience": inputs["audience"],
@@ -154,23 +397,30 @@ class PresentationService:
                 "open_in_wps": bool(inputs.get("open_in_wps")),
                 "style_skill_id": inputs.get("style_skill_id") or None,
                 "side_effect": "local_pptx_and_optional_wps_open",
-                "requires_user_confirmation": bool(inputs.get("open_in_wps")),
+                "requires_user_confirmation": True,
+                "confirmation_status": "draft",
             }
             confirmation_record = {
-                "status": "confirmed",
-                "mode": "explicit_generate_request",
+                "status": "draft",
+                "mode": "outline_review_required",
                 "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "wps_open": "requested" if inputs.get("open_in_wps") else "not_requested",
+                "generation_status": "not_started",
             }
-            return catalog.create_artifact(
+            artifact_id = catalog.create_artifact(
                 project_id,
-                "presentation_draft",
+                "presentation_plan",
                 plan,
+                idempotency_key=f"presentation.plan:{inputs['request_id']}",
                 source_version_ids=list(inputs.get("source_version_ids") or []),
-                confirmation_status="confirmed",
+                confirmation_status="draft",
                 confirmation_record=confirmation_record,
-                change_summary="首次生成；用户已提交本地 PPT 请求，来源、生成计划和副作用边界已记录。",
+                change_summary="已创建 PPT 大纲计划；实际生成前必须查看并确认大纲摘要。",
             )
+            artifact = catalog.get_artifact(artifact_id)
+            if artifact and artifact.get("plan", {}).get("request_digest") != inputs["request_digest"]:
+                raise ValueError("request_id 已用于其他 PPT 计划，请更换 request_id")
+            return artifact_id
         finally:
             catalog.close()
 
@@ -190,33 +440,73 @@ class PresentationService:
             catalog.close()
 
     @staticmethod
-    def _build_presentation_result(
+    def _build_plan_result(
         inputs: dict[str, Any],
         outputs: dict[str, dict[str, Any]],
         elapsed_ms: float,
     ) -> dict[str, Any]:
         records = outputs["collect_evidence"]["records"]
+        outline = dict(outputs["build_outline"])
+        version_ids, source_refs = _presentation_source_refs(inputs, records)
+        return {
+            "phase": "outline_review",
+            "request_id": inputs.get("request_id"),
+            "plan_task_id": inputs.get("task_id"),
+            "plan_digest": _presentation_plan_digest(outline),
+            "outline": outline,
+            "outline_source": outline.get("outline_source"),
+            "slide_count": len(outline.get("slides") or []),
+            "source_count": outputs["collect_evidence"]["source_count"],
+            "source_document_ids": list(inputs.get("source_document_ids") or []),
+            "source_version_ids": version_ids,
+            "source_refs": source_refs,
+            "source_fingerprints": _source_fingerprints(
+                records,
+                inputs["source_filenames"],
+                list(inputs.get("source_document_ids") or []),
+            ),
+            "artifact_id": inputs.get("artifact_id"),
+            "evidence_snapshot": {
+                "records": records,
+                "source_fingerprints": _source_fingerprints(
+                    records,
+                    inputs["source_filenames"],
+                    list(inputs.get("source_document_ids") or []),
+                ),
+                "source_version_ids": version_ids,
+            },
+            **({"experiment_comparison": inputs["experiment_comparison"],
+                "measurement_evidence": build_experiment_evidence(inputs["experiment_comparison"])}
+               if inputs.get("experiment_comparison") else {}),
+            "skill_application": outline.get("skill_application") or {},
+            "evidence_metrics": presentation_evidence_metrics(
+                outline,
+                outputs["collect_evidence"]["source_count"],
+                records,
+                list(inputs.get("source_document_ids") or []),
+            ),
+            "elapsed_ms": elapsed_ms,
+        }
+
+    @staticmethod
+    def _build_presentation_result(
+        inputs: dict[str, Any],
+        outputs: dict[str, dict[str, Any]],
+        elapsed_ms: float,
+    ) -> dict[str, Any]:
+        confirmed = outputs["load_confirmed_plan"]
+        records = confirmed["records"]
+        outline = confirmed["plan"]
         version_ids = sorted({
             str(record.get("asset_version_id"))
             for record in records
             if str(record.get("asset_version_id") or "").strip()
         })
         source_refs = []
-        for source in inputs["source_filenames"]:
-            source_version_ids = sorted({
-                str(record.get("asset_version_id"))
-                for record in records
-                if record.get("source_filename") == source
-                and str(record.get("asset_version_id") or "").strip()
-            })
-            source_refs.append({
-                "source_filename": source,
-                "version_ids": source_version_ids,
-                "status": "resolved" if source_version_ids else "unresolved",
-            })
+        _, source_refs = _presentation_source_refs(inputs, records)
         verify_output = outputs["verify_pptx"]
         skill_execution = verify_output.get("skill_execution")
-        skill_application = dict(outputs["build_outline"].get("skill_application") or {
+        skill_application = dict(outline.get("skill_application") or {
             "skill_id": (inputs.get("style_skill") or {}).get("skill_id"),
             "skill_title": (inputs.get("style_skill") or {}).get("title"),
             "mode": "bound_for_outline_and_render",
@@ -228,20 +518,28 @@ class PresentationService:
             "output_path": outputs["render_pptx"]["output_path"],
             "slide_count": outputs["verify_pptx"]["slide_count"],
             "renderer": outputs["render_pptx"]["renderer"],
-            "opened_in_wps": outputs["open_in_wps"]["opened"],
-            "source_count": outputs["collect_evidence"]["source_count"],
+            "opened_in_wps": outputs.get("open_in_wps", {}).get("opened", False),
+            "source_count": confirmed["source_count"],
+            "source_document_ids": list(inputs.get("source_document_ids") or []),
             "source_version_ids": version_ids,
             "source_refs": source_refs,
             "artifact_id": inputs.get("artifact_id"),
-            "outline_source": outputs["build_outline"]["outline_source"],
+            "outline_source": outline.get("outline_source") or inputs.get("outline_source") or "extractive",
             "skill_application": skill_application,
             "skill_execution": skill_execution,
             "skill_gate_passed": verify_output.get("skill_gate_passed"),
             "evidence_metrics": presentation_evidence_metrics(
-                outputs["build_outline"],
-                outputs["collect_evidence"]["source_count"],
+                outline,
+                confirmed["source_count"],
                 records,
+                list(inputs.get("source_document_ids") or []),
             ),
+            "request_id": inputs.get("request_id"),
+            "plan_task_id": inputs.get("plan_task_id"),
+            "plan_digest": inputs.get("plan_digest"),
+            **({"experiment_comparison": confirmed["experiment_comparison"],
+                "measurement_evidence": build_experiment_evidence(confirmed["experiment_comparison"])}
+               if confirmed.get("experiment_comparison") else {}),
             "elapsed_ms": elapsed_ms,
         }
 
@@ -252,13 +550,41 @@ class PresentationService:
         catalog = ProjectCatalog(self.workspace)
         try:
             result = dict(task.get("result") or {})
-            if task.get("status") == "completed":
+            if task.get("kind") == "presentation.plan" and task.get("status") == "completed":
+                catalog.update_artifact_provenance(
+                    artifact_id,
+                    source_version_ids=list(result.get("source_version_ids") or []),
+                    plan_patch={
+                        "plan_task_id": inputs.get("task_id"),
+                        "plan_digest": result.get("plan_digest"),
+                        "outline": result.get("outline") or {},
+                        "source_refs": result.get("source_refs") or [],
+                        "source_fingerprints": result.get("source_fingerprints") or {},
+                        "evidence_metrics": result.get("evidence_metrics") or {},
+                    },
+                    confirmation_record_patch={
+                        "status": "draft",
+                        "generation_status": "plan_ready",
+                        "plan_digest": result.get("plan_digest"),
+                    },
+                    change_summary="实际 PPT 大纲已生成并持久化；等待用户确认精确大纲摘要后才会生成文件。",
+                )
+            elif task.get("kind") == "presentation.plan" and task.get("status") == "cancelled":
+                catalog.update_artifact_provenance(
+                    artifact_id,
+                    confirmation_record_patch={
+                        "generation_status": "cancelled",
+                        "failure_reason": "presentation_plan_cancelled",
+                    },
+                    change_summary="PPT 大纲任务已取消；未获得文件生成资格。",
+                )
+            elif task.get("kind") == "presentation.generate" and task.get("status") == "completed":
                 metrics = dict(result.get("evidence_metrics") or {})
                 catalog.update_artifact_provenance(
                     artifact_id,
                     source_version_ids=list(result.get("source_version_ids") or []),
                     plan_patch={
-                        "task_id": inputs.get("task_id"),
+                        "generation_task_id": inputs.get("task_id"),
                         "output_path": result.get("output_path"),
                         "slide_count": result.get("slide_count"),
                         "renderer": result.get("renderer"),
@@ -279,6 +605,15 @@ class PresentationService:
                         f"来源覆盖 {round(float(metrics.get('selected_source_coverage') or 0) * 100)}%。"
                     ),
                 )
+            elif task.get("kind") == "presentation.generate" and task.get("status") == "cancelled":
+                catalog.update_artifact_provenance(
+                    artifact_id,
+                    confirmation_record_patch={
+                        "generation_status": "cancelled",
+                        "failure_reason": "presentation_generation_cancelled",
+                    },
+                    change_summary="PPT 生成任务已取消；已保留当前已有输出，未删除本地文件。",
+                )
             else:
                 catalog.update_artifact_provenance(
                     artifact_id,
@@ -298,20 +633,96 @@ class PresentationService:
         finally:
             catalog.close()
 
-    def _collect_evidence_step(self, inputs: dict[str, Any], _outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    def _collect_evidence_step(
+        self,
+        inputs: dict[str, Any],
+        _outputs: dict[str, dict[str, Any]],
+        _step_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         selected = inputs["source_filenames"]
-        records = collect_indexed_evidence(self.workspace, self.keys, selected)
+        records = collect_indexed_evidence(
+            self.workspace,
+            self.keys,
+            selected,
+            project_id=inputs.get("project_id"),
+            source_version_ids=inputs.get("source_version_ids"),
+            source_document_ids=inputs.get("source_document_ids"),
+        )
+        comparison = self._load_experiment_comparison(inputs)
+        if comparison is not None:
+            required_versions = {str(comparison[role].get("evidence_version_id") or "") for role in ("baseline", "current")}
+            found_versions = {str(record.get("asset_version_id") or "") for record in records}
+            if "" in required_versions or not required_versions.issubset(found_versions):
+                raise TaskPublicError("所选文档必须覆盖两次实验运行的准确来源版本")
+        selected_ids = list(inputs.get("source_document_ids") or [])
+        if selected_ids:
+            found_ids = {
+                str(record.get("document_id") or "").strip()
+                for record in records
+                if str(record.get("document_id") or "").strip()
+            }
+            missing_ids = [
+                document_id
+                for document_id in selected_ids
+                if not _document_id_matches_value(document_id, found_ids)
+            ]
+            if missing_ids:
+                raise TaskPublicError(
+                    "selected document IDs are not indexed: "
+                    + ", ".join(missing_ids[:3])
+                )
+            mismatched_labels = []
+            for index, document_id in enumerate(selected_ids):
+                expected_name = Path(str(selected[index] if index < len(selected) else "")).name.casefold()
+                actual_names = {
+                    Path(str(record.get("source_filename") or "")).name.casefold()
+                    for record in records
+                    if _document_id_matches_value(
+                        document_id,
+                        {str(record.get("document_id") or "")},
+                    )
+                }
+                if actual_names and expected_name not in actual_names:
+                    mismatched_labels.append(document_id)
+            if mismatched_labels:
+                raise TaskPublicError(
+                    "source_document_ids do not match their display labels: "
+                    + ", ".join(mismatched_labels[:3])
+                )
+        else:
+            ambiguous_sources = []
+            for source in selected:
+                identities = {
+                    str(record.get("document_id") or "").strip()
+                    for record in records
+                    if Path(str(record.get("source_filename") or "")).name.casefold() == source
+                    and str(record.get("document_id") or "").strip()
+                }
+                if len(identities) > 1:
+                    ambiguous_sources.append(source)
+            if ambiguous_sources:
+                raise TaskPublicError(
+                    "document name is ambiguous; select exact document IDs: "
+                    + ", ".join(ambiguous_sources[:3])
+                )
         found_sources = {record["source_filename"] for record in records}
         missing = [source for source in selected if source not in found_sources]
         if missing:
-            raise ValueError(f"selected documents are not indexed: {', '.join(missing[:3])}")
+            raise TaskPublicError(
+                f"selected documents are not indexed: {', '.join(missing[:3])}"
+            )
         return {
             "records": records,
-            "source_count": len(found_sources),
+            "source_count": len(selected_ids) if selected_ids else len(found_sources),
             "record_count": len(records),
         }
 
-    def _build_outline_step(self, inputs: dict[str, Any], outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    def _build_outline_step(
+        self,
+        inputs: dict[str, Any],
+        outputs: dict[str, dict[str, Any]],
+        _step_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         records = outputs["collect_evidence"]["records"]
         if self.outline_generator is not None:
             try:
@@ -319,19 +730,97 @@ class PresentationService:
                 outline_source = str(generated.get("outline_source") or "custom_generator")
                 if outline_source not in {"local_ollama", "extractive", "custom_generator"}:
                     outline_source = "custom_generator"
-                return {
+                return self._with_experiment_summary({
                     **validate_presentation_plan(generated, inputs),
                     "outline_source": outline_source,
-                }
+                }, inputs)
             except Exception:
                 pass
-        return {
+        return self._with_experiment_summary({
             **build_extractable_presentation_plan(records, inputs),
             "outline_source": "extractive",
+        }, inputs)
+
+    @staticmethod
+    def _with_experiment_summary(outline: dict[str, Any], inputs: dict[str, Any]) -> dict[str, Any]:
+        measurements = build_experiment_evidence(inputs.get("experiment_comparison"))
+        if not measurements:
+            return outline
+        points = [
+            f"{item['metric']}：{item['baseline_value']:.12g}{item['unit']} → {item['current_value']:.12g}{item['unit']}；"
+            f"绝对变化 {item['absolute_delta']:+.12g}{item['unit']} [{item['id']}]"
+            for item in measurements[:4]
+        ]
+        points.append("配置/环境如有差异，仅为候选因素，不能单独证明因果；需单因素验证。")
+        slide = _content_slide("已确认实验测量对比", points, inputs["source_filenames"], "M# 来自所选运行的可比账本，完整来源与定位随计划保存")
+        slides = list(outline["slides"])
+        slides.insert(1, slide)
+        if len(slides) > inputs["max_slides"]:
+            slides = slides[: inputs["max_slides"] - 1] + [slides[-1]]
+        return {**outline, "slides": slides}
+
+    def _load_confirmed_plan_step(
+        self,
+        inputs: dict[str, Any],
+        _outputs: dict[str, dict[str, Any]],
+        _step_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        journal = TaskJournal(self.workspace, self.keys)
+        try:
+            plan_task = journal.get_task(str(inputs.get("plan_task_id") or ""))
+        finally:
+            journal.close()
+        if plan_task["kind"] != "presentation.plan" or plan_task["status"] != "completed":
+            raise ValueError("PPT 大纲任务尚未完成")
+        plan_result = dict(plan_task.get("result") or {})
+        if str(plan_result.get("plan_digest") or "") != str(inputs.get("plan_digest") or ""):
+            raise ValueError("PPT 大纲摘要不匹配，请重新确认")
+        self._load_experiment_comparison(inputs)
+        snapshot = dict(plan_result.get("evidence_snapshot") or {})
+        records = list(snapshot.get("records") or [])
+        if not records or snapshot.get("source_fingerprints") != _source_fingerprints(
+            collect_indexed_evidence(
+                self.workspace,
+                self.keys,
+                list(inputs.get("source_filenames") or []),
+                project_id=inputs.get("project_id"),
+                source_version_ids=inputs.get("source_version_ids"),
+                source_document_ids=inputs.get("source_document_ids"),
+            ),
+            list(inputs.get("source_filenames") or []),
+            list(inputs.get("source_document_ids") or []),
+        ):
+            raise ValueError("所选证据已变化，请重新生成大纲")
+        artifact_id = str(inputs.get("artifact_id") or "").strip()
+        if artifact_id:
+            catalog = ProjectCatalog(self.workspace)
+            try:
+                artifact = catalog.get_artifact(artifact_id)
+            finally:
+                catalog.close()
+            if artifact is None or artifact.get("confirmation_status") != "confirmed":
+                raise ValueError("PPT 大纲尚未确认")
+        outline = dict(plan_result.get("outline") or {})
+        return {
+            "plan": outline,
+            "records": records,
+            "source_count": int(plan_result.get("source_count") or len({record.get("source_filename") for record in records})),
+            "source_document_ids": list(plan_result.get("source_document_ids") or inputs.get("source_document_ids") or []),
+            "source_version_ids": list(plan_result.get("source_version_ids") or []),
+            "source_refs": list(plan_result.get("source_refs") or []),
+            "source_fingerprints": dict(snapshot.get("source_fingerprints") or {}),
+            **({"experiment_comparison": inputs["experiment_comparison"]} if inputs.get("experiment_comparison") else {}),
         }
 
-    def _render_pptx_step(self, inputs: dict[str, Any], outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
-        plan = outputs["build_outline"]
+    def _render_pptx_step(
+        self,
+        inputs: dict[str, Any],
+        outputs: dict[str, dict[str, Any]],
+        step_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        plan = outputs.get("load_confirmed_plan", {}).get("plan") or outputs.get("build_outline")
+        if not plan:
+            raise ValueError("confirmed presentation plan is missing")
         output_directory = Path(self.workspace.presentations_path).resolve()
         output_directory.mkdir(parents=True, exist_ok=True)
         filename = presentation_filename(
@@ -340,53 +829,121 @@ class PresentationService:
             inputs["task_id"],
         )
         output_path = output_directory / filename
-        script_path = resolve_wps_render_script()
         expected_slide_count = len(plan["slides"])
-        if output_path.exists() and verify_pptx(output_path, expected_slide_count)["valid"]:
+        marker_path = Path(f"{output_path}.souldrive.json")
+        step_idempotency_key = str((step_context or {}).get("idempotency_key") or "")
+        marker_payload = {
+            "task_id": inputs.get("task_id"),
+            "plan_digest": _presentation_plan_digest(plan),
+            "step_idempotency_key": step_idempotency_key,
+            "slide_count": expected_slide_count,
+        }
+        if inputs.get("plan_digest") and inputs["plan_digest"] != marker_payload["plan_digest"]:
+            raise TaskPublicError("实际 PPT 大纲与确认版本不一致，请重新创建并确认计划。")
+        if not output_path.exists():
+            legacy_suffix = re.sub(r"[^A-Za-z0-9]", "", str(inputs["task_id"]))[-8:] or "task"
+            legacy_path = output_directory / f"{filename.rsplit('-', 1)[0]}-{legacy_suffix}.pptx"
+            if legacy_path.exists():
+                try:
+                    legacy_marker = json.loads(Path(f"{legacy_path}.souldrive.json").read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    legacy_marker = {}
+                if isinstance(legacy_marker, dict) and legacy_marker.get("task_id") == inputs["task_id"]:
+                    raise TaskPublicError("此任务已有旧版 PPT 产物，已保留；缺少内容完成指纹，请重新创建并确认计划。")
+        marker = {}
+        if marker_path.exists():
+            try:
+                marker = json.loads(marker_path.read_text(encoding="utf-8"))
+                if not isinstance(marker, dict):
+                    marker = {}
+            except (OSError, ValueError):
+                marker = {}
+        matches = all(marker.get(key) == value for key, value in marker_payload.items())
+        staged_name = str(marker.get("staged_name") or "")
+        staged_path = (
+            output_directory / staged_name
+            if Path(staged_name).name == staged_name and staged_name.startswith(f".{filename}.")
+            else None
+        )
+        if output_path.exists():
+            if not (
+                matches
+                and marker.get("status") in {"ready", "completed"}
+                and marker.get("content_sha256")
+                and _presentation_file_digest(output_path) == marker["content_sha256"]
+                and verify_pptx(output_path, expected_slide_count)["valid"]
+            ):
+                raise TaskPublicError("PPT 路径已有无法验证或已修改的文件，已保留且未覆盖；请重新创建并确认计划。")
+            _write_json_marker(marker_path, {**marker, "status": "completed"})
+            if staged_path is not None:
+                staged_path.unlink(missing_ok=True)
             return {
                 "output_path": str(output_path),
                 "renderer": "recovered",
                 "planned_slide_count": expected_slide_count,
+                "marker_path": str(marker_path),
             }
-        if os.environ.get("SOULDRIVE_PRESENTATION_RENDERER", "openxml").strip().lower() != "com":
-            payload = render_presentation(plan, output_path)
+        if matches and marker.get("status") == "ready":
+            if staged_path is None:
+                raise TaskPublicError("PPT 暂存文件身份无法验证，已保留现有文件；请重新创建并确认计划。")
+            _publish_presentation_file(staged_path, output_path, marker_path, marker)
             return {
                 "output_path": str(output_path),
-                "renderer": payload["renderer"],
+                "renderer": "recovered",
                 "planned_slide_count": expected_slide_count,
+                "marker_path": str(marker_path),
             }
-        completed = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                str(script_path),
-                "-OutputPath",
-                str(output_path),
-            ],
-            input=json.dumps(plan, ensure_ascii=False),
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            timeout=180,
-        )
-        if completed.returncode != 0:
-            error = (completed.stderr or completed.stdout or "WPS presentation rendering failed").strip()
-            raise RuntimeError(error[-1000:])
-        payload = _last_json_object(completed.stdout)
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{filename}.", suffix=".staging.pptx", dir=output_directory, delete=False,
+        ) as staged:
+            staged_path = Path(staged.name)
+        marker_payload["staged_name"] = staged_path.name
+        _write_json_marker(marker_path, {**marker_payload, "status": "rendering"})
+        if os.environ.get("SOULDRIVE_PRESENTATION_RENDERER", "openxml").strip().lower() != "com":
+            payload = render_presentation(plan, staged_path)
+        else:
+            completed = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-NonInteractive",
+                    "-ExecutionPolicy", "Bypass", "-File", str(resolve_wps_render_script()),
+                    "-OutputPath", str(staged_path),
+                ],
+                input=json.dumps(plan, ensure_ascii=False),
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                timeout=180,
+            )
+            if completed.returncode != 0:
+                error = (completed.stderr or completed.stdout or "WPS presentation rendering failed").strip()
+                raise RuntimeError(error[-1000:])
+            payload = _last_json_object(completed.stdout)
+        if not verify_pptx(staged_path, expected_slide_count)["valid"]:
+            raise TaskPublicError("PPT 暂存文件未通过结构校验，未发布或覆盖现有文件。")
+        with staged_path.open("rb+") as staged:
+            os.fsync(staged.fileno())
+        marker_payload.update({
+            "status": "ready",
+            "content_sha256": _presentation_file_digest(staged_path),
+        })
+        _write_json_marker(marker_path, marker_payload)
+        _publish_presentation_file(staged_path, output_path, marker_path, marker_payload)
         return {
             "output_path": str(output_path),
             "renderer": str(payload.get("renderer") or "WPS"),
-            "planned_slide_count": len(plan["slides"]),
+            "planned_slide_count": expected_slide_count,
+            "marker_path": str(marker_path),
         }
 
-    def _verify_pptx_step(self, _inputs: dict[str, Any], outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    def _verify_pptx_step(
+        self,
+        _inputs: dict[str, Any],
+        outputs: dict[str, dict[str, Any]],
+        _step_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         output_path = Path(outputs["render_pptx"]["output_path"])
         expected = int(outputs["render_pptx"]["planned_slide_count"])
         report = verify_pptx(output_path, expected)
@@ -396,17 +953,33 @@ class PresentationService:
         report["skill_gate_passed"] = True
         return report
 
-    def _open_in_wps_step(self, inputs: dict[str, Any], outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    def _open_in_wps_step(
+        self,
+        inputs: dict[str, Any],
+        outputs: dict[str, dict[str, Any]],
+        step_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         if not inputs.get("open_in_wps"):
             return {"opened": False, "reason": "not_requested"}
         output_path = outputs["render_pptx"]["output_path"]
         marker = Path(self.workspace.runtime_path) / f"{inputs['task_id']}.wps-opened"
         if marker.exists():
-            return {"opened": False, "reason": "already_requested"}
+            return {
+                "opened": False,
+                "reason": "already_requested",
+                "step_idempotency_key": str((step_context or {}).get("idempotency_key") or ""),
+            }
         executable = find_wps_presentation_executable()
         if not executable:
             raise RuntimeError("WPS presentation executable was not found")
-        marker.write_text(str(time.time()), encoding="ascii")
+        _write_json_marker(
+            marker,
+            {
+                "requested_at": time.time(),
+                "output_path": output_path,
+                "step_idempotency_key": str((step_context or {}).get("idempotency_key") or ""),
+            },
+        )
         try:
             subprocess.Popen(
                 [executable, output_path],
@@ -418,12 +991,18 @@ class PresentationService:
         except Exception:
             marker.unlink(missing_ok=True)
             raise
-        return {"opened": True, "application": "WPS", "executable_name": Path(executable).name}
+        return {
+            "opened": True,
+            "application": "WPS",
+            "executable_name": Path(executable).name,
+            "step_idempotency_key": str((step_context or {}).get("idempotency_key") or ""),
+        }
 
     def _audit(self, event_type: str, task: dict[str, Any], extra: dict[str, Any]) -> None:
         if self.audit_logger is None:
             return
-        self.audit_logger.append_event(
+        append_audit_event_best_effort(
+            self.audit_logger,
             event_type,
             {
                 "task_id": task.get("task_id"),
@@ -433,12 +1012,236 @@ class PresentationService:
         )
 
 
+def _presentation_file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _publish_presentation_file(
+    staged_path: Path,
+    output_path: Path,
+    marker_path: Path,
+    marker: dict[str, Any],
+) -> None:
+    if not (
+        staged_path.is_file()
+        and marker.get("content_sha256")
+        and _presentation_file_digest(staged_path) == marker["content_sha256"]
+        and verify_pptx(staged_path, int(marker["slide_count"]))["valid"]
+    ):
+        raise TaskPublicError("PPT 暂存文件已改变或无法验证，已保留现有文件；请重新创建并确认计划。")
+    # A hard link publishes the verified bytes atomically without replacing an
+    # existing destination.  Both paths are on the same local filesystem.
+    try:
+        os.link(staged_path, output_path)
+    except FileExistsError as exc:
+        raise TaskPublicError("PPT 路径已有文件，已保留且未覆盖；请重新创建并确认计划。") from exc
+    _write_json_marker(marker_path, {**marker, "status": "completed"})
+    staged_path.unlink(missing_ok=True)
+
+
+def _write_json_marker(path: Path, payload: dict[str, Any]) -> None:
+    """Publish a complete recovery marker without exposing a partial JSON file."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+            temporary.write("\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _stable_presentation_task_id(kind: str, identity: str) -> str:
+    digest = hashlib.sha256(f"{kind}:{identity}".encode("utf-8")).hexdigest()
+    return f"task_{digest[:24]}"
+
+
+def _presentation_request_digest(inputs: dict[str, Any]) -> str:
+    payload = {
+        key: value
+        for key, value in inputs.items()
+        if key not in {"request_id", "task_id", "artifact_id", "request_digest"}
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _presentation_repetition_inputs(
+    inputs: dict[str, Any],
+    *,
+    plan_digest: str | None = None,
+) -> dict[str, Any]:
+    """Project PPT business identity away from per-execution identifiers."""
+    projection = {
+        "project_id": inputs.get("project_id"),
+        "source_filenames": list(inputs.get("source_filenames") or []),
+        "source_document_ids": list(inputs.get("source_document_ids") or []),
+        "source_version_ids": list(inputs.get("source_version_ids") or []),
+        "title": inputs.get("title"),
+        "audience": inputs.get("audience"),
+        "max_slides": inputs.get("max_slides"),
+        "open_in_wps": bool(inputs.get("open_in_wps")),
+        "style_skill_id": inputs.get("style_skill_id"),
+    }
+    if "style_skill" in inputs:
+        projection["style_skill"] = inputs.get("style_skill")
+    if inputs.get("baseline_run_id"):
+        projection.update({key: inputs[key] for key in ("baseline_run_id", "current_run_id")})
+        projection["comparison_digest"] = _presentation_plan_digest(inputs.get("experiment_comparison") or {})
+    if plan_digest is not None:
+        projection["plan_digest"] = str(plan_digest)
+    return projection
+
+
+def _presentation_plan_digest(plan: dict[str, Any]) -> str:
+    encoded = json.dumps(plan, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _presentation_source_refs(
+    inputs: dict[str, Any],
+    records: list[dict[str, Any]],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    version_ids = sorted({
+        str(record.get("asset_version_id"))
+        for record in records
+        if str(record.get("asset_version_id") or "").strip()
+    })
+    source_refs = []
+    selected_ids = list(inputs.get("source_document_ids") or [])
+    for index, source in enumerate(inputs["source_filenames"]):
+        selected_id = selected_ids[index] if index < len(selected_ids) else ""
+        source_version_ids = sorted({
+            str(record.get("asset_version_id"))
+            for record in records
+            if (
+                _document_id_matches_value(selected_id, {str(record.get("document_id") or "")})
+                if selected_id
+                else record.get("source_filename") == source
+            )
+            and str(record.get("asset_version_id") or "").strip()
+        })
+        source_refs.append({
+            "source_filename": source,
+            "document_id": selected_id or None,
+            "version_ids": source_version_ids,
+            "status": "resolved" if source_version_ids else "unresolved",
+        })
+    return version_ids, source_refs
+
+
+def _source_fingerprints(
+    records: list[dict[str, Any]],
+    selected_sources: list[str],
+    selected_document_ids: list[str] | None = None,
+) -> dict[str, str]:
+    fingerprints: dict[str, str] = {}
+    selected_ids = list(selected_document_ids or [])
+    for index, source in enumerate(selected_sources):
+        selected_id = selected_ids[index] if index < len(selected_ids) else ""
+        source_records = [
+            record for record in records
+            if (
+                _document_id_matches_value(selected_id, {str(record.get("document_id") or "")})
+                if selected_id
+                else Path(str(record.get("source_filename") or "")).name == Path(source).name
+            )
+        ]
+        canonical_records = [
+            {
+                "asset_id": str(record.get("asset_id") or ""),
+                "asset_version_id": str(record.get("asset_version_id") or ""),
+                "parent_id": str(record.get("parent_id") or ""),
+                "page_number": record.get("page_number"),
+                "parent_index": record.get("parent_index"),
+                "section": str(record.get("section") or ""),
+                "content": str(record.get("content") or ""),
+            }
+            for record in source_records
+        ]
+        canonical_records.sort(
+            key=lambda record: (
+                str(record["asset_version_id"]),
+                str(record["parent_id"]),
+                int(record["page_number"] or 0),
+                int(record["parent_index"] or 0),
+                record["content"],
+            )
+        )
+        encoded = json.dumps(canonical_records, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        key = selected_id or Path(source).name
+        fingerprints[key] = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return fingerprints
+
+
+def _document_id_candidates(value: object) -> set[str]:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return set()
+    if normalized.startswith("secure_"):
+        return {normalized, normalized.removeprefix("secure_")}
+    return {normalized, f"secure_{normalized}"}
+
+
+def _document_id_matches_value(value: object, actual_ids: set[str]) -> bool:
+    expected = _document_id_candidates(value)
+    if not expected:
+        return False
+    for actual_id in actual_ids:
+        if _document_id_candidates(actual_id) & expected:
+            return True
+    return False
+
+
 def validate_presentation_request(request: dict[str, Any]) -> dict[str, Any]:
+    raw_source_values = list(request.get("source_filenames") or [])
+    source_document_ids = []
+    seen_document_ids = set()
+    seen_document_id_aliases = set()
+    for value in request.get("source_document_ids") or []:
+        document_id = str(value or "").strip()[:256]
+        if not document_id:
+            continue
+        aliases = _document_id_candidates(document_id)
+        if document_id in seen_document_ids or aliases & seen_document_id_aliases:
+            raise ValueError("source_document_ids must identify distinct documents")
+        source_document_ids.append(document_id)
+        seen_document_ids.add(document_id)
+        seen_document_id_aliases.update(aliases)
     sources = []
-    for value in request.get("source_filenames") or []:
+    seen_source_keys = set()
+    for value in raw_source_values:
         source = Path(str(value or "").strip()).name
-        if source and source not in sources:
+        source_key = source.casefold()
+        if source and (source_document_ids or source_key not in seen_source_keys):
             sources.append(source)
+            seen_source_keys.add(source_key)
+    if source_document_ids and not raw_source_values:
+        raise ValueError("source_filenames are required as display labels with source_document_ids")
+    if source_document_ids and len(source_document_ids) != len(sources):
+        raise ValueError("source_filenames and source_document_ids must have the same length")
     if not 1 <= len(sources) <= 12:
         raise ValueError("select between 1 and 12 indexed documents")
     title = " ".join(str(request.get("title") or "").split())[:120]
@@ -451,13 +1254,20 @@ def validate_presentation_request(request: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("max_slides must be an integer") from exc
     max_slides = max(4, min(max_slides, 16))
     project_id = str(request.get("project_id") or "").strip()[:128]
+    baseline_run_id = str(request.get("baseline_run_id") or "").strip()[:128]
+    current_run_id = str(request.get("current_run_id") or "").strip()[:128]
+    if bool(baseline_run_id) != bool(current_run_id) or (baseline_run_id and not project_id):
+        raise ValueError("实验比较 PPT 需要当前项目和完整的基线/当前运行对")
     source_version_ids = []
     for value in request.get("source_version_ids") or []:
         source_version_id = str(value or "").strip()
         if source_version_id and source_version_id not in source_version_ids:
             source_version_ids.append(source_version_id[:160])
+    request_id = str(request.get("request_id") or "").strip()[:128] or f"req_{uuid.uuid4().hex}"
     return {
+        "request_id": request_id,
         "source_filenames": sources,
+        "source_document_ids": source_document_ids[:12],
         "title": title,
         "audience": audience,
         "max_slides": max_slides,
@@ -465,13 +1275,62 @@ def validate_presentation_request(request: dict[str, Any]) -> dict[str, Any]:
         "style_skill_id": str(request.get("style_skill_id") or "").strip(),
         "project_id": project_id,
         "source_version_ids": source_version_ids[:64],
+        **({"baseline_run_id": baseline_run_id, "current_run_id": current_run_id} if baseline_run_id else {}),
     }
 
 
-def collect_indexed_evidence(workspace, keys, selected_sources: list[str]) -> list[dict[str, Any]]:
+def collect_indexed_evidence(
+    workspace,
+    keys,
+    selected_sources: list[str] | None,
+    *,
+    project_id: str | None = None,
+    source_version_ids: list[str] | None = None,
+    source_document_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    selected_sources = list(selected_sources or [])
     selected = {Path(source).name.casefold(): Path(source).name for source in selected_sources}
+    selected_document_ids = [
+        str(document_id or "").strip()
+        for document_id in source_document_ids or []
+        if str(document_id or "").strip()
+    ]
+    selected_id_keys = {
+        document_id
+        for document_id in selected_document_ids
+    }
+
+    def matching_document_id(metadata: dict[str, Any]) -> str | None:
+        actual_id = str((metadata or {}).get("document_id") or "").strip()
+        if not actual_id:
+            return None
+        for requested_id in selected_document_ids:
+            if _document_id_matches_value(requested_id, {actual_id}):
+                return requested_id
+        return None
+
+    def selected_source_name(metadata: dict[str, Any]) -> str | None:
+        source = Path(str((metadata or {}).get("source_filename") or "")).name
+        source_key = source.casefold()
+        if selected_document_ids:
+            if matching_document_id(metadata) is None:
+                return None
+        elif selected and source_key not in selected:
+            return None
+        return selected.get(source_key) or source or None
+
+    scoped_project_id = str(project_id or "").strip()
+    scoped_version_ids = {
+        str(version_id).strip()
+        for version_id in source_version_ids or []
+        if str(version_id).strip()
+    }
     records: list[dict[str, Any]] = []
     known_parent_ids: set[str] = set()
+    # Consult the durable catalog even for a workspace-global presentation.
+    # A legacy parent row without project_id must not become global merely
+    # because the caller omitted project_id when selecting by filename.
+    catalog_projects_by_source = _catalog_projects_by_source(workspace, set(selected))
     secure_path = Path(workspace.secure_vector_store_path)
     if keys is not None and secure_path.exists():
         store = SecureVectorStore(str(secure_path), keys)
@@ -479,15 +1338,36 @@ def collect_indexed_evidence(workspace, keys, selected_sources: list[str]) -> li
             payload = store.collection.get(include=["metadatas"])
             parent_ids: dict[str, dict[str, Any]] = {}
             for metadata in payload.get("metadatas") or []:
-                source = Path(str((metadata or {}).get("source_filename") or "")).name
                 parent_id = str((metadata or {}).get("parent_id") or "")
-                if source.casefold() in selected and parent_id:
+                if selected_source_name(metadata) and parent_id:
                     parent_ids.setdefault(parent_id, dict(metadata or {}))
             for parent_id, child_metadata in parent_ids.items():
                 parent = store.get_parent(parent_id)
                 if parent:
                     known_parent_ids.add(parent_id)
-                    records.append(_evidence_record(parent_id, parent["content"], {**child_metadata, **parent["metadata"]}))
+                    metadata = _merge_evidence_metadata(
+                        child_metadata,
+                        parent.get("metadata") if isinstance(parent, dict) else {},
+                    )
+                    if metadata is None:
+                        # Child and parent indexes disagree about provenance.
+                        # Do not let the less trustworthy merge order turn a
+                        # foreign project record into an apparently local one.
+                        continue
+                    source_name = selected_source_name(metadata)
+                    if not source_name:
+                        continue
+                    source_key = Path(source_name).name.casefold()
+                    if not _catalog_scope_matches(
+                        metadata,
+                        source_key,
+                        scoped_project_id,
+                        catalog_projects_by_source,
+                    ) or not _evidence_matches_scope(metadata, scoped_project_id, scoped_version_ids):
+                        continue
+                    record = _evidence_record(parent_id, parent["content"], metadata)
+                    record["source_filename"] = source_name
+                    records.append(record)
         finally:
             store.close()
 
@@ -495,10 +1375,16 @@ def collect_indexed_evidence(workspace, keys, selected_sources: list[str]) -> li
     # indexing.  A vector rebuild can temporarily lag behind that index (or a
     # plain document may intentionally have no vector row), so use the parent
     # store for sources not found above instead of reporting a false failure.
+    found_document_ids = {
+        matching_document_id(record)
+        for record in records
+        if matching_document_id(record)
+    }
     missing_sources = set(selected) - {
         Path(record["source_filename"]).name.casefold() for record in records
     }
-    if missing_sources or not records:
+    missing_document_ids = selected_id_keys - found_document_ids
+    if missing_sources or missing_document_ids or not records:
         db_path = Path(workspace.parent_doc_path)
         if not db_path.exists():
             if records:
@@ -515,27 +1401,165 @@ def collect_indexed_evidence(workspace, keys, selected_sources: list[str]) -> li
             if parent_id in known_parent_ids:
                 continue
             metadata = json.loads(metadata_json)
-            source = Path(str(metadata.get("source_filename") or "")).name
-            if source.casefold() in missing_sources:
-                records.append(_evidence_record(parent_id, content, metadata))
+            source_name = selected_source_name(metadata)
+            source_key = Path(source_name).name.casefold() if source_name else ""
+            if (
+                source_name
+                and (
+                    source_key in missing_sources
+                    or bool(missing_document_ids)
+                )
+                and _catalog_scope_matches(
+                    metadata,
+                    source_key,
+                    scoped_project_id,
+                    catalog_projects_by_source,
+                )
+                and _evidence_matches_scope(metadata, scoped_project_id, scoped_version_ids)
+            ):
+                record = _evidence_record(parent_id, content, metadata)
+                record["source_filename"] = source_name
+                records.append(record)
 
-    records.sort(
-        key=lambda item: (
-            selected_sources.index(item["source_filename"]),
-            item["page_number"],
-            item["parent_index"],
+    source_order = {
+        Path(source).name.casefold(): index
+        for index, source in enumerate(selected_sources)
+    }
+    id_order = {
+        document_id: index
+        for index, document_id in enumerate(selected_document_ids)
+    }
+
+    def record_order(item: dict[str, Any]) -> tuple[int, int, int]:
+        matched_id = matching_document_id(item)
+        return (
+            id_order.get(matched_id, source_order.get(
+                Path(str(item.get("source_filename") or "")).name.casefold(),
+                len(selected_sources) + len(selected_document_ids),
+            )),
+            int(item.get("page_number") or 0),
+            int(item.get("parent_index") or 0),
         )
-    )
+
+    records.sort(key=record_order)
     limited = []
     per_source: Counter[str] = Counter()
     for record in records:
-        if per_source[record["source_filename"]] >= 18:
+        limit_key = (
+            matching_document_id(record)
+            or record["source_filename"]
+        )
+        if per_source[limit_key] >= 18:
             continue
         if len(limited) >= 96:
             break
         limited.append(record)
-        per_source[record["source_filename"]] += 1
+        per_source[limit_key] += 1
     return limited
+
+
+def _evidence_matches_scope(
+    metadata: dict[str, Any],
+    project_id: str,
+    source_version_ids: set[str],
+) -> bool:
+    metadata_project_id = str(metadata.get("project_id") or "").strip()
+    # An absent project_id is the durable representation of a shared/global
+    # document.  It is available to a selected project, while a project-bound
+    # document requires an explicit matching project scope.  This prevents the
+    # legacy filename-only entry point from merging same-named private files.
+    if metadata_project_id and not project_id:
+        return False
+    if project_id and metadata_project_id and metadata_project_id != project_id:
+        return False
+    if source_version_ids:
+        version_id = str(
+            metadata.get("asset_version_id") or metadata.get("version_id") or ""
+        ).strip()
+        if version_id not in source_version_ids:
+            return False
+    return True
+
+
+def _catalog_projects_by_source(
+    workspace,
+    selected_sources: set[str],
+) -> dict[str, set[str]]:
+    """Return durable project bindings for selected filenames.
+
+    An old parent index can omit ``project_id``.  If the catalog still proves
+    that the filename is project-bound, treating that row as global would make
+    a filename-only presentation selection unsafe.
+    """
+    if not selected_sources or not getattr(workspace, "project_catalog_path", None):
+        return {}
+    catalog = ProjectCatalog(workspace)
+    try:
+        rows = catalog.conn.execute(
+            """
+            SELECT a.project_id, v.file_ref
+            FROM assets a
+            JOIN asset_versions v ON v.asset_id = a.asset_id
+            """
+        ).fetchall()
+    finally:
+        catalog.close()
+    result: dict[str, set[str]] = {}
+    for row in rows:
+        source_key = Path(str(row[1] or "")).name.casefold()
+        project_id = str(row[0] or "").strip()
+        if source_key in selected_sources and project_id:
+            result.setdefault(source_key, set()).add(project_id)
+    return result
+
+
+def _catalog_scope_matches(
+    metadata: dict[str, Any],
+    source_key: str,
+    scoped_project_id: str,
+    catalog_projects_by_source: dict[str, set[str]],
+) -> bool:
+    bound_projects = catalog_projects_by_source.get(source_key)
+    if not bound_projects:
+        return True
+    stored_project_id = str(metadata.get("project_id") or "").strip()
+    if not scoped_project_id:
+        return False
+    return bool(
+        stored_project_id
+        and stored_project_id == scoped_project_id
+        and stored_project_id in bound_projects
+    )
+
+
+_EVIDENCE_PROVENANCE_FIELDS = (
+    "source_filename",
+    "project_id",
+    "asset_id",
+    "asset_version_id",
+    "document_id",
+    "document_hash",
+    "catalog_file_ref",
+)
+
+
+def _merge_evidence_metadata(
+    child_metadata: dict[str, Any] | None,
+    parent_metadata: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Merge child/parent provenance without allowing identity downgrades."""
+    child = dict(child_metadata or {})
+    parent = dict(parent_metadata or {})
+    for field in _EVIDENCE_PROVENANCE_FIELDS:
+        child_value = str(child.get(field) or "").strip()
+        parent_value = str(parent.get(field) or "").strip()
+        if child_value and parent_value and child_value != parent_value:
+            return None
+    merged = dict(child)
+    for key, value in parent.items():
+        if not str(merged.get(key) or "").strip() and value is not None:
+            merged[key] = value
+    return merged
 
 
 def build_extractable_presentation_plan(
@@ -780,20 +1804,94 @@ def presentation_evidence_metrics(
     plan: dict[str, Any],
     source_count: int,
     records: list[dict[str, Any]],
+    selected_document_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Expose source attribution coverage without claiming semantic fact checking."""
     slides = list(plan.get("slides") or [])
     evidence_slides = [slide for slide in slides if slide.get("kind") not in {"cover", "sources"}]
     attributed = [slide for slide in evidence_slides if slide.get("sources")]
-    selected = {Path(str(record.get("source_filename") or "")).name for record in records}
-    cited = {Path(str(source)).name for slide in evidence_slides for source in slide.get("sources") or []}
+    selected_labels = {
+        Path(str(record.get("source_filename") or "")).name
+        for record in records
+        if Path(str(record.get("source_filename") or "")).name
+    }
+    plan_labels = [
+        Path(str(value or "")).name
+        for value in plan.get("source_filenames") or []
+        if Path(str(value or "")).name
+    ]
+    if plan_labels:
+        selected_labels.update(plan_labels)
+    cited_values = [
+        str(source or "").strip()
+        for slide in evidence_slides
+        for source in slide.get("sources") or []
+        if str(source or "").strip()
+    ]
+    cited_labels = {Path(source).name for source in cited_values}
+    selected_label_keys = {label.casefold() for label in selected_labels}
+    cited_label_keys = {label.casefold() for label in cited_labels}
+    cited_label_hits = selected_label_keys & cited_label_keys
+
+    selected_ids = [
+        str(value or "").strip()
+        for value in (selected_document_ids if selected_document_ids is not None else plan.get("source_document_ids") or [])
+        if str(value or "").strip()
+    ]
+    selected_identity_count = len(dict.fromkeys(selected_ids)) if selected_ids else len(selected_labels)
+    cited_identity_indexes: set[int] = set()
+    if selected_ids:
+        labels_by_index = list(plan_labels)
+        for index, document_id in enumerate(selected_ids):
+            if index >= len(labels_by_index):
+                matching_record = next(
+                    (
+                        record for record in records
+                        if _document_id_matches_value(document_id, {str(record.get("document_id") or "")})
+                    ),
+                    None,
+                )
+                labels_by_index.append(Path(str((matching_record or {}).get("source_filename") or "")).name)
+        label_to_indexes: dict[str, list[int]] = {}
+        for index, label in enumerate(labels_by_index[:len(selected_ids)]):
+            label_to_indexes.setdefault(label.casefold(), []).append(index)
+        for cited_value in cited_values:
+            exact_indexes = [
+                index
+                for index, document_id in enumerate(selected_ids)
+                if _document_id_matches_value(cited_value, {document_id})
+            ]
+            if exact_indexes:
+                cited_identity_indexes.update(exact_indexes)
+                continue
+            cited_label = Path(cited_value).name.casefold()
+            matching_indexes = label_to_indexes.get(cited_label) or []
+            if len(matching_indexes) == 1:
+                cited_identity_indexes.add(matching_indexes[0])
+        cited_identity_count = len(cited_identity_indexes)
+        has_duplicate_labels = any(
+            len(indexes) > 1 for indexes in label_to_indexes.values()
+        )
+        if has_duplicate_labels and cited_identity_count < selected_identity_count:
+            identity_status = "ambiguous_display_labels"
+        else:
+            identity_status = "exact_object_ids"
+    else:
+        cited_identity_count = len(cited_label_hits)
+        identity_status = "display_name_only"
+
     return {
         "evidence_slide_count": len(evidence_slides),
         "attributed_slide_count": len(attributed),
         "evidence_slide_coverage": round(len(attributed) / max(1, len(evidence_slides)), 4),
         "selected_source_count": source_count,
-        "cited_source_count": len(cited & selected),
-        "selected_source_coverage": round(len(cited & selected) / max(1, len(selected)), 4),
+        "selected_source_label_count": len(selected_labels),
+        "cited_source_count": len(cited_label_hits),
+        "selected_label_coverage": round(len(cited_label_hits) / max(1, len(selected_labels)), 4),
+        "selected_identity_count": selected_identity_count,
+        "cited_identity_count": cited_identity_count,
+        "selected_source_coverage": round(cited_identity_count / max(1, selected_identity_count), 4),
+        "source_identity_coverage_status": identity_status,
         "evidence_bound_point_count": sum(len(slide.get("points") or []) for slide in attributed),
     }
 
@@ -935,7 +2033,7 @@ def resolve_wps_render_script() -> Path:
 def presentation_filename(title: str, sources: list[str], task_id: str) -> str:
     base = title or Path(sources[0]).stem or "SoulDrive-presentation"
     safe = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", "_", base).strip(" ._")[:80]
-    suffix = re.sub(r"[^A-Za-z0-9]", "", task_id)[-8:] or "task"
+    suffix = hashlib.sha256(str(task_id).encode("utf-8")).hexdigest()[:16]
     return f"{safe or 'SoulDrive-presentation'}-{suffix}.pptx"
 
 
@@ -957,10 +2055,12 @@ def _evidence_record(parent_id: str, content: str, metadata: dict[str, Any]) -> 
         )
     return {
         "parent_id": str(parent_id),
+        "project_id": str(metadata.get("project_id") or ""),
         "source_filename": source,
+        "document_id": str(metadata.get("document_id") or ""),
         "document_title": str(metadata.get("document_title") or Path(source).stem),
         "asset_id": str(metadata.get("asset_id") or ""),
-        "asset_version_id": str(metadata.get("asset_version_id") or ""),
+        "asset_version_id": str(metadata.get("asset_version_id") or metadata.get("version_id") or ""),
         "catalog_file_ref": str(metadata.get("catalog_file_ref") or ""),
         "section": _compact(section, 200),
         "page_number": _safe_int(metadata.get("page_number") or metadata.get("page"), 0),

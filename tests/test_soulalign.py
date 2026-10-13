@@ -1,4 +1,9 @@
-from core.soulalign import decide, verify_target_candidates
+from core.soulalign import _bounded_confidence, decide, verify_target_candidates
+
+
+def test_target_confidence_rejects_non_finite_values():
+    assert _bounded_confidence(float("nan")) == 0.0
+    assert _bounded_confidence(float("inf")) == 0.0
 
 
 def test_soulalign_requires_clarification_for_low_confidence_target():

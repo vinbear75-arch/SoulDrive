@@ -14,15 +14,16 @@ from core.experiment_ledger import (
     summarize_experiment_repeats,
 )
 from core.project_catalog import ProjectCatalog
+from core.paper_importer import file_md5
 from core.workspace import SoulDriveWorkspace
 
 
-def _catalog(tmp_path):
+def _catalog(tmp_path, content_hash="hash-1"):
     workspace = SoulDriveWorkspace.from_drive(str(tmp_path)).ensure()
     catalog = ProjectCatalog(workspace)
     catalog.create_project("实验项目", project_id="project")
     catalog.create_asset("project", "指标文件", "metrics", asset_id="asset")
-    catalog.create_asset_version("asset", "hash-1", "metrics.csv", version_id="version-1")
+    catalog.create_asset_version("asset", content_hash, "metrics.csv", version_id="version-1")
     return workspace, catalog
 
 
@@ -54,9 +55,9 @@ def test_metric_import_requires_confirmation_and_required_provenance(tmp_path):
 
 
 def test_metric_import_and_comparison_are_traceable_and_gated(tmp_path):
-    workspace, catalog = _catalog(tmp_path)
     source = tmp_path / "metrics.csv"
     source.write_text("metric,value\naccuracy,0.81\n", encoding="utf-8")
+    workspace, catalog = _catalog(tmp_path, file_md5(source))
     try:
         baseline = import_metric_source(
             catalog,
@@ -71,8 +72,8 @@ def test_metric_import_and_comparison_are_traceable_and_gated(tmp_path):
         run = catalog.get_experiment_run(baseline["run_id"])
         assert run["measurements"][0]["source_locator"] == "row:1"
 
-        catalog.create_asset_version("asset", "hash-2", "metrics-v2.csv", version_id="version-2")
         source.write_text("metric,value\naccuracy,0.86\n", encoding="utf-8")
+        catalog.create_asset_version("asset", file_md5(source), "metrics-v2.csv", version_id="version-2")
         current = import_metric_source(
             catalog,
             project_id="project",
@@ -95,17 +96,45 @@ def test_metric_import_and_comparison_are_traceable_and_gated(tmp_path):
             [baseline["run_id"], current["run_id"]],
             project_id="project",
         )
-        assert repeated["status"] == "ready"
-        assert repeated["metrics"][0]["mean"] == 0.835
-        assert repeated["metrics"][0]["variance"] == 0.00125
-        assert repeated["metrics"][0]["confidence_interval_95"]
+        assert repeated["status"] == "not_comparable"
+        assert repeated["reason"] == "mismatch"
+        assert repeated["compatibility"]["config_ref"] is False
+        assert repeated["metrics"] == []
 
-        catalog.create_asset_version("asset", "hash-3", "metrics-v3.csv", version_id="version-3")
         source.write_text("metric,value\naccuracy,0.87\n", encoding="utf-8")
-        blocked_run = import_metric_source(
+        catalog.create_asset_version("asset", file_md5(source), "metrics-v3.csv", version_id="version-3")
+        repeat = import_metric_source(
             catalog,
             project_id="project",
             evidence_version_id="version-3",
+            path=source,
+            experiment_name="alignment",
+            confirmed=True,
+            **_defaults(performed_at="2026-08-20T10:00:00+08:00"),
+        )
+        same_condition = summarize_experiment_repeats(
+            catalog,
+            [baseline["run_id"], repeat["run_id"]],
+            project_id="project",
+        )
+        assert same_condition["status"] == "ready"
+        assert same_condition["metrics"][0]["n"] == 2
+        assert same_condition["metrics"][0]["mean"] == 0.84
+        assert same_condition["metrics"][0]["variance"] == 0.0018
+        assert same_condition["metrics"][0]["confidence_interval_95"]
+
+        one_run = summarize_experiment_repeats(catalog, [baseline["run_id"]], project_id="project")
+        assert one_run["status"] == "ready"
+        assert one_run["metrics"][0]["n"] == 1
+        assert one_run["metrics"][0]["variance"] is None
+        assert one_run["metrics"][0]["confidence_interval_95"] is None
+
+        source.write_text("metric,value\naccuracy,0.87\n", encoding="utf-8")
+        catalog.create_asset_version("asset", file_md5(source), "metrics-v4.csv", version_id="version-4")
+        blocked_run = import_metric_source(
+            catalog,
+            project_id="project",
+            evidence_version_id="version-4",
             path=source,
             experiment_name="alignment",
             confirmed=True,
@@ -165,6 +194,53 @@ def test_partial_metric_match_does_not_expose_changes(tmp_path):
         assert comparison["changes"] == []
     finally:
         catalog.close()
+
+
+def test_repeat_summary_rejects_duplicate_ids_and_metric_keys():
+    class FakeCatalog:
+        def __init__(self):
+            self.runs = {
+                "run-a": {
+                    "run_id": "run-a",
+                    "project_id": "project",
+                    "experiment_id": "experiment",
+                    "experiment_name": "alignment",
+                    "dataset_version": "dataset-v1",
+                    "evaluation_script_ref": "eval-v1",
+                    "config_ref": "config-a",
+                    "environment_ref": "env-a",
+                    "measurements": [
+                        {"name": "accuracy", "unit": "%", "definition_version": "metric-v1", "split": "test", "direction": "higher", "value": 0.81},
+                        {"name": "accuracy", "unit": "%", "definition_version": "metric-v1", "split": "test", "direction": "higher", "value": 0.82},
+                    ],
+                },
+                "run-b": {
+                    "run_id": "run-b",
+                    "project_id": "project",
+                    "experiment_id": "experiment",
+                    "experiment_name": "alignment",
+                    "dataset_version": "dataset-v1",
+                    "evaluation_script_ref": "eval-v1",
+                    "config_ref": "config-a",
+                    "environment_ref": "env-a",
+                    "measurements": [
+                        {"name": "accuracy", "unit": "%", "definition_version": "metric-v1", "split": "test", "direction": "higher", "value": 0.83},
+                    ],
+                },
+            }
+
+        def get_experiment_run(self, run_id):
+            return self.runs.get(run_id)
+
+    catalog = FakeCatalog()
+    duplicate_ids = summarize_experiment_repeats(catalog, ["run-a", "run-a"], project_id="project")
+    assert duplicate_ids["status"] == "not_comparable"
+    assert duplicate_ids["reason"] == "duplicate_run_ids"
+
+    duplicate_metrics = summarize_experiment_repeats(catalog, ["run-a", "run-b"], project_id="project")
+    assert duplicate_metrics["status"] == "not_comparable"
+    assert duplicate_metrics["reason"] == "duplicate_metric_key"
+    assert duplicate_metrics["metrics"] == []
 
 
 def test_previous_month_uses_local_timezone_boundaries():
@@ -233,6 +309,7 @@ def test_comparable_experiment_result_becomes_locatable_m_evidence():
     assert len(evidence) == 1
     assert evidence[0]["id"] == "M1"
     assert evidence[0]["evidence_type"] == "experiment_measurement"
+    assert evidence[0]["project_id"] == "project"
     assert "当前值=0.81" in evidence[0]["context"]
     assert "current.csv" in evidence[0]["context"] or "row:2" in evidence[0]["context"]
     assert "M1" in build_experiment_evidence_text(evidence)

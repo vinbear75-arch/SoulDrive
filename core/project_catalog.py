@@ -1,27 +1,87 @@
+import hashlib
 import json
 import os
-import json
 import math
 import sqlite3
+import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 13
 PROJECT_MODES = {"research", "business"}
+
+
+def _synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
+def project_deletion_error_observation(error: Any) -> dict[str, Any]:
+    """Persist only a bounded fingerprint for a deletion failure."""
+    if isinstance(error, dict):
+        error_type = str(error.get("error_type") or "UnknownError")[:96]
+        error_digest = str(error.get("error_digest") or "")
+        error_chars = error.get("error_chars")
+        if (
+            len(error_digest) == 16
+            and all(character in "0123456789abcdef" for character in error_digest.lower())
+            and isinstance(error_chars, int)
+            and error_chars >= 0
+        ):
+            return {
+                "error_type": error_type,
+                "error_digest": error_digest.lower(),
+                "error_chars": error_chars,
+            }
+        error = json.dumps(error, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    else:
+        text = str(error or "")
+        try:
+            decoded = json.loads(text)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            decoded = None
+        if isinstance(decoded, dict):
+            return project_deletion_error_observation(decoded)
+
+    message = str(error or "")
+    return {
+        "error_type": "UnknownError",
+        "error_digest": hashlib.sha256(message.encode("utf-8")).hexdigest()[:16],
+        "error_chars": len(message),
+    }
+
+
+def _serialize_project_deletion_error(error: Any) -> str | None:
+    if error is None or str(error or "") == "":
+        return None
+    return json.dumps(
+        project_deletion_error_observation(error),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 class ProjectCatalog:
     def __init__(self, workspace):
         self.db_path = Path(workspace.project_catalog_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self._lock = threading.RLock()
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self._ensure_schema()
 
+    @_synchronized
     def close(self) -> None:
         self.conn.close()
 
@@ -36,8 +96,43 @@ class ProjectCatalog:
                 root_path TEXT,
                 instructions TEXT NOT NULL DEFAULT '',
                 memory_policy TEXT NOT NULL DEFAULT 'project_plus_global',
+                idempotency_key TEXT UNIQUE,
                 created_at TEXT NOT NULL
             );
+
+            -- Deliberately has no foreign key to projects: a completed or
+            -- in-flight deletion must remain recoverable after the catalog
+            -- row itself is removed.
+            CREATE TABLE IF NOT EXISTS project_deletions (
+                project_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL CHECK(status IN ('pending', 'failed', 'completed')),
+                root_path TEXT,
+                snapshot_json TEXT NOT NULL DEFAULT '{}',
+                result_json TEXT NOT NULL DEFAULT '{}',
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_deletions_status
+                ON project_deletions(status, updated_at);
+
+            -- Deliberately has no foreign key to documents: the source may
+            -- already be gone when a client retries the same deletion.
+            CREATE TABLE IF NOT EXISTS document_deletion_receipts (
+                idempotency_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                document_id TEXT,
+                content_digest TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('in_progress', 'failed', 'uncertain', 'completed')),
+                owner_id TEXT,
+                lease_expires_at REAL,
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_document_deletion_receipts_status
+                ON document_deletion_receipts(status, updated_at);
 
             CREATE TABLE IF NOT EXISTS assets (
                 asset_id TEXT PRIMARY KEY,
@@ -133,7 +228,11 @@ class ProjectCatalog:
                 title TEXT NOT NULL,
                 due_at TEXT,
                 status TEXT NOT NULL,
-                evidence_refs_json TEXT NOT NULL DEFAULT '[]'
+                evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT,
+                updated_at TEXT,
+                started_at TEXT,
+                completed_at TEXT
             );
 
             CREATE TABLE IF NOT EXISTS project_templates (
@@ -194,9 +293,30 @@ class ProjectCatalog:
             self.conn.execute("ALTER TABLE projects ADD COLUMN instructions TEXT NOT NULL DEFAULT ''")
         if "memory_policy" not in columns:
             self.conn.execute("ALTER TABLE projects ADD COLUMN memory_policy TEXT NOT NULL DEFAULT 'project_plus_global'")
+        if "idempotency_key" not in columns:
+            self.conn.execute("ALTER TABLE projects ADD COLUMN idempotency_key TEXT")
+        self.conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_idempotency_key "
+            "ON projects(idempotency_key)"
+        )
+        deletion_receipt_columns = {
+            row[1] for row in self.conn.execute("PRAGMA table_info(document_deletion_receipts)")
+        }
+        if "document_id" not in deletion_receipt_columns:
+            self.conn.execute("ALTER TABLE document_deletion_receipts ADD COLUMN document_id TEXT")
         run_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(experiment_runs)")}
         if "evaluation_script_ref" not in run_columns:
             self.conn.execute("ALTER TABLE experiment_runs ADD COLUMN evaluation_script_ref TEXT NOT NULL DEFAULT ''")
+        task_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(project_tasks)")}
+        for column in ("created_at", "updated_at", "started_at", "completed_at"):
+            if column not in task_columns:
+                # Legacy task rows stay NULL: a due date is not an occurrence
+                # time, so the episodic projection must not invent one.
+                self.conn.execute(f"ALTER TABLE project_tasks ADD COLUMN {column} TEXT")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_project_tasks_project_updated "
+            "ON project_tasks(project_id, updated_at, task_id)"
+        )
         measurement_columns = {row[1] for row in self.conn.execute("PRAGMA table_info(measurements)")}
         if "source_locator" not in measurement_columns:
             self.conn.execute("ALTER TABLE measurements ADD COLUMN source_locator TEXT NOT NULL DEFAULT ''")
@@ -319,9 +439,24 @@ class ProjectCatalog:
                 self.conn.execute(
                     "ALTER TABLE artifacts ADD COLUMN change_summary TEXT NOT NULL DEFAULT ''"
                 )
+        self._sanitize_legacy_project_deletion_errors()
         self._backfill_measurement_revisions()
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
+
+    def _sanitize_legacy_project_deletion_errors(self) -> None:
+        rows = self.conn.execute(
+            "SELECT project_id, error FROM project_deletions WHERE error <> ''"
+        ).fetchall()
+        updates = [
+            (_serialize_project_deletion_error(row["error"]), row["project_id"])
+            for row in rows
+        ]
+        if updates:
+            self.conn.executemany(
+                "UPDATE project_deletions SET error = ? WHERE project_id = ?",
+                updates,
+            )
 
     def _backfill_measurement_revisions(self) -> None:
         """Give legacy current measurements a first immutable revision."""
@@ -357,6 +492,7 @@ class ProjectCatalog:
                 ),
             )
 
+    @_synchronized
     def create_project(
         self,
         name: str,
@@ -367,38 +503,94 @@ class ProjectCatalog:
         root_path: str | None = None,
         instructions: str = "",
         memory_policy: str = "project_plus_global",
+        idempotency_key: str | None = None,
         created_at: str | None = None,
-    ) -> str:
+        return_status: bool = False,
+    ) -> str | dict[str, Any]:
+        normalized_name = _required(name, "name")
+        normalized_status = _required(status, "status")
+        normalized_mode = _project_mode(project_mode)
+        normalized_root = str(root_path or "").strip() or None
+        normalized_instructions = str(instructions or "").strip()[:8000]
+        normalized_memory_policy = str(memory_policy or "project_plus_global").strip()
+        normalized_key = _required(idempotency_key, "idempotency_key") if idempotency_key else None
         project_id = project_id or _new_id("project")
-        self.conn.execute(
-            "INSERT INTO projects(project_id, name, status, project_mode, root_path, instructions, memory_policy, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                project_id,
-                _required(name, "name"),
-                _required(status, "status"),
-                _project_mode(project_mode),
-                str(root_path or "").strip() or None,
-                str(instructions or "").strip()[:8000],
-                str(memory_policy or "project_plus_global").strip(),
-                _timestamp(created_at),
-            ),
+        deleted_receipt = self.conn.execute(
+            "SELECT 1 FROM project_deletions WHERE project_id = ? AND status = 'completed'",
+            (project_id,),
+        ).fetchone()
+        if deleted_receipt is not None:
+            raise sqlite3.IntegrityError("project_id was deleted and cannot be reused")
+        insert_sql = (
+            "INSERT INTO projects(project_id, name, status, project_mode, root_path, instructions, "
+            "memory_policy, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
-        self.conn.commit()
-        return project_id
+        insert_values = (
+            project_id,
+            normalized_name,
+            normalized_status,
+            normalized_mode,
+            normalized_root,
+            normalized_instructions,
+            normalized_memory_policy,
+            normalized_key,
+            _timestamp(created_at),
+        )
+        with self.conn:
+            if normalized_key:
+                # Let the unique index serialize concurrent requests.  A
+                # replay is resolved by reselecting the committed winner,
+                # rather than by racing a preliminary SELECT against INSERT.
+                inserted = self.conn.execute(
+                    insert_sql.replace("INSERT INTO", "INSERT OR IGNORE INTO", 1),
+                    insert_values,
+                ).rowcount == 1
+                if not inserted:
+                    row = self.conn.execute(
+                        "SELECT * FROM projects WHERE idempotency_key = ?",
+                        (normalized_key,),
+                    ).fetchone()
+                    if row is not None:
+                        if not _project_row_matches_input(
+                            row,
+                            name=normalized_name,
+                            status=normalized_status,
+                            project_mode=normalized_mode,
+                            root_path=normalized_root,
+                            instructions=normalized_instructions,
+                            memory_policy=normalized_memory_policy,
+                        ):
+                            raise ValueError("idempotency_key is already bound to different project input")
+                        project_id = str(row["project_id"])
+                        return {"project_id": project_id, "replayed": True} if return_status else project_id
+                    # Preserve strict errors for an unrelated constraint,
+                    # such as reusing an explicit project_id.
+                    self.conn.execute(insert_sql, insert_values)
+            else:
+                self.conn.execute(insert_sql, insert_values)
+            return {"project_id": project_id, "replayed": False} if return_status else project_id
 
-    def delete_project(self, project_id: str) -> dict[str, Any] | None:
-        """删除项目目录记录及其级联业务数据，但保留用户项目文件夹。"""
+    @_synchronized
+    def get_project_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
+        key = _required(idempotency_key, "idempotency_key")
+        row = self.conn.execute(
+            "SELECT * FROM projects WHERE idempotency_key = ?",
+            (key,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+    @_synchronized
+    def project_deletion_snapshot(self, project_id: str) -> dict[str, Any] | None:
+        """Return the durable deletion input before any project row is removed."""
         project_id = str(project_id or "").strip()
         if not project_id:
             raise ValueError("project_id is required")
-
         project = self.conn.execute(
             "SELECT project_id, root_path FROM projects WHERE project_id = ?",
             (project_id,),
         ).fetchone()
         if project is None:
             return None
-
         counts = {
             "asset_count": self.conn.execute(
                 "SELECT COUNT(*) FROM assets WHERE project_id = ?", (project_id,)
@@ -445,6 +637,323 @@ class ProjectCatalog:
             ).fetchone()[0],
         }
 
+        return {
+            "project_id": project_id,
+            "root_path": project["root_path"],
+            **{key: int(value) for key, value in counts.items()},
+        }
+
+    @staticmethod
+    def _decode_project_deletion_json(value: str | None) -> dict[str, Any]:
+        try:
+            decoded = json.loads(value or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
+
+    def _project_deletion_record(self, row: sqlite3.Row) -> dict[str, Any]:
+        raw_error = str(row["error"] or "")
+        return {
+            "project_id": row["project_id"],
+            "status": row["status"],
+            "root_path": row["root_path"],
+            "snapshot": self._decode_project_deletion_json(row["snapshot_json"]),
+            "result": self._decode_project_deletion_json(row["result_json"]),
+            "error": "项目删除失败，请查看运行诊断。" if raw_error else "",
+            "error_observation": (
+                project_deletion_error_observation(raw_error) if raw_error else None
+            ),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    @_synchronized
+    def begin_project_deletion(self, project_id: str) -> dict[str, Any] | None:
+        """Create or resume a local durable deletion receipt.
+
+        The receipt intentionally survives the cascading project delete so a
+        retry after a process crash can distinguish an already-completed
+        delete from an unknown project ID.
+        """
+        project_id = str(project_id or "").strip()
+        if not project_id:
+            raise ValueError("project_id is required")
+        now = _timestamp(None)
+        row = self.conn.execute(
+            "SELECT * FROM project_deletions WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        if row is not None:
+            record = self._project_deletion_record(row)
+            if record["status"] == "completed":
+                return record
+            with self.conn:
+                self.conn.execute(
+                    """
+                    UPDATE project_deletions
+                    SET status = 'pending', error = '', updated_at = ?
+                    WHERE project_id = ?
+                    """,
+                    (now, project_id),
+                )
+            row = self.conn.execute(
+                "SELECT * FROM project_deletions WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            return self._project_deletion_record(row)
+
+        snapshot = self.project_deletion_snapshot(project_id)
+        if snapshot is None:
+            # Another process may have created the receipt after the initial
+            # lookup but before the project snapshot was read.
+            row = self.conn.execute(
+                "SELECT * FROM project_deletions WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            return self._project_deletion_record(row) if row is not None else None
+        encoded_snapshot = json.dumps(snapshot, ensure_ascii=False, sort_keys=True)
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO project_deletions(
+                    project_id, status, root_path, snapshot_json, result_json,
+                    error, created_at, updated_at
+                ) VALUES (?, 'pending', ?, ?, '{}', '', ?, ?)
+                ON CONFLICT(project_id) DO NOTHING
+                """,
+                (project_id, snapshot.get("root_path"), encoded_snapshot, now, now),
+            )
+            row = self.conn.execute(
+                "SELECT * FROM project_deletions WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            if row is not None and str(row["status"] or "") != "completed":
+                self.conn.execute(
+                    """
+                    UPDATE project_deletions
+                    SET status = 'pending', error = '', updated_at = ?
+                    WHERE project_id = ? AND status <> 'completed'
+                    """,
+                    (now, project_id),
+                )
+                row = self.conn.execute(
+                    "SELECT * FROM project_deletions WHERE project_id = ?",
+                    (project_id,),
+                ).fetchone()
+        return self._project_deletion_record(row)
+
+    @_synchronized
+    def mark_project_deletion_failed(self, project_id: str, error: str) -> None:
+        now = _timestamp(None)
+        with self.conn:
+            self.conn.execute(
+                """
+                UPDATE project_deletions
+                SET status = 'failed', error = ?, updated_at = ?
+                WHERE project_id = ? AND status <> 'completed'
+                """,
+                (
+                    _serialize_project_deletion_error(error),
+                    now,
+                    str(project_id or "").strip(),
+                ),
+            )
+
+    @_synchronized
+    def complete_project_deletion(self, project_id: str, result: dict[str, Any]) -> None:
+        now = _timestamp(None)
+        encoded_result = json.dumps(result, ensure_ascii=False, sort_keys=True)
+        with self.conn:
+            self.conn.execute(
+                """
+                UPDATE project_deletions
+                SET status = 'completed', result_json = ?, error = '', updated_at = ?
+                WHERE project_id = ?
+                """,
+                (encoded_result, now, str(project_id or "").strip()),
+            )
+
+    @staticmethod
+    def _document_deletion_record(row: sqlite3.Row) -> dict[str, Any]:
+        raw_error = str(row["error"] or "")
+        lease_expires_at = row["lease_expires_at"]
+        return {
+            "idempotency_key": row["idempotency_key"],
+            "name": row["name"],
+            "document_id": row["document_id"],
+            "content_digest": row["content_digest"],
+            "status": row["status"],
+            "owner_id": row["owner_id"],
+            "lease_expires_at": float(lease_expires_at) if lease_expires_at is not None else None,
+            "error_observation": (
+                project_deletion_error_observation(raw_error) if raw_error else None
+            ),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "completed_at": row["completed_at"],
+        }
+
+    @_synchronized
+    def document_deletion_receipt(self, idempotency_key: str) -> dict[str, Any] | None:
+        key = _required(idempotency_key, "idempotency_key")
+        row = self.conn.execute(
+            "SELECT * FROM document_deletion_receipts WHERE idempotency_key = ?",
+            (key,),
+        ).fetchone()
+        return self._document_deletion_record(row) if row is not None else None
+
+    @_synchronized
+    def claim_document_deletion(
+        self,
+        name: str,
+        content_digest: str,
+        idempotency_key: str,
+        *,
+        owner_id: str,
+        document_id: str | None = None,
+        lease_seconds: float = 300.0,
+    ) -> dict[str, Any]:
+        """Durably bind one deletion key to one source version.
+
+        A live claim prevents concurrent retries from deleting two different
+        objects with the same name.  An expired claim can be recovered after a
+        worker crash; the source digest remains the replay/conflict fence.
+        """
+        normalized_name = str(name or "").strip()
+        normalized_document_id = str(document_id or "").strip() or None
+        normalized_digest = str(content_digest or "").strip()
+        key = _required(idempotency_key, "idempotency_key")
+        owner = _required(owner_id, "owner_id")
+        if not normalized_name or not normalized_digest:
+            raise ValueError("document deletion name and content digest are required")
+        now_epoch = time.time()
+        now = _timestamp(None)
+        lease_until = now_epoch + max(30.0, min(float(lease_seconds), 3600.0))
+        with self.conn:
+            row = self.conn.execute(
+                "SELECT * FROM document_deletion_receipts WHERE idempotency_key = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                insert_cursor = self.conn.execute(
+                    """
+                    INSERT INTO document_deletion_receipts(
+                        idempotency_key, name, document_id, content_digest, status, owner_id,
+                        lease_expires_at, error, created_at, updated_at, completed_at
+                    ) VALUES (?, ?, ?, ?, 'in_progress', ?, ?, '', ?, ?, NULL)
+                    ON CONFLICT(idempotency_key) DO NOTHING
+                    """,
+                    (key, normalized_name, normalized_document_id, normalized_digest, owner, lease_until, now, now),
+                )
+                row = self.conn.execute(
+                    "SELECT * FROM document_deletion_receipts WHERE idempotency_key = ?",
+                    (key,),
+                ).fetchone()
+                if row is None:
+                    raise RuntimeError("document deletion receipt disappeared during claim")
+                if insert_cursor.rowcount == 1:
+                    return self._document_deletion_record(row) | {
+                        "claimed": True,
+                        "replayed": False,
+                    }
+
+            if (
+                str(row["name"]) != normalized_name
+                or str(row["content_digest"]) != normalized_digest
+                or (
+                    normalized_document_id
+                    and row["document_id"]
+                    and str(row["document_id"]) != normalized_document_id
+                )
+            ):
+                raise ValueError("idempotency_key is already bound to different document input")
+            status = str(row["status"])
+            if status == "completed":
+                return self._document_deletion_record(row) | {
+                    "claimed": False,
+                    "replayed": True,
+                }
+            existing_lease = float(row["lease_expires_at"] or 0)
+            if status == "in_progress" and existing_lease > now_epoch and str(row["owner_id"] or "") != owner:
+                return self._document_deletion_record(row) | {
+                    "claimed": False,
+                    "replayed": True,
+                }
+            self.conn.execute(
+                """
+                UPDATE document_deletion_receipts
+                SET status = 'in_progress', owner_id = ?, lease_expires_at = ?,
+                    error = '', updated_at = ?, completed_at = NULL
+                WHERE idempotency_key = ?
+                """,
+                (owner, lease_until, now, key),
+            )
+            row = self.conn.execute(
+                "SELECT * FROM document_deletion_receipts WHERE idempotency_key = ?",
+                (key,),
+            ).fetchone()
+            return self._document_deletion_record(row) | {
+                "claimed": True,
+                "replayed": True,
+            }
+
+    @_synchronized
+    def mark_document_deletion_failed(self, idempotency_key: str, owner_id: str, error: Any) -> None:
+        key = _required(idempotency_key, "idempotency_key")
+        owner = _required(owner_id, "owner_id")
+        with self.conn:
+            self.conn.execute(
+                """
+                UPDATE document_deletion_receipts
+                SET status = 'failed', owner_id = NULL, lease_expires_at = NULL,
+                    error = ?, updated_at = ?
+                WHERE idempotency_key = ? AND owner_id = ? AND status = 'in_progress'
+                """,
+                (_serialize_project_deletion_error(error) or '', _timestamp(None), key, owner),
+            )
+
+    @_synchronized
+    def mark_document_deletion_uncertain(self, idempotency_key: str, owner_id: str, error: Any) -> None:
+        key = _required(idempotency_key, "idempotency_key")
+        owner = _required(owner_id, "owner_id")
+        with self.conn:
+            self.conn.execute(
+                """
+                UPDATE document_deletion_receipts
+                SET status = 'uncertain', owner_id = NULL, lease_expires_at = NULL,
+                    error = ?, updated_at = ?
+                WHERE idempotency_key = ? AND owner_id = ? AND status = 'in_progress'
+                """,
+                (_serialize_project_deletion_error(error) or '', _timestamp(None), key, owner),
+            )
+
+    @_synchronized
+    def complete_document_deletion(self, idempotency_key: str, owner_id: str) -> None:
+        key = _required(idempotency_key, "idempotency_key")
+        owner = _required(owner_id, "owner_id")
+        with self.conn:
+            cursor = self.conn.execute(
+                """
+                UPDATE document_deletion_receipts
+                SET status = 'completed', owner_id = NULL, lease_expires_at = NULL,
+                    error = '', updated_at = ?, completed_at = ?
+                WHERE idempotency_key = ? AND owner_id = ? AND status = 'in_progress'
+                """,
+                (_timestamp(None), _timestamp(None), key, owner),
+            )
+        if cursor.rowcount != 1:
+            row = self.document_deletion_receipt(key)
+            if not row or row.get("status") != "completed":
+                raise ValueError("document deletion receipt lease lost")
+
+    @_synchronized
+    def delete_project(self, project_id: str) -> dict[str, Any] | None:
+        """删除项目目录记录及其级联业务数据，但保留用户项目文件夹。"""
+        snapshot = self.project_deletion_snapshot(project_id)
+        if snapshot is None:
+            return None
+        project_id = str(project_id or "").strip()
+
         with self.conn:
             # 联系人是全局通讯录，删除项目时只移除已经失效的项目绑定。
             for row in self.conn.execute(
@@ -462,13 +971,24 @@ class ProjectCatalog:
                     (json.dumps(kept, ensure_ascii=False), row[0]),
                 )
             self.conn.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        return snapshot
 
-        return {
-            "project_id": project_id,
-            "root_path": project["root_path"],
-            **{key: int(value) for key, value in counts.items()},
-        }
+    @_synchronized
+    def get_memory_policy(self, project_id: str) -> str | None:
+        """Return the persisted memory boundary for one project."""
+        project_id = str(project_id or "").strip()
+        if not project_id:
+            return None
+        row = self.conn.execute(
+            "SELECT memory_policy FROM projects WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        policy = str(row["memory_policy"] or "project_plus_global").strip()
+        return policy if policy in {"project_plus_global", "project_only"} else "project_plus_global"
 
+    @_synchronized
     def get_playbook_approval(self, project_id: str, playbook_id: str) -> dict[str, Any] | None:
         row = self.conn.execute(
             "SELECT project_id, playbook_id, playbook_version, status, reviewed_at "
@@ -477,6 +997,7 @@ class ProjectCatalog:
         ).fetchone()
         return dict(row) if row is not None else None
 
+    @_synchronized
     def list_playbook_approvals(self, project_id: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             "SELECT project_id, playbook_id, playbook_version, status, reviewed_at "
@@ -485,6 +1006,7 @@ class ProjectCatalog:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    @_synchronized
     def set_playbook_approval(
         self,
         project_id: str,
@@ -524,6 +1046,7 @@ class ProjectCatalog:
             )
         return record
 
+    @_synchronized
     def create_asset(
         self,
         project_id: str,
@@ -552,6 +1075,7 @@ class ProjectCatalog:
         self.conn.commit()
         return asset_id
 
+    @_synchronized
     def create_asset_version(
         self,
         asset_id: str,
@@ -586,6 +1110,7 @@ class ProjectCatalog:
         self.conn.commit()
         return version_id
 
+    @_synchronized
     def register_imported_document(
         self,
         project_id: str,
@@ -658,6 +1183,7 @@ class ProjectCatalog:
             "status": "registered",
         }
 
+    @_synchronized
     def find_imported_document_bindings(self, file_ref: str, *, content_hash: str | None = None) -> list[dict[str, Any]]:
         """列出一个导入文档当前绑定的项目，供范围审计与安全归类使用。"""
         normalized_ref = _normalize_file_ref(file_ref)
@@ -685,6 +1211,7 @@ class ProjectCatalog:
             bindings.append(item)
         return bindings
 
+    @_synchronized
     def unbind_imported_document(self, file_ref: str, content_hash: str) -> dict[str, Any]:
         """将无外部证据引用的导入文档解除项目绑定，保留原始文档本体。"""
         bindings = self.find_imported_document_bindings(file_ref, content_hash=content_hash)
@@ -734,6 +1261,7 @@ class ProjectCatalog:
             "version_ids": version_ids,
         }
 
+    @_synchronized
     def create_experiment(
         self,
         project_id: str,
@@ -750,6 +1278,7 @@ class ProjectCatalog:
         self.conn.commit()
         return experiment_id
 
+    @_synchronized
     def create_experiment_run(
         self,
         experiment_id: str,
@@ -784,6 +1313,7 @@ class ProjectCatalog:
         self.conn.commit()
         return run_id
 
+    @_synchronized
     def create_metric_definition(
         self,
         name: str,
@@ -814,6 +1344,7 @@ class ProjectCatalog:
         self.conn.commit()
         return metric_id
 
+    @_synchronized
     def record_measurement(
         self,
         run_id: str,
@@ -919,6 +1450,7 @@ class ProjectCatalog:
         )
         self.conn.commit()
 
+    @_synchronized
     def list_measurement_revisions(
         self,
         run_id: str,
@@ -946,6 +1478,7 @@ class ProjectCatalog:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    @_synchronized
     def get_experiment_run(self, run_id: str) -> dict[str, Any] | None:
         row = self.conn.execute(
             """
@@ -981,6 +1514,7 @@ class ProjectCatalog:
         ]
         return item
 
+    @_synchronized
     def list_experiment_runs(
         self,
         project_id: str,
@@ -1006,6 +1540,7 @@ class ProjectCatalog:
         ).fetchall()
         return [item for row in rows if (item := self.get_experiment_run(str(row[0]))) is not None]
 
+    @_synchronized
     def find_current_versions(
         self,
         project_id: str,
@@ -1053,45 +1588,64 @@ class ProjectCatalog:
             current.append(item)
         return current
 
+    @_synchronized
     def find_asset_version_for_file(
         self,
         file_ref: str,
         *,
         content_hash: str | None = None,
+        project_id: str | None = None,
     ) -> dict[str, Any] | None:
-        """Resolve one indexed file to its project identity when the catalog has it."""
+        """Resolve one indexed file, optionally inside one project boundary."""
         normalized = str(file_ref or "").replace("\\", "/").lstrip("./")
         hash_clause = " AND v.content_hash = ?" if content_hash else ""
+        project_clause = " AND a.project_id = ?" if project_id else ""
         exact_params: list[Any] = [normalized]
         if content_hash:
             exact_params.append(str(content_hash))
+        if project_id:
+            exact_params.append(str(project_id))
         row = self.conn.execute(
             f"""
             SELECT a.project_id, a.asset_id, a.asset_type, a.title,
                    v.version_id, v.valid_from, v.authored_at, v.imported_at,
-                   v.file_ref, v.metadata_json
+                   v.file_ref, v.content_hash, v.metadata_json
             FROM asset_versions v
             JOIN assets a ON a.asset_id = v.asset_id
-            WHERE replace(v.file_ref, '\\', '/') = ?{hash_clause}
+            WHERE replace(v.file_ref, '\\', '/') = ?{hash_clause}{project_clause}
             ORDER BY v.valid_from DESC, v.version_id DESC
             LIMIT 1
             """,
             exact_params,
         ).fetchone()
         if row is None:
+            known_exact = self.conn.execute(
+                f"""
+                SELECT 1 FROM asset_versions v JOIN assets a ON a.asset_id = v.asset_id
+                WHERE replace(v.file_ref, '\\', '/') = ?{project_clause}
+                LIMIT 1
+                """,
+                [normalized, *([str(project_id)] if project_id else [])],
+            ).fetchone()
+            if known_exact is not None:
+                # A known source with changed bytes is not a different same-named asset.
+                return None
             basename = os.path.basename(normalized)
             fallback_params: list[Any] = [f"%/{basename}", basename]
             if content_hash:
                 fallback_params.append(str(content_hash))
+            if project_id:
+                fallback_params.append(str(project_id))
             rows = self.conn.execute(
                 f"""
                 SELECT a.project_id, a.asset_id, a.asset_type, a.title,
                        v.version_id, v.valid_from, v.authored_at, v.imported_at,
-                       v.file_ref, v.metadata_json
+                       v.file_ref, v.content_hash, v.metadata_json
                 FROM asset_versions v
                 JOIN assets a ON a.asset_id = v.asset_id
                 WHERE (replace(v.file_ref, '\\', '/') LIKE ? OR replace(v.file_ref, '\\', '/') = ?)
                   {('AND v.content_hash = ?' if content_hash else '')}
+                  {('AND a.project_id = ?' if project_id else '')}
                 ORDER BY v.valid_from DESC, v.version_id DESC
                 """,
                 fallback_params,
@@ -1103,6 +1657,7 @@ class ProjectCatalog:
         item["metadata"] = json.loads(item.pop("metadata_json") or "{}")
         return item
 
+    @_synchronized
     def create_contact(
         self,
         display_name: str,
@@ -1111,11 +1666,15 @@ class ProjectCatalog:
         aliases: list[str] | None = None,
         project_ids: list[str] | None = None,
         contact_id: str | None = None,
-    ) -> str:
+        return_status: bool = False,
+    ) -> str | dict[str, Any]:
         """Store a user-confirmed local contact; this is not an employee directory."""
         display_name = _required(display_name, "display_name")
         email = _required(email, "email")
-        if "@" not in email or any(character.isspace() for character in email):
+        if "@" not in email or any(
+            character.isspace() or ord(character) < 0x20 or ord(character) == 0x7F
+            for character in email
+        ):
             raise ValueError("email must be a local contact address")
         aliases = _clean_list(aliases, 12, 120)
         project_ids = _clean_list(project_ids, 24, 128)
@@ -1146,7 +1705,8 @@ class ProjectCatalog:
                 ),
             )
             self.conn.commit()
-            return str(existing["contact_id"])
+            contact_id = str(existing["contact_id"])
+            return {"contact_id": contact_id, "replayed": True} if return_status else contact_id
 
         contact_id = contact_id or _new_id("contact")
         self.conn.execute(
@@ -1163,12 +1723,14 @@ class ProjectCatalog:
             ),
         )
         self.conn.commit()
-        return contact_id
+        return {"contact_id": contact_id, "replayed": False} if return_status else contact_id
 
+    @_synchronized
     def resolve_contacts(self, query: str, *, project_id: str | None = None) -> list[dict[str, Any]]:
         query = _required(query, "query").casefold()
         rows = self.conn.execute(
-            "SELECT contact_id, display_name, aliases_json, email, project_ids_json FROM contacts ORDER BY display_name"
+            "SELECT contact_id, display_name, aliases_json, email, project_ids_json "
+            "FROM contacts ORDER BY display_name, contact_id"
         ).fetchall()
         matches: list[dict[str, Any]] = []
         for row in rows:
@@ -1193,11 +1755,20 @@ class ProjectCatalog:
                     "project_ids": project_ids,
                     "match_score": score,
                 })
-        return sorted(matches, key=lambda item: (-item["match_score"], item["display_name"].casefold()))
+        return sorted(
+            matches,
+            key=lambda item: (
+                -item["match_score"],
+                item["display_name"].casefold(),
+                item["contact_id"],
+            ),
+        )
 
+    @_synchronized
     def list_contacts(self, *, project_id: str | None = None) -> list[dict[str, Any]]:
         rows = self.conn.execute(
-            "SELECT contact_id, display_name, aliases_json, email, project_ids_json FROM contacts ORDER BY display_name"
+            "SELECT contact_id, display_name, aliases_json, email, project_ids_json "
+            "FROM contacts ORDER BY display_name, contact_id"
         ).fetchall()
         contacts = []
         for row in rows:
@@ -1214,11 +1785,13 @@ class ProjectCatalog:
             })
         return contacts
 
+    @_synchronized
     def delete_contact(self, contact_id: str) -> bool:
         with self.conn:
             cursor = self.conn.execute("DELETE FROM contacts WHERE contact_id = ?", (_required(contact_id, "contact_id"),))
         return cursor.rowcount > 0
 
+    @_synchronized
     def create_artifact(
         self,
         project_id: str | None,
@@ -1231,51 +1804,86 @@ class ProjectCatalog:
         confirmation_record: dict[str, Any] | None = None,
         change_summary: str = "",
         artifact_id: str | None = None,
-    ) -> str:
-        if idempotency_key:
-            row = self.conn.execute(
-                "SELECT artifact_id FROM artifacts WHERE idempotency_key = ?",
-                (_required(idempotency_key, "idempotency_key"),),
-            ).fetchone()
-            if row is not None:
-                return str(row[0])
-        artifact_id = artifact_id or _new_id("artifact")
+        return_status: bool = False,
+    ) -> str | dict[str, Any]:
         if not isinstance(plan, dict):
             raise ValueError("artifact plan must be an object")
         if confirmation_record is not None and not isinstance(confirmation_record, dict):
             raise ValueError("confirmation_record must be an object")
+        normalized_project_id = (
+            str(project_id).strip()
+            if project_id is not None and str(project_id).strip()
+            else None
+        )
+        normalized_artifact_type = _required(artifact_type, "artifact_type")
+        normalized_source_version_ids = _clean_list(source_version_ids, 64, 160)
+        normalized_confirmation_status = _required(confirmation_status, "confirmation_status")
+        normalized_idempotency_key = (
+            _required(idempotency_key, "idempotency_key") if idempotency_key else None
+        )
+        input_digest = _artifact_input_digest(
+            normalized_project_id,
+            normalized_artifact_type,
+            plan,
+            normalized_source_version_ids,
+            normalized_confirmation_status,
+        )
+
+        artifact_id = artifact_id or _new_id("artifact")
         created_at = _timestamp(None)
         record = dict(confirmation_record or {})
-        record.setdefault("status", confirmation_status)
+        record.setdefault("status", normalized_confirmation_status)
         record.setdefault("required", bool(plan.get("requires_user_confirmation", False)))
         record.setdefault("recorded_at", created_at)
         summary = str(change_summary or "").strip()[:2000]
         if not summary:
             summary = "首次创建；无前一版本可比较。"
-        self.conn.execute(
-            """
+        insert_sql = """
             INSERT INTO artifacts(
                 artifact_id, project_id, artifact_type, idempotency_key, source_version_ids_json,
                 plan_json, confirmation_status, confirmation_record_json,
                 change_summary, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                artifact_id,
-                str(project_id).strip() if project_id is not None and str(project_id).strip() else None,
-                _required(artifact_type, "artifact_type"),
-                _required(idempotency_key, "idempotency_key") if idempotency_key else None,
-                json.dumps(_clean_list(source_version_ids, 64, 160), ensure_ascii=False),
-                json.dumps(plan, ensure_ascii=False, sort_keys=True),
-                _required(confirmation_status, "confirmation_status"),
-                json.dumps(record, ensure_ascii=False, sort_keys=True),
-                summary,
-                created_at,
-            ),
+        """
+        insert_values = (
+            artifact_id,
+            normalized_project_id,
+            normalized_artifact_type,
+            normalized_idempotency_key,
+            json.dumps(normalized_source_version_ids, ensure_ascii=False),
+            json.dumps(plan, ensure_ascii=False, sort_keys=True),
+            normalized_confirmation_status,
+            json.dumps(record, ensure_ascii=False, sort_keys=True),
+            summary,
+            created_at,
         )
-        self.conn.commit()
-        return artifact_id
+        with self.conn:
+            if normalized_idempotency_key:
+                # The unique idempotency index is the single serialization
+                # point for concurrent artifact creation.
+                inserted = self.conn.execute(
+                    insert_sql.replace("INSERT INTO", "INSERT OR IGNORE INTO", 1),
+                    insert_values,
+                ).rowcount == 1
+                if not inserted:
+                    row = self.conn.execute(
+                        "SELECT artifact_id, project_id, artifact_type, source_version_ids_json, plan_json, confirmation_status "
+                        "FROM artifacts WHERE idempotency_key = ?",
+                        (normalized_idempotency_key,),
+                    ).fetchone()
+                    if row is not None:
+                        if _artifact_row_input_digest(row) != input_digest:
+                            raise ValueError("idempotency_key is already bound to different artifact input")
+                        artifact_id = str(row["artifact_id"])
+                        return {"artifact_id": artifact_id, "replayed": True} if return_status else artifact_id
+                    # Preserve strict errors for an unrelated constraint,
+                    # such as an explicitly reused artifact_id.
+                    self.conn.execute(insert_sql, insert_values)
+            else:
+                self.conn.execute(insert_sql, insert_values)
+            return {"artifact_id": artifact_id, "replayed": False} if return_status else artifact_id
 
+    @_synchronized
     def get_artifact(self, artifact_id: str) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,)).fetchone()
         if row is None:
@@ -1290,6 +1898,15 @@ class ProjectCatalog:
         item["confirmation_record"] = confirmation_record if isinstance(confirmation_record, dict) else {}
         return item
 
+    @_synchronized
+    def get_artifact_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT artifact_id FROM artifacts WHERE idempotency_key = ?",
+            (_required(idempotency_key, "idempotency_key"),),
+        ).fetchone()
+        return self.get_artifact(str(row[0])) if row is not None else None
+
+    @_synchronized
     def list_artifacts(self, project_id: str | None, *, artifact_type: str | None = None) -> list[dict[str, Any]]:
         query = ["SELECT artifact_id FROM artifacts WHERE project_id IS NULL"] if project_id is None else ["SELECT artifact_id FROM artifacts WHERE project_id = ?"]
         params: list[Any] = [] if project_id is None else [project_id]
@@ -1300,6 +1917,25 @@ class ProjectCatalog:
         rows = self.conn.execute(" ".join(query), tuple(params)).fetchall()
         return [artifact for row in rows if (artifact := self.get_artifact(row[0])) is not None]
 
+    @_synchronized
+    def list_schedule_history(self, *, days: int = 7, limit: int = 100) -> list[dict[str, Any]]:
+        """Return recently created schedule records, including elapsed/cancelled items."""
+        days = max(1, min(int(days), 31))
+        limit = max(1, min(int(limit), 200))
+        created_after = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        rows = self.conn.execute(
+            """
+            SELECT artifact_id
+            FROM artifacts
+            WHERE artifact_type = ? AND created_at >= ?
+            ORDER BY created_at DESC, artifact_id DESC
+            LIMIT ?
+            """,
+            ("schedule_draft", created_after, limit),
+        ).fetchall()
+        return [artifact for row in rows if (artifact := self.get_artifact(row[0])) is not None]
+
+    @_synchronized
     def set_artifact_status(self, artifact_id: str, status: str) -> dict[str, Any] | None:
         if status not in {"draft", "confirmed", "cancelled"}:
             raise ValueError("unsupported artifact confirmation status")
@@ -1319,6 +1955,7 @@ class ProjectCatalog:
         self.conn.commit()
         return self.get_artifact(artifact_id)
 
+    @_synchronized
     def update_artifact_provenance(
         self,
         artifact_id: str,
@@ -1364,36 +2001,165 @@ class ProjectCatalog:
         self.conn.commit()
         return self.get_artifact(artifact_id)
 
-    def reserve_email_delivery(self, artifact_id: str, idempotency_key: str) -> str:
-        row = self.conn.execute("SELECT status FROM email_deliveries WHERE artifact_id = ?", (artifact_id,)).fetchone()
-        if row is not None:
-            if row["status"] == "failed":
-                self.conn.execute(
-                    "UPDATE email_deliveries SET idempotency_key = ?, status = 'sending', sent_at = NULL, detail_json = '{}' WHERE artifact_id = ?",
-                    (_required(idempotency_key, "idempotency_key"), artifact_id),
-                )
-                self.conn.commit()
-                return "reserved"
-            return str(row["status"])
-        self.conn.execute(
-            "INSERT INTO email_deliveries(artifact_id, idempotency_key, status) VALUES (?, ?, 'sending')",
-            (_required(artifact_id, "artifact_id"), _required(idempotency_key, "idempotency_key")),
-        )
-        self.conn.commit()
-        return "reserved"
+    @_synchronized
+    def reserve_email_delivery(
+        self,
+        artifact_id: str,
+        idempotency_key: str,
+        *,
+        request_digest: str | None = None,
+    ) -> str:
+        normalized_artifact_id = _required(artifact_id, "artifact_id")
+        normalized_key = _required(idempotency_key, "idempotency_key")
+        normalized_digest = str(request_digest or "").strip() or None
+        # Serialize the check-and-reserve pair across local processes.  A
+        # plain SELECT followed by INSERT lets two concurrent send requests
+        # both observe an empty row and turns the loser into a SQLite UNIQUE
+        # constraint error instead of a deterministic idempotency outcome.
+        with self.conn:
+            self.conn.execute("BEGIN IMMEDIATE")
+            key_row = self.conn.execute(
+                "SELECT artifact_id FROM email_deliveries WHERE idempotency_key = ?",
+                (normalized_key,),
+            ).fetchone()
+            if key_row is not None and str(key_row["artifact_id"]) != normalized_artifact_id:
+                return "conflict"
 
+            row = self.conn.execute(
+                "SELECT status, idempotency_key, detail_json FROM email_deliveries WHERE artifact_id = ?",
+                (normalized_artifact_id,),
+            ).fetchone()
+            if row is not None:
+                try:
+                    stored_detail = json.loads(row["detail_json"] or "{}")
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    stored_detail = {}
+                if not isinstance(stored_detail, dict):
+                    stored_detail = {}
+                stored_digest = str(stored_detail.get("request_digest") or "").strip() or None
+                if (
+                    str(row["idempotency_key"]) == normalized_key
+                    and normalized_digest
+                    and stored_digest
+                    and stored_digest != normalized_digest
+                ):
+                    return "conflict"
+                if row["status"] == "failed":
+                    # A failed delivery is an explicit retry boundary.  Reusing
+                    # the original key is preferred, but a caller may provide a
+                    # new key to acknowledge a new external attempt.  The key is
+                    # still rejected when it belongs to another artifact.
+                    self.conn.execute(
+                        "UPDATE email_deliveries SET idempotency_key = ?, status = 'sending', sent_at = NULL, detail_json = ? WHERE artifact_id = ?",
+                        (
+                            normalized_key,
+                            json.dumps(
+                                {"request_digest": normalized_digest} if normalized_digest else {},
+                                ensure_ascii=False,
+                                sort_keys=True,
+                            ),
+                            normalized_artifact_id,
+                        ),
+                    )
+                    return "reserved"
+                if str(row["idempotency_key"]) != normalized_key:
+                    return "conflict"
+                if normalized_digest and not stored_digest:
+                    stored_detail["request_digest"] = normalized_digest
+                    self.conn.execute(
+                        "UPDATE email_deliveries SET detail_json = ? WHERE artifact_id = ?",
+                        (json.dumps(stored_detail, ensure_ascii=False, sort_keys=True), normalized_artifact_id),
+                    )
+                if row["status"] == "sending":
+                    # The external provider may already have accepted the
+                    # message while the local terminal receipt is missing.
+                    # Treat this as uncertain rather than permitting a
+                    # duplicate send under the same key.
+                    return "uncertain"
+                return str(row["status"])
+            self.conn.execute(
+                "INSERT INTO email_deliveries(artifact_id, idempotency_key, status, detail_json) VALUES (?, ?, 'sending', ?)",
+                (
+                    normalized_artifact_id,
+                    normalized_key,
+                    json.dumps(
+                        {"request_digest": normalized_digest} if normalized_digest else {},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                ),
+            )
+            return "reserved"
+
+    @_synchronized
     def finish_email_delivery(self, artifact_id: str, status: str, detail: dict[str, Any]) -> None:
-        if status not in {"sent", "failed"}:
+        if status not in {"sent", "failed", "uncertain"}:
             raise ValueError("unsupported delivery status")
+        existing = self.conn.execute(
+            "SELECT detail_json FROM email_deliveries WHERE artifact_id = ?",
+            (artifact_id,),
+        ).fetchone()
+        try:
+            merged_detail = json.loads(existing["detail_json"] or "{}") if existing is not None else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            merged_detail = {}
+        if not isinstance(merged_detail, dict):
+            merged_detail = {}
+        merged_detail.update(detail if isinstance(detail, dict) else {})
         self.conn.execute(
             "UPDATE email_deliveries SET status = ?, sent_at = ?, detail_json = ? WHERE artifact_id = ?",
-            (status, _timestamp(None) if status == "sent" else None, json.dumps(detail, ensure_ascii=False), artifact_id),
+            (
+                status,
+                _timestamp(None) if status == "sent" else None,
+                json.dumps(merged_detail, ensure_ascii=False, sort_keys=True),
+                artifact_id,
+            ),
         )
         self.conn.commit()
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex}"
+
+
+def _artifact_input_digest(
+    project_id: str | None,
+    artifact_type: str,
+    plan: dict[str, Any],
+    source_version_ids: list[str],
+    confirmation_status: str,
+) -> str:
+    payload = {
+        "project_id": project_id,
+        "artifact_type": artifact_type,
+        "plan": plan,
+        "source_version_ids": source_version_ids,
+        "confirmation_status": confirmation_status,
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _artifact_row_input_digest(row: sqlite3.Row) -> str:
+    try:
+        source_version_ids = json.loads(row["source_version_ids_json"] or "[]")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        source_version_ids = []
+    if not isinstance(source_version_ids, list):
+        source_version_ids = []
+    try:
+        plan = json.loads(row["plan_json"] or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        plan = {}
+    if not isinstance(plan, dict):
+        plan = {}
+    return _artifact_input_digest(
+        str(row["project_id"] or "").strip() or None,
+        str(row["artifact_type"] or "").strip(),
+        plan,
+        [str(item) for item in source_version_ids],
+        str(row["confirmation_status"] or "").strip(),
+    )
 
 
 def _required(value: Any, name: str) -> str:
@@ -1408,6 +2174,26 @@ def _project_mode(value: str) -> str:
     if mode not in PROJECT_MODES:
         raise ValueError("project_mode must be research or business")
     return mode
+
+
+def _project_row_matches_input(
+    row,
+    *,
+    name: str,
+    status: str,
+    project_mode: str,
+    root_path: str | None,
+    instructions: str,
+    memory_policy: str,
+) -> bool:
+    return (
+        str(row["name"] or "") == name
+        and str(row["status"] or "") == status
+        and str(row["project_mode"] or "") == project_mode
+        and (str(row["root_path"] or "").strip() or None) == root_path
+        and str(row["instructions"] or "") == instructions
+        and str(row["memory_policy"] or "") == memory_policy
+    )
 
 
 def _timestamp(value: str | None) -> str:

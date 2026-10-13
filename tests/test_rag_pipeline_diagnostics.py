@@ -190,6 +190,39 @@ class RagPipelineDiagnosticsTests(unittest.TestCase):
         self.assertTrue(scan["3"]["any_hit"])
         self.assertEqual(scan["3"]["source_coverage"], 1.0)
 
+    def test_stage_identity_evaluation_rejects_legacy_source_and_keeps_runtime_id(self):
+        result = diagnose_rag_pipeline.build_stage_result(
+            expected_sources=["安全治理标准"],
+            candidates=[
+                {
+                    "candidate_id": "candidate-old",
+                    "source_filename": "安全治理标准-旧版.pdf",
+                    "document_id": "asset-runtime-old",
+                }
+            ],
+            expected_document_ids=["SDOC-001"],
+        )
+
+        self.assertFalse(result["any_hit"])
+        self.assertEqual(result["missing_sources"], ["安全治理标准"])
+        self.assertEqual(result["top_document_ids"], ["asset-runtime-old"])
+
+    def test_stage_identity_evaluation_accepts_exact_source_with_runtime_id(self):
+        result = diagnose_rag_pipeline.build_stage_result(
+            expected_sources=["安全治理标准"],
+            candidates=[
+                {
+                    "candidate_id": "candidate-current",
+                    "source_filename": "安全治理标准.pdf",
+                    "document_id": "asset-runtime-current",
+                }
+            ],
+            expected_document_ids=["SDOC-001"],
+        )
+
+        self.assertTrue(result["any_hit"])
+        self.assertEqual(result["hit_sources"], ["安全治理标准"])
+
     def test_report_summarizes_recall_depth_and_final_k_scans(self):
         sample = _sample(
             "Q1",

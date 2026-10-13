@@ -259,16 +259,18 @@ def score_record(record: dict[str, Any], chunks: list[ChunkRecord]) -> dict[str,
     required_metadata = [str(item) for item in record.get("required_metadata", [])]
     required_modalities = [str(item) for item in record.get("required_modalities", [])]
     source_filename = str(record.get("source_filename") or "")
+    expected_document_id = str(
+        record.get("evaluation_doc_id")
+        or record.get("doc_id")
+        or ""
+    ).strip()
     matched_chunks = [
         chunk
         for chunk in chunks
-        if source_matches(
-            str(
-                chunk.metadata.get("source_filename")
-                or chunk.metadata.get("document_title")
-                or ""
-            ),
+        if chunk_matches_record_document(
+            chunk,
             source_filename,
+            expected_document_id,
         )
     ]
     min_chunk_count = int(record.get("min_chunk_count") or 1)
@@ -359,6 +361,8 @@ def score_record(record: dict[str, Any], chunks: list[ChunkRecord]) -> dict[str,
     return {
         "id": str(record.get("id") or ""),
         "source_filename": source_filename,
+        "expected_document_id": expected_document_id,
+        "document_identity_required": bool(expected_document_id),
         "document_class": str(record.get("document_class") or ""),
         "evaluation_scope": str(record.get("evaluation_scope") or "unknown"),
         "difficulty": str(record.get("difficulty") or "unknown"),
@@ -423,6 +427,35 @@ def source_matches(source_filename: str, expected_filename: str) -> bool:
     if not source_filename or not expected_filename:
         return False
     return eval_rag.source_matches(source_filename, expected_filename) or eval_rag.source_matches(expected_filename, source_filename)
+
+
+def chunk_matches_record_document(
+    chunk: ChunkRecord,
+    expected_filename: str,
+    expected_document_id: str,
+) -> bool:
+    metadata = chunk.metadata
+    explicit_evaluation_id = next(
+        (
+            str(metadata.get(key) or "").strip()
+            for key in ("evaluation_doc_id", "corpus_doc_id", "gold_document_id")
+            if str(metadata.get(key) or "").strip()
+        ),
+        "",
+    )
+    if expected_document_id and explicit_evaluation_id:
+        return explicit_evaluation_id == expected_document_id
+
+    source_value = str(metadata.get("source_filename") or "").strip()
+    if expected_document_id:
+        if not source_value:
+            return False
+        return eval_rag.source_matches_exact(source_value, expected_filename)
+
+    return source_matches(
+        source_value or str(metadata.get("document_title") or ""),
+        expected_filename,
+    )
 
 
 def chunk_has_page(chunk: ChunkRecord) -> bool:

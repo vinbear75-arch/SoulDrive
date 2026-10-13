@@ -206,6 +206,36 @@ class CloudModelTests(unittest.TestCase):
         )
         self.assertNotIn("test-key", response.text)
 
+    def test_config_endpoint_keeps_saved_config_when_audit_fails(self):
+        config = CloudModelConfig("https://api.example.com/v1", "test-key", "model-a", True, ("model-a",))
+        saver = Mock(return_value=config)
+
+        class FailingAuditLogger:
+            def append_event(self, *_args, **_kwargs):
+                raise OSError("audit sink failed for secret-api-key")
+
+        with patch.dict(os.environ, {"SOULDRIVE_API_TOKEN": "test-token"}, clear=False), patch.object(
+            mcp_server, "effective_runtime_state", return_value={"locked": False, "software_unlocked": True}
+        ), patch.object(mcp_server, "save_cloud_model_config", saver), patch.object(
+            mcp_server, "current_audit_logger", return_value=FailingAuditLogger()
+        ), patch.object(mcp_server, "rag", None):
+            response = TestClient(mcp_server.app).post(
+                "/cloud-model/config",
+                headers={"X-SoulDrive-Token": "test-token"},
+                json={
+                    "base_url": "https://api.example.com/v1",
+                    "api_key": "secret-api-key",
+                    "model": "model-a",
+                    "enabled": True,
+                    "models": ["model-a"],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["model"], "model-a")
+        self.assertIn("审计记录写入失败", response.json()["warning"])
+        self.assertNotIn("secret-api-key", response.text)
+
 
 if __name__ == "__main__":
     unittest.main()

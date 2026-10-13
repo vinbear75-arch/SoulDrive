@@ -1,6 +1,11 @@
 import unittest
 
-from core.query_expansion import expand_query_variants, query_requires_source_diversity
+from core.context_gate import plan_retrieval
+from core.query_expansion import (
+    expand_query_variants,
+    query_requires_source_diversity,
+    split_comparison_query,
+)
 
 
 class QueryExpansionTests(unittest.TestCase):
@@ -53,6 +58,23 @@ class QueryExpansionTests(unittest.TestCase):
         self.assertTrue(query_requires_source_diversity("分别说明两个方案的风险与收益"))
         self.assertFalse(query_requires_source_diversity("说明项目方案的建设目标"))
         self.assertFalse(query_requires_source_diversity("验收指标值和完成期限分别是多少"))
+
+    def test_query_requires_source_diversity_does_not_misclassify_single_document_rule(self):
+        self.assertFalse(query_requires_source_diversity("实验指标在什么条件下可以比较？"))
+
+    def test_comparison_without_document_count_suffix_still_produces_subqueries(self):
+        query = "请对比项目A与项目B的安全风险"
+
+        self.assertEqual(
+            split_comparison_query(query),
+            ["项目A 核心证据", "项目B 核心证据"],
+        )
+        plan = plan_retrieval(query)
+        self.assertEqual(plan.action, "decompose")
+        self.assertEqual(plan.subqueries, ("项目A 核心证据", "项目B 核心证据"))
+        variants = expand_query_variants(query)
+        self.assertIn("项目A 核心证据", variants)
+        self.assertIn("项目B 核心证据", variants)
 
     def test_expand_query_variants_covers_strict_retrieval_eval_terms(self):
         cases = [

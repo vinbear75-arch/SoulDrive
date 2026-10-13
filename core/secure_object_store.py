@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
@@ -36,7 +37,8 @@ class SecureObjectStore:
             "ciphertext": _b64(ciphertext),
         }
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(envelope, ensure_ascii=False), encoding="utf-8")
+        payload = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
+        _atomic_write_bytes(path, payload)
         return path
 
     def read_bytes(self, object_id: str) -> bytes:
@@ -84,3 +86,29 @@ def _b64(value: bytes) -> str:
 
 def _unb64(value: str) -> bytes:
     return base64.b64decode(value.encode("ascii"))
+
+
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    """Keep an authenticated object either old and readable or fully replaced."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w+b",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(payload)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass

@@ -32,13 +32,14 @@ class LlamaRuntimeConfig:
     model_filename: str = DEFAULT_CHAT_MODEL
     chat_n_ctx: int = 8192
     graph_n_ctx: int = 4096
-    temperature: float = 0.01
+    temperature: float = 0.0
     top_p: float = 0.85
     repeat_penalty: float = 1.12
     max_tokens: int = 900
     graph_temperature: float = 0.1
     graph_max_tokens: int = 2048
     graph_repeat_penalty: float = 1.1
+    seed: int = 42
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +53,7 @@ class LlamaRuntimeConfig:
             "graph_temperature": self.graph_temperature,
             "graph_max_tokens": self.graph_max_tokens,
             "graph_repeat_penalty": self.graph_repeat_penalty,
+            "seed": self.seed,
         }
 
 
@@ -61,13 +63,14 @@ def llama_runtime_config(workspace_path: str | None = None) -> LlamaRuntimeConfi
         model_filename=model_filename,
         chat_n_ctx=_bounded_int("SOULDRIVE_LLAMA_CHAT_CTX", 8192, 1024, 32768),
         graph_n_ctx=_bounded_int("SOULDRIVE_LLAMA_GRAPH_CTX", 8192, 1024, 16384),
-        temperature=_bounded_float("SOULDRIVE_LLAMA_TEMPERATURE", 0.01, 0.0, 1.0),
+        temperature=_bounded_float("SOULDRIVE_LLAMA_TEMPERATURE", 0.0, 0.0, 1.0),
         top_p=_bounded_float("SOULDRIVE_LLAMA_TOP_P", 0.85, 0.05, 1.0),
         repeat_penalty=_bounded_float("SOULDRIVE_LLAMA_REPEAT_PENALTY", 1.12, 1.0, 2.0),
         max_tokens=_bounded_int("SOULDRIVE_LLAMA_MAX_TOKENS", 900, 128, 4096),
         graph_temperature=_bounded_float("SOULDRIVE_GRAPH_TEMPERATURE", 0.1, 0.0, 1.0),
         graph_max_tokens=_bounded_int("SOULDRIVE_GRAPH_MAX_TOKENS", 2048, 256, 4096),
         graph_repeat_penalty=_bounded_float("SOULDRIVE_GRAPH_REPEAT_PENALTY", 1.1, 1.0, 2.0),
+        seed=_bounded_int("SOULDRIVE_LLAMA_SEED", 42, 0, 2_147_483_647),
     )
 
 

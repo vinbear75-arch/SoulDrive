@@ -100,6 +100,39 @@ class LearningEvalTests(unittest.TestCase):
 
         self.assertLess(comparison["baseline"]["summary"]["pass_rate"], comparison["runtime"]["summary"]["pass_rate"])
 
+    def test_seeded_runtime_scopes_procedural_skills_to_workflow(self):
+        records = [
+            {
+                "id": "SCOPE-01",
+                "metric": "procedural_memory_scope",
+                "workflow_id": "paper_review",
+                "setup_assets": [
+                    {
+                        "asset_type": "skill",
+                        "subtype": "sop",
+                        "title": "Meeting actions",
+                        "content": "Extract meeting decisions and action items.",
+                        "workflow_ids": ["meeting_actions"],
+                    },
+                    {
+                        "asset_type": "skill",
+                        "subtype": "sop",
+                        "title": "Paper review",
+                        "content": "Extract paper methods and citations.",
+                        "workflow_ids": ["paper_review"],
+                    },
+                ],
+                "query": "Extract paper methods and action items",
+                "expected_keywords": ["Paper review", "Extract paper methods"],
+                "forbidden_keywords": ["Meeting actions", "meeting decisions"],
+            }
+        ]
+
+        [result] = eval_learning_loop.run_seeded_runtime(records)
+
+        self.assertTrue(result["score"]["passed"])
+        self.assertEqual(result["matched_skill_ids"], ["Paper review"])
+
 
 if __name__ == "__main__":
     unittest.main()

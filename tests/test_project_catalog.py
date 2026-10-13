@@ -1,9 +1,22 @@
+from concurrent.futures import ThreadPoolExecutor
+import json
 import sqlite3
 import tempfile
+import threading
+import time
 from pathlib import Path
+from unittest.mock import patch
 
-from core.project_catalog import ProjectCatalog, SCHEMA_VERSION
+from core.project_catalog import ProjectCatalog, SCHEMA_VERSION, project_deletion_error_observation
 from core.workspace import SoulDriveWorkspace
+
+
+def _capture_exception(function, *args):
+    try:
+        function(*args)
+    except Exception as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return None
 
 
 def _catalog():
@@ -33,9 +46,44 @@ def test_catalog_creates_versioned_project_schema():
             "playbook_approvals",
             "contacts",
             "artifacts",
+            "project_deletions",
+            "document_deletion_receipts",
         }.issubset(tables)
         assert catalog.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert workspace.project_catalog_path.endswith("project_catalog.sqlite")
+        task_columns = {
+            row[1]
+            for row in catalog.conn.execute("PRAGMA table_info(project_tasks)")
+        }
+        assert {"created_at", "updated_at", "completed_at"}.issubset(task_columns)
+    finally:
+        catalog.close()
+        temp_dir.cleanup()
+
+
+def test_catalog_shared_connection_concurrent_project_creates_are_complete():
+    temp_dir, workspace, catalog = _catalog()
+    try:
+        def create_batch(batch_index):
+            start = batch_index * 20
+            for index_number in range(start, start + 20):
+                catalog.create_project(
+                    f"并发项目 {index_number}",
+                    project_id=f"concurrent-project-{index_number}",
+                    idempotency_key=f"concurrent-project-key-{index_number}",
+                )
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            errors = [
+                result
+                for result in pool.map(
+                    lambda batch: _capture_exception(create_batch, batch),
+                    range(4),
+                )
+                if result is not None
+            ]
+        assert errors == []
+        assert catalog.conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0] == 80
     finally:
         catalog.close()
         temp_dir.cleanup()
@@ -60,6 +108,43 @@ def test_catalog_migrates_existing_projects_to_research_mode():
         try:
             row = catalog.conn.execute("SELECT project_mode FROM projects WHERE project_id = 'legacy'").fetchone()
             assert row["project_mode"] == "research"
+        finally:
+            catalog.close()
+
+
+def test_catalog_migrates_legacy_project_tasks_with_nullable_temporal_fields():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+        legacy = sqlite3.connect(workspace.project_catalog_path)
+        try:
+            legacy.execute(
+                "CREATE TABLE projects (project_id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)"
+            )
+            legacy.execute(
+                "CREATE TABLE project_tasks (task_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, due_at TEXT, status TEXT NOT NULL, evidence_refs_json TEXT NOT NULL DEFAULT '[]')"
+            )
+            legacy.execute(
+                "INSERT INTO projects VALUES ('legacy', '旧项目', 'active', '2026-08-01T00:00:00+00:00')"
+            )
+            legacy.execute(
+                "INSERT INTO project_tasks(task_id, project_id, title, status) VALUES ('legacy-task', 'legacy', '旧任务', 'open')"
+            )
+            legacy.commit()
+        finally:
+            legacy.close()
+
+        catalog = ProjectCatalog(workspace)
+        try:
+            columns = {
+                row[1]: row
+                for row in catalog.conn.execute("PRAGMA table_info(project_tasks)")
+            }
+            assert {"created_at", "updated_at", "started_at", "completed_at"}.issubset(columns)
+            row = catalog.conn.execute(
+                "SELECT created_at, updated_at FROM project_tasks WHERE task_id = 'legacy-task'"
+            ).fetchone()
+            assert row["created_at"] is None
+            assert row["updated_at"] is None
         finally:
             catalog.close()
 
@@ -124,6 +209,393 @@ def test_catalog_artifact_scope_migration_preserves_email_delivery_foreign_key()
             assert catalog.conn.execute("SELECT COUNT(*) FROM email_deliveries").fetchone()[0] == 0
         finally:
             catalog.close()
+
+
+def test_artifact_idempotency_key_rejects_different_payload():
+    temp_dir, _workspace, catalog = _catalog()
+    try:
+        first = catalog.create_artifact(
+            None,
+            "schedule_draft",
+            {"title": "第一次", "start_at": "2026-09-09T09:00:00+08:00"},
+            idempotency_key="schedule-idempotency-1",
+        )
+        repeated = catalog.create_artifact(
+            None,
+            "schedule_draft",
+            {"title": "第一次", "start_at": "2026-09-09T09:00:00+08:00"},
+            idempotency_key="schedule-idempotency-1",
+        )
+
+        assert repeated == first
+        try:
+            catalog.create_artifact(
+                None,
+                "schedule_draft",
+                {"title": "被静默覆盖的第二次请求", "start_at": "2026-09-09T09:00:00+08:00"},
+                idempotency_key="schedule-idempotency-1",
+            )
+        except ValueError as exc:
+            assert "idempotency_key" in str(exc)
+        else:
+            raise AssertionError("different artifact input must not reuse an idempotency key")
+    finally:
+        catalog.close()
+
+
+def test_project_idempotency_key_is_atomic_across_catalog_connections():
+    temp_dir, workspace, catalog = _catalog()
+    catalog.close()
+    barrier = threading.Barrier(2)
+    results = []
+    errors = []
+    catalogs = []
+    lock = threading.Lock()
+
+    def create() -> None:
+        worker_catalog = ProjectCatalog(workspace)
+        with lock:
+            catalogs.append(worker_catalog)
+        try:
+            barrier.wait(timeout=5)
+            result = worker_catalog.create_project(
+                "并发项目",
+                project_mode="research",
+                idempotency_key="project-concurrent-key",
+                return_status=True,
+            )
+            with lock:
+                results.append(result)
+        except Exception as exc:  # pragma: no cover - assertion below reports the race
+            with lock:
+                errors.append(exc)
+
+    threads = [threading.Thread(target=create), threading.Thread(target=create)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    for worker_catalog in catalogs:
+        worker_catalog.close()
+
+    try:
+        assert not errors, errors
+        assert len(results) == 2
+        assert {item["project_id"] for item in results} == {results[0]["project_id"]}
+        check = ProjectCatalog(workspace)
+        try:
+            assert check.conn.execute(
+                "SELECT COUNT(*) FROM projects WHERE idempotency_key = ?",
+                ("project-concurrent-key",),
+            ).fetchone()[0] == 1
+        finally:
+            check.close()
+    finally:
+        temp_dir.cleanup()
+
+
+def test_artifact_idempotency_key_is_atomic_across_catalog_connections():
+    temp_dir, workspace, catalog = _catalog()
+    catalog.close()
+    barrier = threading.Barrier(2)
+    results = []
+    errors = []
+    catalogs = []
+    lock = threading.Lock()
+
+    def create() -> None:
+        worker_catalog = ProjectCatalog(workspace)
+        with lock:
+            catalogs.append(worker_catalog)
+        try:
+            barrier.wait(timeout=5)
+            result = worker_catalog.create_artifact(
+                None,
+                "schedule_draft",
+                {"title": "并发草案", "start_at": "2026-09-09T09:00:00+08:00"},
+                idempotency_key="artifact-concurrent-key",
+                return_status=True,
+            )
+            with lock:
+                results.append(result)
+        except Exception as exc:  # pragma: no cover - assertion below reports the race
+            with lock:
+                errors.append(exc)
+
+    threads = [threading.Thread(target=create), threading.Thread(target=create)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    for worker_catalog in catalogs:
+        worker_catalog.close()
+
+    try:
+        assert not errors, errors
+        assert len(results) == 2
+        assert {item["artifact_id"] for item in results} == {results[0]["artifact_id"]}
+        check = ProjectCatalog(workspace)
+        try:
+            assert check.conn.execute(
+                "SELECT COUNT(*) FROM artifacts WHERE idempotency_key = ?",
+                ("artifact-concurrent-key",),
+            ).fetchone()[0] == 1
+        finally:
+            check.close()
+    finally:
+        temp_dir.cleanup()
+
+
+def test_completed_project_deletion_reserves_project_id_for_replay_safety():
+    temp_dir, workspace, catalog = _catalog()
+    try:
+        catalog.create_project("可删除项目", project_id="reserved")
+        receipt = catalog.begin_project_deletion("reserved")
+        catalog.delete_project("reserved")
+        catalog.complete_project_deletion("reserved", {"status": "deleted", "project_id": "reserved"})
+        assert receipt["status"] == "pending"
+        try:
+            catalog.create_project("同 ID 新项目", project_id="reserved")
+        except sqlite3.IntegrityError:
+            pass
+        else:
+            raise AssertionError("completed deletion receipts must reserve project IDs")
+    finally:
+        catalog.close()
+        temp_dir.cleanup()
+
+
+def test_concurrent_project_deletion_receipt_claim_is_idempotent():
+    temp_dir, workspace, catalog = _catalog()
+    catalog.create_project("并发删除项目", project_id="concurrent-delete")
+    catalog.close()
+    barrier = threading.Barrier(2)
+    results = []
+    errors = []
+    original_snapshot = ProjectCatalog.project_deletion_snapshot
+
+    def synchronized_snapshot(self, project_id):
+        snapshot = original_snapshot(self, project_id)
+        barrier.wait(timeout=10)
+        return snapshot
+
+    def claim():
+        local = ProjectCatalog(workspace)
+        try:
+            results.append(local.begin_project_deletion("concurrent-delete"))
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            local.close()
+
+    try:
+        with patch.object(ProjectCatalog, "project_deletion_snapshot", synchronized_snapshot):
+            threads = [threading.Thread(target=claim) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=15)
+
+        assert errors == []
+        assert len(results) == 2
+        assert {record["status"] for record in results} == {"pending"}
+    finally:
+        temp_dir.cleanup()
+
+
+def test_legacy_project_deletion_error_is_sanitized_on_catalog_reopen():
+    secret = "root busy redis://user:password@private-host secret=delete-token"
+    temp_dir, workspace, catalog = _catalog()
+    try:
+        catalog.create_project("可清理项目", project_id="legacy-delete")
+        catalog.begin_project_deletion("legacy-delete")
+        catalog.conn.execute(
+            "UPDATE project_deletions SET status = 'failed', error = ? WHERE project_id = ?",
+            (secret, "legacy-delete"),
+        )
+        catalog.conn.commit()
+        catalog.close()
+
+        reopened = ProjectCatalog(workspace)
+        row = reopened.conn.execute(
+            "SELECT error FROM project_deletions WHERE project_id = ?",
+            ("legacy-delete",),
+        ).fetchone()
+        record = reopened.begin_project_deletion("legacy-delete")
+        reopened.close()
+    finally:
+        if catalog.conn:
+            try:
+                catalog.close()
+            except Exception:
+                pass
+        temp_dir.cleanup()
+
+    assert row is not None
+    assert secret not in row["error"]
+    assert json.loads(row["error"]) == project_deletion_error_observation(secret)
+    assert record["error"] == ""
+
+
+def test_email_delivery_binds_one_idempotency_key_to_one_confirmed_draft():
+    temp_dir, _workspace, catalog = _catalog()
+    try:
+        first = catalog.create_artifact(None, "email_draft", {"subject": "A"})
+        second = catalog.create_artifact(None, "email_draft", {"subject": "B"})
+
+        assert catalog.reserve_email_delivery(first, "email-delivery-key-1") == "reserved"
+        assert catalog.reserve_email_delivery(first, "email-delivery-key-2") == "conflict"
+        assert catalog.reserve_email_delivery(second, "email-delivery-key-1") == "conflict"
+
+        catalog.finish_email_delivery(first, "failed", {"error": "temporary"})
+        assert catalog.reserve_email_delivery(first, "email-delivery-key-2") == "reserved"
+        catalog.finish_email_delivery(first, "sent", {"provider": "mock"})
+        assert catalog.reserve_email_delivery(first, "email-delivery-key-2") == "sent"
+    finally:
+        catalog.close()
+        temp_dir.cleanup()
+
+
+def test_email_delivery_reservation_is_safe_for_concurrent_attempts():
+    temp_dir, workspace, catalog = _catalog()
+    try:
+        artifact_id = catalog.create_artifact(None, "email_draft", {"subject": "并发"})
+    finally:
+        catalog.close()
+
+    barrier = threading.Barrier(2)
+    results = []
+    result_lock = threading.Lock()
+
+    def reserve(key: str) -> None:
+        worker_catalog = ProjectCatalog(workspace)
+        try:
+            barrier.wait(timeout=5)
+            result = worker_catalog.reserve_email_delivery(artifact_id, key)
+            with result_lock:
+                results.append(result)
+        except Exception as exc:  # pragma: no cover - assertion below reports the concrete race
+            with result_lock:
+                results.append(exc)
+        finally:
+            worker_catalog.close()
+
+    threads = [
+        threading.Thread(target=reserve, args=("concurrent-key-a",)),
+        threading.Thread(target=reserve, args=("concurrent-key-b",)),
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+        assert all(not thread.is_alive() for thread in threads)
+        assert sorted(result for result in results if isinstance(result, str)) == ["conflict", "reserved"]
+        assert all(isinstance(result, str) for result in results), results
+    finally:
+        temp_dir.cleanup()
+
+
+def test_document_deletion_receipt_fences_concurrent_retry_and_recovers_expired_claim():
+    temp_dir, workspace, catalog = _catalog()
+    try:
+        first = catalog.claim_document_deletion(
+            "paper.pdf",
+            "sha256:first",
+            "document-delete-key",
+            owner_id="worker-a",
+        )
+        assert first["claimed"] is True
+        busy = catalog.claim_document_deletion(
+            "paper.pdf",
+            "sha256:first",
+            "document-delete-key",
+            owner_id="worker-b",
+        )
+        assert busy["claimed"] is False
+        assert busy["status"] == "in_progress"
+
+        catalog.conn.execute(
+            "UPDATE document_deletion_receipts SET lease_expires_at = ? WHERE idempotency_key = ?",
+            (time.time() - 1, "document-delete-key"),
+        )
+        catalog.conn.commit()
+        recovered = catalog.claim_document_deletion(
+            "paper.pdf",
+            "sha256:first",
+            "document-delete-key",
+            owner_id="worker-b",
+        )
+        assert recovered["claimed"] is True
+        assert recovered["replayed"] is True
+
+        catalog.complete_document_deletion("document-delete-key", "worker-b")
+        completed = catalog.document_deletion_receipt("document-delete-key")
+        assert completed["status"] == "completed"
+        assert completed["owner_id"] is None
+        assert catalog.claim_document_deletion(
+            "paper.pdf",
+            "sha256:first",
+            "document-delete-key",
+            owner_id="worker-c",
+        )["claimed"] is False
+    finally:
+        catalog.close()
+        temp_dir.cleanup()
+
+
+def test_document_deletion_receipt_claim_is_atomic_across_catalog_connections():
+    temp_dir, workspace, catalog = _catalog()
+    catalog.close()
+    first_catalog = ProjectCatalog(workspace)
+    second_catalog = ProjectCatalog(workspace)
+    barrier = threading.Barrier(2)
+    results = []
+    errors = []
+
+    def trace_factory():
+        seen = False
+
+        def trace(statement):
+            nonlocal seen
+            if not seen and "SELECT * FROM document_deletion_receipts WHERE idempotency_key" in statement:
+                seen = True
+                barrier.wait(timeout=10)
+
+        return trace
+
+    first_catalog.conn.set_trace_callback(trace_factory())
+    second_catalog.conn.set_trace_callback(trace_factory())
+
+    def claim(worker_catalog, owner_id):
+        try:
+            results.append(
+                worker_catalog.claim_document_deletion(
+                    "paper.pdf",
+                    "sha256:concurrent",
+                    "document-delete-concurrent",
+                    owner_id=owner_id,
+                )
+            )
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [
+        threading.Thread(target=claim, args=(first_catalog, "worker-a")),
+        threading.Thread(target=claim, args=(second_catalog, "worker-b")),
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=15)
+        assert all(not thread.is_alive() for thread in threads)
+        assert errors == []
+        assert sorted(item["claimed"] for item in results) == [False, True]
+    finally:
+        first_catalog.close()
+        second_catalog.close()
+        temp_dir.cleanup()
 
 
 def test_project_stores_folder_and_memory_policy():
@@ -427,6 +899,20 @@ def test_contact_save_merges_same_mailbox_instead_of_creating_ambiguity():
         temp_dir.cleanup()
 
 
+def test_contact_save_rejects_non_whitespace_control_characters():
+    temp_dir, _workspace, catalog = _catalog()
+    try:
+        try:
+            catalog.create_contact("异常联系人", "li@example.test\x00")
+        except ValueError as exc:
+            assert "email" in str(exc)
+        else:
+            raise AssertionError("control characters must not be stored in contacts")
+    finally:
+        catalog.close()
+        temp_dir.cleanup()
+
+
 def test_global_contact_is_visible_after_switching_projects():
     temp_dir, _workspace, catalog = _catalog()
     try:
@@ -437,6 +923,23 @@ def test_global_contact_is_visible_after_switching_projects():
         assert [item["email"] for item in catalog.list_contacts(project_id="project-a")] == ["2956584050@qq.com"]
         assert [item["email"] for item in catalog.list_contacts(project_id="project-b")] == ["2956584050@qq.com"]
         assert len(catalog.resolve_contacts("handsome_Vin", project_id="project-b")) == 1
+
     finally:
         catalog.close()
         temp_dir.cleanup()
+
+
+def test_contact_lists_use_contact_id_as_final_tiebreaker():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+        catalog = ProjectCatalog(workspace)
+        try:
+            catalog.create_contact("同名联系人", "b@example.test", contact_id="contact-b")
+            catalog.create_contact("同名联系人", "a@example.test", contact_id="contact-a")
+            listed = catalog.list_contacts()
+            resolved = catalog.resolve_contacts("同名联系人")
+        finally:
+            catalog.close()
+
+    assert [item["contact_id"] for item in listed] == ["contact-a", "contact-b"]
+    assert [item["contact_id"] for item in resolved] == ["contact-a", "contact-b"]

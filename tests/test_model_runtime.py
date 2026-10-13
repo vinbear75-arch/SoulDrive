@@ -33,6 +33,7 @@ class ModelRuntimeTests(unittest.TestCase):
             "SOULDRIVE_OLLAMA_MODEL",
             "SOULDRIVE_EMBEDDING_PROVIDER",
             "SOULDRIVE_OLLAMA_EMBEDDING_MODEL",
+            "SOULDRIVE_LLAMA_SEED",
         ):
             os.environ.pop(name, None)
 
@@ -52,6 +53,14 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(config.chat_n_ctx, 8192)
         self.assertEqual(config.graph_n_ctx, 8192)
         self.assertEqual(config.max_tokens, 900)
+        self.assertEqual(config.temperature, 0.0)
+        self.assertEqual(config.seed, 42)
+
+    def test_llama_runtime_config_bounds_generation_seed(self):
+        with patch.dict(os.environ, {"SOULDRIVE_LLAMA_SEED": "-5"}):
+            config = llama_runtime_config()
+
+        self.assertEqual(config.seed, 0)
 
     def test_preferred_chat_model_prefers_complete_7b_shard_for_experiment(self):
         with tempfile.TemporaryDirectory() as temp_dir:

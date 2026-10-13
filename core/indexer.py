@@ -4,6 +4,7 @@ import hashlib
 import shutil
 import time
 import uuid
+from collections import Counter
 from pathlib import Path
 from core.document_types import SUPPORTED_DOCUMENT_EXTENSIONS, is_image_document
 from core.indexing_errors import indexing_failure
@@ -84,6 +85,16 @@ def _failure_summary(failures: list[dict]):
         code = str(failure.get("error_code") or "INDEXING_FAILED")
         summary[code] = summary.get(code, 0) + 1
     return summary
+
+
+def _error_observation(exc: BaseException) -> dict:
+    """保留失败关联信息，但不把异常原文写入运行状态。"""
+    message = str(exc or "")
+    return {
+        "error_type": type(exc).__name__,
+        "error_digest": hashlib.sha256(message.encode("utf-8")).hexdigest()[:16],
+        "error_chars": len(message),
+    }
 
 
 def _empty_indexing_observability() -> dict:
@@ -231,6 +242,7 @@ class DriveIndexer:
         self.workspace = None
         self.project_catalog = None
         self._index_source_names = {}
+        self._index_source_ids = {}
 
     def _calculate_file_hash(self, file_path: str) -> str:
         """璁＄畻鏂囦欢鐨?MD5 鍝堝笇鍊硷紝鐢ㄤ簬绮剧‘姣斿鏂囦欢鍐呭鏄惁鍙戠敓鐗╃悊鏀瑰彉"""
@@ -291,6 +303,7 @@ class DriveIndexer:
                 path_text = str(temp_path)
                 document_files.append(path_text)
                 self._index_source_names[path_text] = safe_document_filename(document["name"])
+                self._index_source_ids[path_text] = str(object_id)
         finally:
             store.close()
         return document_files, temp_dir
@@ -335,6 +348,11 @@ class DriveIndexer:
             self._index_source_names = {
                 path: name
                 for path, name in self._index_source_names.items()
+                if not path.startswith(temp_prefix)
+            }
+            self._index_source_ids = {
+                path: source_id
+                for path, source_id in self._index_source_ids.items()
                 if not path.startswith(temp_prefix)
             }
 
@@ -398,31 +416,74 @@ class DriveIndexer:
         )
 
     @staticmethod
-    def _index_document_id(file_hash: str, source_filename: str) -> str:
-        source_key = hashlib.sha1(source_filename.encode("utf-8")).hexdigest()[:12]
+    def _index_document_id(file_hash: str, source_filename: str, *, document_id: str | None = None) -> str:
+        source_key = hashlib.sha1((document_id or source_filename).encode("utf-8")).hexdigest()[:12]
         return f"{file_hash}_{source_key}_schema_{INDEX_METADATA_SCHEMA_VERSION}"
 
     @staticmethod
-    def _stable_document_id(pdf_path: str, catalog_item: dict | None = None) -> str:
-        """Return an identity that survives content-version changes."""
+    def _stable_document_id(
+        pdf_path: str,
+        catalog_item: dict | None = None,
+        *,
+        source_identity: str | None = None,
+    ) -> str:
+        """Return a deterministic identity for one indexed document source."""
+        if str(source_identity or "").strip():
+            # Encrypted documents are parsed from a per-run temporary path;
+            # that path is not a document identity.  The opaque object ID is
+            # stable for the managed secure object and keeps cleanup/citation
+            # records distinct when display names collide.
+            return f"secure_{str(source_identity).strip()}"
         if catalog_item and catalog_item.get("asset_id"):
             return str(catalog_item["asset_id"])
         normalized = str(Path(pdf_path).resolve()).replace("\\", "/").lower()
         digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:20]
         return f"doc_{digest}"
 
+    def _document_identity_for_source(self, pdf_path: str, doc_id: str, file_hash: str | None):
+        """Resolve stable ownership separately from a verified content-version binding."""
+        catalog_item = self._catalog_item_for_document(pdf_path, doc_id, file_hash) if file_hash else None
+        identity_item = catalog_item
+        if identity_item is None and self.project_catalog is not None:
+            bindings = self.project_catalog.find_imported_document_bindings(
+                self._catalog_ref_for_document(pdf_path, doc_id)
+            )
+            owners = {(str(item["project_id"]), str(item["asset_id"])) for item in bindings}
+            if len(owners) == 1:
+                project_id, asset_id = next(iter(owners))
+                identity_item = {"project_id": project_id, "asset_id": asset_id}
+        project = None if catalog_item else self._project_for_path(pdf_path)
+        project_id = identity_item["project_id"] if identity_item else project[0] if project else None
+        if not catalog_item and project_id:
+            project = (project_id, project[1] if project else None)
+        document_id = self._stable_document_id(
+            pdf_path, identity_item, source_identity=self._index_source_ids.get(pdf_path)
+        )
+        return document_id, project_id, catalog_item, project
+
     def sync_drive(self, drive_path: str, auth_level: str = "PRO"):
         workspace = SoulDriveWorkspace.from_drive(drive_path).ensure()
         return self.sync_workspace(workspace, auth_level)
 
-    def sync_workspace(self, workspace: SoulDriveWorkspace, auth_level: str = "PRO"):
+    def sync_workspace(
+        self,
+        workspace: SoulDriveWorkspace,
+        auth_level: str = "PRO",
+        *,
+        run_id: str | None = None,
+        idempotency_key: str | None = None,
+    ):
         """鍩轰簬 MD5 鏍￠獙鐨勪弗鏍煎閲忓悜閲忓寲绠￠亾"""
         from core.knowledge_base import LocalKnowledgeBase
 
         self.workspace = workspace.ensure()
         self.project_catalog = ProjectCatalog(self.workspace)
-        run_id = str(uuid.uuid4())
+        run_id = str(run_id or uuid.uuid4())
         started_at = time.time()
+        identity_updates = {"run_id": run_id, "status": "queued"}
+        if idempotency_key:
+            identity_updates["idempotency_key"] = str(idempotency_key)
+        update_indexing_status(expected_run_id=run_id, **identity_updates)
         observability = _empty_indexing_observability()
         disk_report = self.workspace.disk_diagnostics()
         if not disk_report.get("ready"):
@@ -431,6 +492,7 @@ class DriveIndexer:
             self.project_catalog.close()
             self.project_catalog = None
             update_indexing_status(
+                expected_run_id=run_id,
                 status="blocked",
                 run_id=run_id,
                 total_files=0,
@@ -458,6 +520,7 @@ class DriveIndexer:
         )
         pdf_files, secure_index_temp_dir = self._discover_index_document_files()
         update_indexing_status(
+            expected_run_id=run_id,
             status="scanning",
             run_id=run_id,
             total_files=len(pdf_files),
@@ -477,14 +540,35 @@ class DriveIndexer:
 
         files_to_process = []
         discovered_documents = []
+        document_ids_by_path = {}
+        identities_by_path = {}
+        source_names = {path: self._source_display_name(path) for path in pdf_files}
+        source_counts = Counter(source_names.values())
         skipped_files = 0
         for pdf_path in pdf_files:
             # 1. 璁＄畻褰撳墠纭洏涓婃枃浠剁殑鐪熷疄 MD5
             file_hash = self._calculate_file_hash(pdf_path)
-            doc_id = self._source_display_name(pdf_path)
+            doc_id = source_names[pdf_path]
+            source_identity = self._index_source_ids.get(pdf_path)
+            try:
+                identity = self._document_identity_for_source(pdf_path, doc_id, file_hash)
+            except Exception as error:
+                # Keep catalog failures inside the per-document failure boundary below.
+                identity = error
+            identities_by_path[pdf_path] = identity
+            document_id = (
+                self._stable_document_id(pdf_path, source_identity=source_identity)
+                if isinstance(identity, Exception) else identity[0]
+            )
+            document_ids_by_path[pdf_path] = document_id
 
             # 2. 浣跨敤鍝堝笇鍊间綔涓烘煡璇㈠嚟璇侊紝鍚?ChromaDB 鎺㈡煡
-            index_status = self._document_index_status(file_hash, doc_id, pdf_path)
+            index_status = "missing" if isinstance(identity, Exception) else self._document_index_status(
+                file_hash,
+                doc_id,
+                pdf_path,
+                document_id=document_id if source_identity or identity[1] or source_counts[doc_id] > 1 else None,
+            )
             discovered_documents.append((pdf_path, doc_id, file_hash))
             if index_status != "current":
                 should_extract_graph = True
@@ -513,6 +597,7 @@ class DriveIndexer:
             logger.info("[Indexer] No new or changed documents found.")
             observability["graphrag"] = self._build_graphrag_index(auth_level)
             update_indexing_status(
+                expected_run_id=run_id,
                 status="idle",
                 run_id=run_id,
                 total_files=0,
@@ -540,6 +625,7 @@ class DriveIndexer:
 
         logger.info("[Indexer] Found %s new or changed documents; starting parse.", len(files_to_process))
         update_indexing_status(
+            expected_run_id=run_id,
             status="indexing",
             run_id=run_id,
             total_files=len(files_to_process),
@@ -561,18 +647,9 @@ class DriveIndexer:
         succeeded_files = 0
         chunk_count = 0
         for processed_index, (pdf_path, doc_id, file_hash, should_extract_graph) in enumerate(files_to_process, start=1):
-            update_indexing_status(
-                status="indexing",
-                total_files=len(files_to_process),
-                discovered_files=len(pdf_files),
-                skipped_files=skipped_files,
-                succeeded_files=succeeded_files,
-                processed_files=processed_index - 1,
-                current_file=doc_id,
-                chunk_count=chunk_count,
-                observability=observability,
-            )
             document_started_at = time.time()
+            document_id = document_ids_by_path[pdf_path]
+            project_id = None
             parse_ms = 0
             ingest_ms = 0
             graph_ms = 0
@@ -582,6 +659,24 @@ class DriveIndexer:
             status = "failed"
             active_parser = None
             try:
+                identity = identities_by_path[pdf_path]
+                if isinstance(identity, Exception):
+                    raise identity
+                document_id, project_id, catalog_item, project = identity
+                update_indexing_status(
+                    expected_run_id=run_id,
+                    status="indexing",
+                    total_files=len(files_to_process),
+                    discovered_files=len(pdf_files),
+                    skipped_files=skipped_files,
+                    succeeded_files=succeeded_files,
+                    processed_files=processed_index - 1,
+                    current_file=doc_id,
+                    current_document_id=document_id,
+                    current_project_id=project_id,
+                    chunk_count=chunk_count,
+                    observability=observability,
+                )
                 parse_started_at = time.time()
                 active_parser = self._parser_for_path(pdf_path)
                 chunks = active_parser.parse_and_chunk(pdf_path)
@@ -595,12 +690,15 @@ class DriveIndexer:
                         pdf_path,
                         preserve_ids=set(),
                         file_hash=file_hash,
+                        project_id=project_id,
+                        document_id=document_id if self._index_source_ids.get(pdf_path) or project_id or source_counts[doc_id] > 1 else None,
                     )
                     parser_error = getattr(active_parser, "last_error", None)
                     failure = dict(parser_error) if parser_error else indexing_failure(doc_id, "no parseable chunks")
-                    failure["source_filename"] = doc_id
+                    failure.update({"source_filename": doc_id, "document_id": document_id, "project_id": project_id})
                     failures.append(failure)
                     update_indexing_status(
+                        expected_run_id=run_id,
                         failures=failures,
                         failure_summary=_failure_summary(failures),
                         observability=observability,
@@ -608,8 +706,6 @@ class DriveIndexer:
                     continue
 
                 navigation_summary = _document_navigation_summary(doc_id, chunks)
-                catalog_item = self._catalog_item_for_document(pdf_path, doc_id, file_hash)
-                project = None if catalog_item else self._project_for_path(pdf_path)
 
                 # Keep source provenance on every parent before child indexing.
                 for chunk_index, chunk in enumerate(chunks):
@@ -621,7 +717,7 @@ class DriveIndexer:
                     chunk.metadata["document_summary_method"] = "extractive_pre_index_v1"
                     chunk.metadata["indexed_at"] = time.time()
                     chunk.metadata["metadata_schema_version"] = INDEX_METADATA_SCHEMA_VERSION
-                    chunk.metadata["document_id"] = self._stable_document_id(pdf_path, catalog_item)
+                    chunk.metadata["document_id"] = document_id
                     if catalog_item:
                         catalog_title = str(catalog_item.get("title") or "").strip()
                         if catalog_title:
@@ -646,7 +742,7 @@ class DriveIndexer:
                     )
 
                 ingest_started_at = time.time()
-                index_document_id = self._index_document_id(file_hash, doc_id)
+                index_document_id = self._index_document_id(file_hash, doc_id, document_id=document_id)
                 ingest_summary = self.kb.ingest_chunks(index_document_id, chunks) or {}
                 ingest_ms = _elapsed_ms(ingest_started_at)
                 current_child_ids = {
@@ -659,6 +755,8 @@ class DriveIndexer:
                     pdf_path,
                     preserve_ids=current_child_ids,
                     file_hash=file_hash,
+                    project_id=project_id,
+                    document_id=document_id if self._index_source_ids.get(pdf_path) or project_id or source_counts[doc_id] > 1 else None,
                 )
                 succeeded_files += 1
                 chunk_count += len(chunks)
@@ -682,8 +780,10 @@ class DriveIndexer:
                     logger.info("[Indexer] %s indexed without graph summary, hash: %s.", doc_id, file_hash[:8])
             except Exception as e:
                 failure = indexing_failure(doc_id, str(e))
+                failure.update({"document_id": document_id, "project_id": project_id})
                 failures.append(failure)
                 update_indexing_status(
+                    expected_run_id=run_id,
                     failures=failures,
                     failure_summary=_failure_summary(failures),
                     observability=observability,
@@ -693,6 +793,8 @@ class DriveIndexer:
                 parse_stats = dict(getattr(active_parser, "last_parse_stats", {}) or {})
                 observability = _record_document_observation(observability, {
                     "source_filename": doc_id,
+                    "document_id": document_id,
+                    "project_id": project_id,
                     "status": status,
                     "chunk_count": document_chunk_count,
                     "chunk_chars": document_chunk_chars,
@@ -763,6 +865,7 @@ class DriveIndexer:
                     ),
                 })
                 update_indexing_status(
+                    expected_run_id=run_id,
                     status="indexing",
                     total_files=len(files_to_process),
                     discovered_files=len(pdf_files),
@@ -780,6 +883,7 @@ class DriveIndexer:
         self._teardown_parser()
         self._cleanup_secure_index_temp_dir(secure_index_temp_dir)
         update_indexing_status(
+            expected_run_id=run_id,
             status="completed",
             total_files=len(files_to_process),
             discovered_files=len(pdf_files),
@@ -804,12 +908,20 @@ class DriveIndexer:
         pdf_path: str,
         preserve_ids: set[str] | None = None,
         file_hash: str | None = None,
+        project_id: str | None = None,
+        document_id: str | None = None,
     ):
         source_path = os.path.abspath(pdf_path)
         preserve_ids = preserve_ids or set()
+        target_project_id = str(project_id or "").strip() or None
         previous_records: dict[str, dict] = {}
 
-        for where_filter in ({"source_path": source_path}, {"source_filename": doc_id}):
+        where_filters = (
+            [{"document_id": str(document_id).strip()}]
+            if str(document_id or "").strip()
+            else [{"source_path": source_path}, {"source_filename": doc_id}]
+        )
+        for where_filter in where_filters:
             try:
                 existing = self.kb.collection.get(
                     where=where_filter,
@@ -818,11 +930,17 @@ class DriveIndexer:
                 ids = list(existing.get("ids") or [])
                 metadatas = list(existing.get("metadatas") or [])
                 for index, child_id in enumerate(ids):
-                    previous_records[str(child_id)] = (
+                    metadata = (
                         dict(metadatas[index] or {})
                         if index < len(metadatas)
                         else {}
                     )
+                    if (
+                        target_project_id
+                        and str(metadata.get("project_id") or "").strip() != target_project_id
+                    ):
+                        continue
+                    previous_records[str(child_id)] = metadata
             except Exception as exc:
                 logger.warning(
                     "[Indexer] Failed to inspect stale chunks for %s: %s",
@@ -844,7 +962,15 @@ class DriveIndexer:
                             if index < len(metadatas)
                             else {}
                         )
-                        if metadata.get("source_filename") not in {None, "", doc_id}:
+                        if document_id:
+                            if str(metadata.get("document_id") or "").strip() != str(document_id).strip():
+                                continue
+                        elif metadata.get("source_filename") not in {None, "", doc_id}:
+                            continue
+                        if (
+                            target_project_id
+                            and str(metadata.get("project_id") or "").strip() != target_project_id
+                        ):
                             continue
                         previous_records[child_id] = metadata
             except Exception as exc:
@@ -877,14 +1003,21 @@ class DriveIndexer:
         file_hash: str,
         source_filename: str | None = None,
         file_path: str | None = None,
+        document_id: str | None = None,
     ) -> bool:
-        return self._document_index_status(file_hash, source_filename, file_path) == "current"
+        return self._document_index_status(
+            file_hash,
+            source_filename,
+            file_path,
+            document_id=document_id,
+        ) == "current"
 
     def _document_index_status(
         self,
         file_hash: str,
         source_filename: str | None = None,
         file_path: str | None = None,
+        document_id: str | None = None,
     ) -> str:
         try:
             existing = self.kb.collection.get(where={"document_hash": file_hash}, include=["metadatas"])
@@ -895,7 +1028,16 @@ class DriveIndexer:
             return "missing"
 
         metadatas = existing.get("metadatas") or []
-        if source_filename is not None:
+        if document_id:
+            metadatas = [
+                metadata
+                for metadata in metadatas
+                if str((metadata or {}).get("document_id") or "").strip()
+                == str(document_id).strip()
+            ]
+            if not metadatas:
+                return "missing"
+        elif source_filename is not None:
             metadatas = [
                 metadata
                 for metadata in metadatas
@@ -956,6 +1098,45 @@ class DriveIndexer:
                         return "metadata_upgrade"
                     if any(str((metadata or {}).get(key) or "").strip() for key in catalog_fields):
                         return "metadata_upgrade"
+        if file_path:
+            # Ingestion writes the new hash before stale records are removed.
+            # A process crash in that window must not make the next run treat
+            # the document as complete forever.
+            try:
+                source_records = self.kb.collection.get(
+                    where={"source_path": os.path.abspath(file_path)},
+                    include=["metadatas"],
+                )
+                source_hashes = {
+                    str((metadata or {}).get("document_hash") or "").strip()
+                    for metadata in source_records.get("metadatas") or []
+                }
+                if any(source_hash != str(file_hash).strip() for source_hash in source_hashes):
+                    return "stale_cleanup"
+            except Exception:
+                # The primary current-hash check above remains authoritative
+                # when a backend cannot perform the optional cleanup scan.
+                pass
+        consistency_checker = getattr(self.kb, "check_index_consistency", None)
+        if callable(consistency_checker):
+            try:
+                if document_id:
+                    try:
+                        consistency_status = consistency_checker(
+                            file_hash,
+                            source_filename,
+                            document_id=document_id,
+                        )
+                    except TypeError:
+                        # Keep lightweight test doubles and legacy adapters
+                        # compatible while the real KB gains identity scope.
+                        consistency_status = consistency_checker(file_hash, source_filename)
+                else:
+                    consistency_status = consistency_checker(file_hash, source_filename)
+            except Exception:
+                consistency_status = "derived_index_check_failed"
+            if consistency_status and consistency_status != "current":
+                return str(consistency_status)
         return "current"
 
     def _parser_for_path(self, document_path: str):
@@ -1061,81 +1242,142 @@ class DriveIndexer:
             from core.graph_rag import GraphRAGBuilder
 
             started_at = time.time()
-            builder = GraphRAGBuilder(
-                graph_store,
-                report_generator=report_generator,
-                min_communities=3,
-                max_communities=4,
-                max_documents=10,
-            )
-            payload = builder.build()
             project_indexes = []
+            failed_project_ids = []
             shared_global_payload = {}
-            try:
-                snapshot = graph_store.get_graph_snapshot()
-                chunk_ids = [
-                    str(chunk_id)
-                    for document in snapshot.get("documents") or []
-                    for chunk_id in document.get("chunk_ids") or []
-                    if str(chunk_id)
-                ]
-                chunk_project_ids = (
-                    self.kb.metadata_for_chunk_ids(chunk_ids)
-                    if self.kb is not None and hasattr(self.kb, "metadata_for_chunk_ids")
-                    else {}
-                )
+            snapshot = graph_store.get_graph_snapshot()
+            chunk_ids = [
+                str(chunk_id)
+                for document in snapshot.get("documents") or []
+                for chunk_id in document.get("chunk_ids") or []
+                if str(chunk_id)
+            ]
+            chunk_project_ids = (
+                self.kb.metadata_for_chunk_ids(chunk_ids)
+                if self.kb is not None and hasattr(self.kb, "metadata_for_chunk_ids")
+                else {}
+            )
+            normalized_chunk_project_ids = {
+                str(chunk_id): str(
+                    (metadata.get("project_id") if isinstance(metadata, dict) else metadata)
+                    or ""
+                ).strip()
+                for chunk_id, metadata in (chunk_project_ids or {}).items()
+                if str(chunk_id)
+            }
+            scope_manifest_complete = bool(chunk_ids) and set(chunk_ids).issubset(
+                normalized_chunk_project_ids
+            )
+            project_ids = sorted({
+                project_id
+                for project_id in normalized_chunk_project_ids.values()
+                if project_id
+            })
+            scope_observation = {
+                "scope_manifest_complete": scope_manifest_complete,
+                "scope_metadata_count": len(normalized_chunk_project_ids),
+                "chunk_count": len(set(chunk_ids)),
+                "project_ids": project_ids,
+            }
+            all_projects_payload = {}
+            all_projects_observation = (
+                {
+                    "status": "not_applicable",
+                    "index_name": "all_projects",
+                    "reason": "no_graph_chunks",
+                    **scope_observation,
+                }
+                if not chunk_ids
+                else {
+                    "status": "skipped",
+                    "index_name": "all_projects",
+                    "reason": "scope_metadata_incomplete",
+                    **scope_observation,
+                }
+            )
+            if scope_manifest_complete:
                 try:
-                    shared_global_payload = GraphRAGBuilder(
+                    all_projects_payload = GraphRAGBuilder(
                         graph_store,
                         report_generator=report_generator,
                         min_communities=3,
                         max_communities=4,
                         max_documents=10,
-                        global_only=True,
-                        index_name="global_shared",
-                        chunk_project_ids=chunk_project_ids,
+                        global_only=False,
+                        index_name="all_projects",
+                        chunk_project_ids=normalized_chunk_project_ids,
+                        source_snapshot=snapshot,
                     ).build()
-                except Exception as exc:
-                    shared_global_payload = {
-                        "status": "failed",
-                        "error": str(exc)[:240],
+                    all_projects_observation = {
+                        "status": str(all_projects_payload.get("status") or "completed"),
+                        "index_name": "all_projects",
+                        "document_count": all_projects_payload.get("document_count", 0),
+                        "community_count": all_projects_payload.get("community_count", 0),
+                        "target_range_ok": all_projects_payload.get("target_range_ok", False),
+                        **scope_observation,
                     }
-                project_ids = sorted({
-                    str(metadata.get("project_id") or "").strip()
-                    for metadata in chunk_project_ids.values()
-                    if str(metadata.get("project_id") or "").strip()
-                })
-                for project_id in project_ids:
-                    try:
-                        project_payload = GraphRAGBuilder(
-                            graph_store,
-                            report_generator=report_generator,
-                            min_communities=3,
-                            max_communities=4,
-                            max_documents=10,
-                            project_id=project_id,
-                            chunk_project_ids={
-                                chunk_id: str(metadata.get("project_id") or "")
-                                for chunk_id, metadata in chunk_project_ids.items()
-                            },
-                        ).build()
-                        project_indexes.append({
-                            "project_id": project_id,
-                            "status": "completed",
-                            "document_count": project_payload.get("document_count", 0),
-                            "community_count": project_payload.get("community_count", 0),
-                            "target_range_ok": project_payload.get("target_range_ok", False),
-                        })
-                    except Exception as exc:
-                        project_indexes.append({
-                            "project_id": project_id,
-                            "status": "failed",
-                            "error": str(exc)[:240],
-                        })
-            except Exception as exc:
-                project_indexes.append({"status": "failed", "error": str(exc)[:240]})
+                except Exception as exc:
+                    all_projects_observation = {
+                        "status": "failed",
+                        "index_name": "all_projects",
+                        **scope_observation,
+                        **_error_observation(exc),
+                    }
+            shared_global_payload = GraphRAGBuilder(
+                graph_store,
+                report_generator=report_generator,
+                min_communities=3,
+                max_communities=4,
+                max_documents=10,
+                global_only=True,
+                index_name="global_shared",
+                chunk_project_ids=chunk_project_ids,
+                source_snapshot=snapshot,
+            ).build()
+            payload = shared_global_payload
+            for project_id in project_ids:
+                try:
+                    project_payload = GraphRAGBuilder(
+                        graph_store,
+                        report_generator=report_generator,
+                        min_communities=3,
+                        max_communities=4,
+                        max_documents=10,
+                        project_id=project_id,
+                        chunk_project_ids={
+                            chunk_id: str(metadata.get("project_id") or "")
+                            for chunk_id, metadata in chunk_project_ids.items()
+                        },
+                        source_snapshot=snapshot,
+                    ).build()
+                    project_indexes.append({
+                        "project_id": project_id,
+                        "status": str(project_payload.get("status") or "completed"),
+                        "document_count": project_payload.get("document_count", 0),
+                        "community_count": project_payload.get("community_count", 0),
+                        "target_range_ok": project_payload.get("target_range_ok", False),
+                    })
+                    if str(project_payload.get("status") or "completed") != "completed":
+                        failed_project_ids.append(project_id)
+                except Exception as exc:
+                    failed_project_ids.append(project_id)
+                    project_indexes.append({
+                        "project_id": project_id,
+                        "status": "failed",
+                        **_error_observation(exc),
+                    })
+            shared_status = str(shared_global_payload.get("status") or "completed")
+            graph_status = (
+                "completed"
+                if (
+                    shared_status == "completed"
+                    and not failed_project_ids
+                    and all_projects_observation["status"] in {"completed", "not_applicable"}
+                )
+                else "degraded"
+            )
             return {
-                "status": "completed",
+                "status": graph_status,
                 "algorithm": payload.get("algorithm"),
                 "elapsed_ms": _elapsed_ms(started_at),
                 "document_count": payload.get("document_count", 0),
@@ -1144,13 +1386,15 @@ class DriveIndexer:
                 "community_count": payload.get("community_count", 0),
                 "target_range_ok": payload.get("target_range_ok", False),
                 "project_indexes": project_indexes,
+                "failed_project_ids": sorted(set(failed_project_ids)),
                 "shared_global": {
-                    "status": shared_global_payload.get("status", "completed"),
+                    "status": shared_status,
                     "index_name": "global_shared",
                     "document_count": shared_global_payload.get("document_count", 0),
                     "community_count": shared_global_payload.get("community_count", 0),
                     "target_range_ok": shared_global_payload.get("target_range_ok", False),
                 },
+                "all_projects": all_projects_observation,
                 "report_methods": sorted({
                     str(item.get("report_method") or "unknown")
                     for item in payload.get("communities") or []
@@ -1161,7 +1405,7 @@ class DriveIndexer:
             return {
                 "status": "failed",
                 "algorithm": "leiden_v1_local_move_refine",
-                "error": str(exc)[:240],
+                **_error_observation(exc),
             }
         finally:
             if close_store and graph_store is not None:

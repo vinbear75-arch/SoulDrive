@@ -1,10 +1,22 @@
 import json
+import hashlib
 import os
 import sqlite3
+import threading
 import time
+from functools import wraps
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
 
 class LocalGraphDB:
     """
@@ -25,7 +37,8 @@ class LocalGraphDB:
         # 连接 SQLite 数据库
         # check_same_thread=False: 允许在不同线程中共享此数据库连接。
         # 在大模型/Web应用中，常有异步并发请求，此参数可防止多线程环境下的 SQLite 报错
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._lock = threading.RLock()
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
 
         # 建立连接后，立即初始化表结构（如果表已存在则不会重复创建）
         self._init_schema()
@@ -79,6 +92,16 @@ class LocalGraphDB:
             )
         """)
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS entity_sources (
+                entity_name TEXT NOT NULL,
+                chunk_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                PRIMARY KEY (entity_name, chunk_id),
+                FOREIGN KEY (entity_name) REFERENCES entities(name)
+            )
+        """)
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS relationship_chunks (
                 relationship_id INTEGER NOT NULL,
                 chunk_id TEXT NOT NULL,
@@ -88,7 +111,8 @@ class LocalGraphDB:
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS graph_documents (
-                source_filename TEXT PRIMARY KEY,
+                document_id TEXT PRIMARY KEY,
+                source_filename TEXT NOT NULL,
                 title TEXT NOT NULL,
                 summary TEXT NOT NULL,
                 keywords_json TEXT NOT NULL,
@@ -99,6 +123,37 @@ class LocalGraphDB:
         columns = {row[1] for row in cursor.execute("PRAGMA table_info(graph_documents)").fetchall()}
         if "project_id" not in columns:
             cursor.execute("ALTER TABLE graph_documents ADD COLUMN project_id TEXT NOT NULL DEFAULT ''")
+            columns.add("project_id")
+        if "document_id" not in columns:
+            legacy_rows = cursor.execute(
+                "SELECT source_filename, title, summary, keywords_json, chunk_ids_json, project_id "
+                "FROM graph_documents"
+            ).fetchall()
+            cursor.execute("DROP TABLE IF EXISTS graph_documents_scoped")
+            cursor.execute("""
+                CREATE TABLE graph_documents_scoped (
+                    document_id TEXT PRIMARY KEY,
+                    source_filename TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    keywords_json TEXT NOT NULL,
+                    chunk_ids_json TEXT NOT NULL,
+                    project_id TEXT NOT NULL DEFAULT ''
+                )
+            """)
+            for row in legacy_rows:
+                project_id = str(row[5] or "").strip()
+                cursor.execute(
+                    """
+                    INSERT INTO graph_documents_scoped (
+                        document_id, source_filename, title, summary,
+                        keywords_json, chunk_ids_json, project_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (_graph_document_id(row[0], project_id), *row[:5], project_id),
+                )
+            cursor.execute("DROP TABLE graph_documents")
+            cursor.execute("ALTER TABLE graph_documents_scoped RENAME TO graph_documents")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS graphrag_indexes (
                 index_name TEXT PRIMARY KEY,
@@ -115,11 +170,13 @@ class LocalGraphDB:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_source ON relationships(source)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_target ON relationships(target)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_chunks_chunk ON entity_chunks(chunk_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_sources_chunk ON entity_sources(chunk_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_chunks_chunk ON relationship_chunks(chunk_id)")
 
         # 提交上述建表和索引操作到数据库
         self.conn.commit()
 
+    @_synchronized
     def add_document(
         self,
         source_filename: str,
@@ -132,12 +189,15 @@ class LocalGraphDB:
         source = str(source_filename or "").strip()
         if not source:
             return
+        normalized_project_id = str(project_id or "").strip()
+        document_id = _graph_document_id(source, normalized_project_id)
         self.conn.execute(
             """
             INSERT INTO graph_documents
-                (source_filename, title, summary, keywords_json, chunk_ids_json, project_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(source_filename) DO UPDATE SET
+                (document_id, source_filename, title, summary, keywords_json, chunk_ids_json, project_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(document_id) DO UPDATE SET
+                source_filename = excluded.source_filename,
                 title = excluded.title,
                 summary = excluded.summary,
                 keywords_json = excluded.keywords_json,
@@ -145,20 +205,28 @@ class LocalGraphDB:
                 project_id = excluded.project_id
             """,
             (
+                document_id,
                 source,
                 str(title or source)[:240],
                 str(summary or "")[:4000],
                 json.dumps(_dedupe(keywords or []), ensure_ascii=False),
                 json.dumps(_dedupe(chunk_ids or []), ensure_ascii=False),
-                str(project_id or "").strip(),
+                normalized_project_id,
             ),
         )
         self.conn.commit()
 
+    @_synchronized
     def add_entity(self, name: str, entity_type: str, description: str, chunk_ids: list[str] | None = None):
         """
         数据写入层：插入或更新实体节点
         """
+        name = str(name or "").strip()
+        if not name:
+            return
+        entity_type = str(entity_type or "")
+        description = str(description or "")
+        source_chunk_ids = _dedupe(chunk_ids or [])
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT INTO entities (name, type, description)
@@ -172,10 +240,21 @@ class LocalGraphDB:
             INSERT OR IGNORE INTO entity_chunks (entity_name, chunk_id)
             VALUES (?, ?)
             """,
-            [(name, chunk_id) for chunk_id in _dedupe(chunk_ids or [])],
+            [(name, chunk_id) for chunk_id in source_chunk_ids],
+        )
+        cursor.executemany(
+            """
+            INSERT INTO entity_sources (entity_name, chunk_id, type, description)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(entity_name, chunk_id) DO UPDATE SET
+                type = excluded.type,
+                description = excluded.description
+            """,
+            [(name, chunk_id, entity_type, description) for chunk_id in source_chunk_ids],
         )
         self.conn.commit()
 
+    @_synchronized
     def add_relationship(self, source: str, target: str, relation: str, evidence_chunk_ids: list[str] | None = None):
         """
         数据写入层：插入实体间的连接关系
@@ -206,6 +285,7 @@ class LocalGraphDB:
         )
         self.conn.commit()
 
+    @_synchronized
     def get_all_entities(
         self,
         project_id: str | None = None,
@@ -235,6 +315,7 @@ class LocalGraphDB:
             or set(self._entity_chunk_ids(row[0])) & allowed_chunk_ids
         ]
 
+    @_synchronized
     def get_related_entities(
         self,
         entity_name: str,
@@ -271,6 +352,7 @@ class LocalGraphDB:
             or set(self._relationship_chunk_ids(*item)) & allowed_chunk_ids
         ][:limit]
 
+    @_synchronized
     def get_subgraph(
         self,
         entity_name: str,
@@ -343,6 +425,7 @@ class LocalGraphDB:
 
         return results
 
+    @_synchronized
     def search_context(
         self,
         query: str,
@@ -386,6 +469,7 @@ class LocalGraphDB:
 
         return graph_context
 
+    @_synchronized
     def recall_chunk_ids(
         self,
         query: str,
@@ -439,6 +523,7 @@ class LocalGraphDB:
 
         return chunk_ids[:limit]
 
+    @_synchronized
     def get_graph_snapshot(self) -> dict:
         entities = []
         for name, entity_type, description in self.conn.execute(
@@ -449,6 +534,7 @@ class LocalGraphDB:
                 "type": entity_type,
                 "description": description or "",
                 "chunk_ids": self._entity_chunk_ids(name),
+                "source_attributes": self._entity_source_attributes(name),
             })
 
         relationships = []
@@ -463,14 +549,15 @@ class LocalGraphDB:
             })
 
         documents = []
-        for source, title, summary, keywords_json, chunk_ids_json, project_id in self.conn.execute(
+        for document_id, source, title, summary, keywords_json, chunk_ids_json, project_id in self.conn.execute(
             """
-            SELECT source_filename, title, summary, keywords_json, chunk_ids_json, project_id
+            SELECT document_id, source_filename, title, summary, keywords_json, chunk_ids_json, project_id
             FROM graph_documents
             ORDER BY source_filename ASC
             """
         ).fetchall():
             documents.append({
+                "document_id": document_id,
                 "source_filename": source,
                 "title": title,
                 "summary": summary,
@@ -484,6 +571,7 @@ class LocalGraphDB:
             "documents": documents,
         }
 
+    @_synchronized
     def save_graphrag_index(self, payload: dict, index_name: str = "default") -> None:
         index_name = str(index_name or "default").strip() or "default"
         self.conn.execute(
@@ -498,6 +586,7 @@ class LocalGraphDB:
         )
         self.conn.commit()
 
+    @_synchronized
     def load_graphrag_index(self, index_name: str = "default") -> dict | None:
         index_name = str(index_name or "default").strip() or "default"
         row = self.conn.execute(
@@ -512,6 +601,7 @@ class LocalGraphDB:
             return None
         return payload if isinstance(payload, dict) else None
 
+    @_synchronized
     def remove_chunk_ids(self, chunk_ids: list[str]) -> None:
         removed = _dedupe(chunk_ids)
         if not removed:
@@ -528,6 +618,11 @@ class LocalGraphDB:
             )
             affected_entities.update(row[0] for row in cursor.fetchall())
             cursor.execute(
+                f"SELECT DISTINCT entity_name FROM entity_sources WHERE chunk_id IN ({placeholders})",
+                batch,
+            )
+            affected_entities.update(row[0] for row in cursor.fetchall())
+            cursor.execute(
                 f"SELECT DISTINCT relationship_id FROM relationship_chunks WHERE chunk_id IN ({placeholders})",
                 batch,
             )
@@ -537,23 +632,27 @@ class LocalGraphDB:
                 batch,
             )
             cursor.execute(
+                f"DELETE FROM entity_sources WHERE chunk_id IN ({placeholders})",
+                batch,
+            )
+            cursor.execute(
                 f"DELETE FROM relationship_chunks WHERE chunk_id IN ({placeholders})",
                 batch,
             )
 
-        for source, chunk_ids_json in cursor.execute(
-            "SELECT source_filename, chunk_ids_json FROM graph_documents"
+        for document_id, source, chunk_ids_json in cursor.execute(
+            "SELECT document_id, source_filename, chunk_ids_json FROM graph_documents"
         ).fetchall():
             kept = [item for item in _json_list(chunk_ids_json) if item not in removed]
             if kept:
                 cursor.execute(
-                    "UPDATE graph_documents SET chunk_ids_json = ? WHERE source_filename = ?",
-                    (json.dumps(kept, ensure_ascii=False), source),
+                    "UPDATE graph_documents SET chunk_ids_json = ? WHERE document_id = ?",
+                    (json.dumps(kept, ensure_ascii=False), document_id),
                 )
             else:
                 cursor.execute(
-                    "DELETE FROM graph_documents WHERE source_filename = ?",
-                    (source,),
+                    "DELETE FROM graph_documents WHERE document_id = ?",
+                    (document_id,),
                 )
 
         cursor.executemany(
@@ -580,15 +679,36 @@ class LocalGraphDB:
             """,
             [(entity_name,) for entity_name in affected_entities],
         )
+        cursor.executemany(
+            """
+            DELETE FROM entity_sources
+            WHERE entity_name = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM entities WHERE name = entity_sources.entity_name
+              )
+            """,
+            [(entity_name,) for entity_name in affected_entities],
+        )
         # 删除原始切片后，社区报告和 chunk 指针都可能过期；下次索引会重建派生层。
         cursor.execute("DELETE FROM graphrag_indexes")
         self.conn.commit()
 
+    @_synchronized
     def remove_project(self, project_id: str, chunk_ids: list[str] | None = None) -> None:
         project_id = str(project_id or "").strip()
         if not project_id:
             return
-        self.remove_chunk_ids(chunk_ids or [])
+        scoped_chunk_ids = _dedupe(chunk_ids or [])
+        if not scoped_chunk_ids:
+            scoped_chunk_ids = _dedupe(
+                chunk_id
+                for row in self.conn.execute(
+                    "SELECT chunk_ids_json FROM graph_documents WHERE project_id = ?",
+                    (project_id,),
+                ).fetchall()
+                for chunk_id in _json_list(row[0])
+            )
+        self.remove_chunk_ids(scoped_chunk_ids)
         self.conn.execute(
             "DELETE FROM graph_documents WHERE project_id = ?",
             (project_id,),
@@ -609,6 +729,25 @@ class LocalGraphDB:
             (name,),
         ).fetchall()
         return [row[0] for row in rows]
+
+    def _entity_source_attributes(self, name: str) -> list[dict[str, str]]:
+        rows = self.conn.execute(
+            """
+            SELECT chunk_id, type, description
+            FROM entity_sources
+            WHERE entity_name = ?
+            ORDER BY chunk_id ASC
+            """,
+            (name,),
+        ).fetchall()
+        return [
+            {
+                "chunk_id": str(chunk_id),
+                "type": str(entity_type or ""),
+                "description": str(description or ""),
+            }
+            for chunk_id, entity_type, description in rows
+        ]
 
     def _scope_chunk_ids(
         self,
@@ -647,6 +786,7 @@ class LocalGraphDB:
         ).fetchall()
         return [row[0] for row in rows]
 
+    @_synchronized
     def close(self):
         """释放资源，安全关闭数据库连接，防止连接池泄漏"""
         self.conn.close()
@@ -662,6 +802,12 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(item)
         result.append(item)
     return result
+
+
+def _graph_document_id(source_filename: str, project_id: str | None = None) -> str:
+    scope = str(project_id or "").strip()
+    value = f"document:{scope}\0{str(source_filename or '').strip()}"
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _batches(values: list[str], size: int):

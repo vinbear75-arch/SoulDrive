@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from core.local_file_lock import local_file_lock
+
 
 def _path(workspace_path: str) -> Path:
     return Path(workspace_path).resolve() / "runtime" / "document_usage.json"
@@ -28,37 +30,75 @@ def record_document_hits(workspace_path: str, sources: list[Any]) -> None:
         return
     path = _path(workspace_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    usage = _read(workspace_path)
-    now = time.time()
-    normalized_sources = []
-    for source in sources:
-        if isinstance(source, dict):
-            key = str(source.get("document_id") or source.get("source_filename") or "")
-        else:
-            key = str(source or "")
-        if key:
-            normalized_sources.append(key)
-    for source_name in dict.fromkeys(normalized_sources):
-        item = usage.setdefault(source_name, {"citation_count": 0})
-        item["citation_count"] = int(item.get("citation_count") or 0) + 1
-        item["last_cited_at"] = now
-    fd, temporary = tempfile.mkstemp(prefix="document-usage-", suffix=".json", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(usage, handle, ensure_ascii=False, indent=2)
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    with local_file_lock(f"{path}.lock"):
+        usage = _read(workspace_path)
+        now = time.time()
+        normalized_sources = []
+        for source in sources:
+            if isinstance(source, dict):
+                key = str(source.get("document_id") or source.get("source_filename") or "")
+            else:
+                key = str(source or "")
+            if key:
+                normalized_sources.append(key)
+        for source_name in dict.fromkeys(normalized_sources):
+            item = usage.setdefault(source_name, {"citation_count": 0})
+            item["citation_count"] = int(item.get("citation_count") or 0) + 1
+            item["last_cited_at"] = now
+        _write_usage(path, usage)
 
 
-def forget_document(workspace_path: str, source_name: str) -> None:
+def forget_document(
+    workspace_path: str,
+    source_name: str,
+    *,
+    document_id: str | None = None,
+) -> None:
     path = _path(workspace_path)
-    usage = _read(workspace_path)
-    if source_name not in usage:
-        return
-    usage.pop(source_name, None)
-    path.write_text(json.dumps(usage, ensure_ascii=False, indent=2), encoding="utf-8")
+    with local_file_lock(f"{path}.lock"):
+        usage = _read(workspace_path)
+        keys = {str(source_name or "").strip()}
+        normalized_id = str(document_id or "").strip()
+        if normalized_id:
+            keys.add(normalized_id)
+            if normalized_id.startswith("secure_"):
+                keys.add(normalized_id.removeprefix("secure_"))
+            else:
+                keys.add(f"secure_{normalized_id}")
+        if not any(key in usage for key in keys if key):
+            return
+        for key in keys:
+            if key:
+                usage.pop(key, None)
+        _write_usage(path, usage)
+
+
+def _write_usage(path: Path, usage: dict[str, dict[str, Any]]) -> None:
+    """Publish derived usage state as one complete JSON snapshot."""
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(usage, temporary, ensure_ascii=False, indent=2)
+            temporary.write("\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def document_weight(workspace_path: str, metadata: dict[str, Any]) -> float:

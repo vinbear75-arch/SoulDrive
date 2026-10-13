@@ -34,6 +34,18 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertEqual(state_path, Path(temp_dir) / "runtime" / "runtime_state.json")
         self.assertFalse((Path(temp_dir) / "souldrive_db").exists())
 
+    def test_runtime_state_failure_leaves_no_partial_snapshot(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "runtime_state.json"
+            with patch.object(runtime_state, "STATE_PATH", str(state_path)), patch(
+                "core.atomic_file.os.fsync", side_effect=OSError("disk full")
+            ):
+                with self.assertRaises(OSError):
+                    runtime_state.set_runtime_state(auth_level="LOCAL")
+
+            self.assertFalse(state_path.exists())
+            self.assertEqual(list(state_path.parent.glob(".runtime_state.json.*.tmp")), [])
+
     def test_runtime_state_merges_indexing_without_shared_defaults(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = str(Path(temp_dir) / "runtime_state.json")

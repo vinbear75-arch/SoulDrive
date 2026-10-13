@@ -1,6 +1,6 @@
+import hashlib
 import threading
 import time
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -16,6 +16,7 @@ class RuntimeMetrics:
     failed_requests: int = 0
     chat_requests: int = 0
     chat_failures: int = 0
+    chat_abandoned: int = 0
     chat_completed: int = 0
     chat_under_5s: int = 0
     last_chat_first_token_ms: int = 0
@@ -35,6 +36,8 @@ class RuntimeMetrics:
     memory_gate_skips: int = 0
     last_memory_gate_accepted_count: int = 0
     last_memory_gate_rejected_count: int = 0
+    last_memory_gate_decision_reason: str | None = None
+    learning_context_scope_mismatches: int = 0
     presentation_tasks_started: int = 0
     presentation_tasks_completed: int = 0
     presentation_tasks_failed: int = 0
@@ -43,6 +46,7 @@ class RuntimeMetrics:
     last_retrieval_evidence_count: int = 0
     generation_failures: int = 0
     model_load_failures: int = 0
+    audit_failures: int = 0
     indexing_runs: int = 0
     indexing_failures: int = 0
     last_indexing_ms: int = 0
@@ -50,6 +54,7 @@ class RuntimeMetrics:
     last_model_load_ms: int = 0
     total_latency_ms: int = 0
     last_error: str | None = None
+    last_error_observation: dict[str, Any] | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def record_request(self, elapsed_ms: int, status_code: int):
@@ -66,7 +71,8 @@ class RuntimeMetrics:
 
     def record_error(self, message: str):
         with self._lock:
-            self.last_error = _sanitize_error_message(message)[:500]
+            self.last_error = "运行异常，请查看运行诊断。"
+            self.last_error_observation = _error_observation(message)
 
     def record_model_load(self, elapsed_ms: int):
         with self._lock:
@@ -102,12 +108,20 @@ class RuntimeMetrics:
             self.last_context_gate_accepted_count = max(0, int(accepted_count))
             self.last_context_gate_rejected_count = max(0, int(rejected_count))
 
-    def record_memory_gate(self, decision: str, accepted_count: int, rejected_count: int):
+    def record_memory_gate(
+        self,
+        decision: str,
+        accepted_count: int,
+        rejected_count: int,
+        decision_reason: str | None = None,
+    ):
         with self._lock:
             attribute = "memory_gate_accepts" if decision == "accept" else "memory_gate_skips"
             setattr(self, attribute, getattr(self, attribute) + 1)
             self.last_memory_gate_accepted_count = max(0, int(accepted_count))
             self.last_memory_gate_rejected_count = max(0, int(rejected_count))
+            normalized_reason = str(decision_reason or "").strip()
+            self.last_memory_gate_decision_reason = normalized_reason[:64] or None
 
     def record_indexing_run(self, elapsed_ms: int, chunk_count: int, failed: bool = False):
         with self._lock:
@@ -136,6 +150,7 @@ class RuntimeMetrics:
                 "failed_requests": self.failed_requests,
                 "chat_requests": self.chat_requests,
                 "chat_failures": self.chat_failures,
+                "chat_abandoned": self.chat_abandoned,
                 "chat_completed": self.chat_completed,
                 "chat_under_5s": self.chat_under_5s,
                 "chat_under_5s_rate": round(
@@ -159,6 +174,8 @@ class RuntimeMetrics:
                 "memory_gate_skips": self.memory_gate_skips,
                 "last_memory_gate_accepted_count": self.last_memory_gate_accepted_count,
                 "last_memory_gate_rejected_count": self.last_memory_gate_rejected_count,
+                "last_memory_gate_decision_reason": self.last_memory_gate_decision_reason,
+                "learning_context_scope_mismatches": self.learning_context_scope_mismatches,
                 "presentation_tasks_started": self.presentation_tasks_started,
                 "presentation_tasks_completed": self.presentation_tasks_completed,
                 "presentation_tasks_failed": self.presentation_tasks_failed,
@@ -167,6 +184,7 @@ class RuntimeMetrics:
                 "last_retrieval_evidence_count": self.last_retrieval_evidence_count,
                 "generation_failures": self.generation_failures,
                 "model_load_failures": self.model_load_failures,
+                "audit_failures": self.audit_failures,
                 "indexing_runs": self.indexing_runs,
                 "indexing_failures": self.indexing_failures,
                 "last_indexing_ms": self.last_indexing_ms,
@@ -174,21 +192,17 @@ class RuntimeMetrics:
                 "last_model_load_ms": self.last_model_load_ms,
                 "average_latency_ms": round(average_latency, 2),
                 "last_error": self.last_error,
+                "last_error_observation": dict(self.last_error_observation or {}),
             }
 
 
-runtime_metrics = RuntimeMetrics()
-
-
-WINDOWS_PATH_PATTERN = re.compile(r"(?i)\b[A-Z]:\\[^\s\r\n\t\"']+")
-POSIX_PATH_PATTERN = re.compile(r"(?<!\w)/(?:[^\s\r\n\t\"']+/)+[^\s\r\n\t\"']+")
-SENSITIVE_FIELD_PATTERN = re.compile(
-    r"(?i)\b(token|secret|password|api[_-]?key|hardware[_-]?sn|serial)\b\s*[:=]\s*[^\s\r\n\t\"']+"
-)
-
-
-def _sanitize_error_message(message: str) -> str:
+def _error_observation(message: str) -> dict[str, Any]:
     text = str(message or "")
-    text = WINDOWS_PATH_PATTERN.sub("[local path]", text)
-    text = POSIX_PATH_PATTERN.sub("[local path]", text)
-    return SENSITIVE_FIELD_PATTERN.sub(lambda match: f"{match.group(1)}=[redacted]", text)
+    return {
+        "error_type": "UnknownError",
+        "error_digest": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16],
+        "error_chars": len(text),
+    }
+
+
+runtime_metrics = RuntimeMetrics()

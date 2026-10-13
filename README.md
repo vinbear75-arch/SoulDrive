@@ -13,6 +13,10 @@ SoulDrive 是一个面向私有资产的端侧知识引擎，核心目标是把�
 
 ## 本地业务验证
 
+2026-10-13 阶段交付与空间清理记录见 [阶段闭环报告](docs/reports/2026-10-13-stage-closure-and-cleanup.md)。打包服务的实验比较主线已通过合成工程材料验证；真实桌面交互和开放式业务质量仍是单独的验收项。
+
+默认启动不再自动解锁工作区或内置开发口令；已有工作区/密钥保留，使用正常界面解锁。可选 Redis/Postgres 需自行明确配置。清理编译缓存后，下一次开发启动会重新编译；模型和原始资料留在本机，不随 GitHub 源码上传。
+
 发布前请在同一 Windows 本机环境验证文档摄取、检索问答、证据引用、项目隔离、端侧多模态感知与人工确认链路：
 
 ```powershell
@@ -60,7 +64,7 @@ cargo check --locked --manifest-path souldrive-ui/src-tauri/Cargo.toml
 ### 3. 克隆源码并恢复 Python
 
 ```powershell
-git clone https://github.com/Vin-Bear/SoulDrive.git
+git clone https://github.com/vinbear75-arch/SoulDrive.git
 cd SoulDrive
 git status --short --branch
 

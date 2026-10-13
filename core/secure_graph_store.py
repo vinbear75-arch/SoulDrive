@@ -4,8 +4,10 @@ import hmac
 import json
 import os
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
+from functools import wraps
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -17,12 +19,22 @@ DOCUMENT_AAD = b"SoulDrive secure graph document v1"
 GRAPHRAG_INDEX_AAD = b"SoulDrive secure GraphRAG index v1"
 
 
+def _synchronized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 @dataclass(frozen=True)
 class _EntityRecord:
     name: str
     entity_type: str
     description: str
     chunk_ids: list[str]
+    source_attributes: list[dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -48,7 +60,8 @@ class SecureGraphStore:
         self.db_path = db_path
         self.keys = keys
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._lock = threading.RLock()
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self._init_schema()
 
     def _init_schema(self):
@@ -91,6 +104,7 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def add_document(
         self,
         source_filename: str,
@@ -103,14 +117,22 @@ class SecureGraphStore:
         source = str(source_filename or "").strip()
         if not source:
             return
-        document_id = self._document_id(source)
+        normalized_project_id = str(project_id or "").strip()
+        document_id = self._document_id(source, normalized_project_id)
+        for existing_id, existing in self._document_rows():
+            if (
+                existing_id != document_id
+                and existing.source_filename == source
+                and existing.project_id == normalized_project_id
+            ):
+                self.conn.execute("DELETE FROM documents WHERE document_id = ?", (existing_id,))
         payload = {
             "source_filename": source,
             "title": str(title or source)[:240],
             "summary": str(summary or "")[:4000],
             "keywords": _dedupe(keywords or []),
             "chunk_ids": _dedupe(chunk_ids or []),
-            "project_id": str(project_id or "").strip(),
+            "project_id": normalized_project_id,
         }
         nonce, ciphertext = self._encrypt_json(
             payload,
@@ -125,15 +147,38 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def add_entity(self, name: str, entity_type: str, description: str, chunk_ids: list[str] | None = None):
+        name = str(name or "").strip()
+        if not name:
+            return
+        entity_type = str(entity_type or "")
+        description = str(description or "")
         entity_id = self._entity_id(name)
         existing = self._entity_by_name(name)
-        merged_chunk_ids = _dedupe([*(existing.chunk_ids if existing else []), *(chunk_ids or [])])
+        source_chunk_ids = _dedupe(chunk_ids or [])
+        merged_chunk_ids = _dedupe([*(existing.chunk_ids if existing else []), *source_chunk_ids])
+        source_attributes = {
+            str(item.get("chunk_id") or ""): {
+                "chunk_id": str(item.get("chunk_id") or ""),
+                "type": str(item.get("type") or ""),
+                "description": str(item.get("description") or ""),
+            }
+            for item in (existing.source_attributes if existing else [])
+            if str(item.get("chunk_id") or "")
+        }
+        for chunk_id in source_chunk_ids:
+            source_attributes[chunk_id] = {
+                "chunk_id": chunk_id,
+                "type": entity_type,
+                "description": description,
+            }
         payload = {
             "name": name,
             "type": entity_type,
             "description": description,
             "chunk_ids": merged_chunk_ids,
+            "source_attributes": [source_attributes[key] for key in sorted(source_attributes)],
         }
         nonce, ciphertext = self._encrypt_json(payload, ENTITY_AAD + entity_id.encode("ascii"))
         self.conn.execute(
@@ -145,6 +190,7 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def add_relationship(self, source: str, target: str, relation: str, evidence_chunk_ids: list[str] | None = None):
         relationship_id = self._relationship_id(source, relation, target)
         existing = self._relationship_by_parts(source, relation, target)
@@ -168,6 +214,7 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def get_all_entities(
         self,
         project_id: str | None = None,
@@ -185,6 +232,7 @@ class SecureGraphStore:
             key=lambda value: (-len(value), value),
         )
 
+    @_synchronized
     def get_related_entities(
         self,
         entity_name: str,
@@ -205,6 +253,7 @@ class SecureGraphStore:
         matches.sort(key=lambda item: (item[0], item[1], item[2]))
         return matches[:limit]
 
+    @_synchronized
     def get_subgraph(
         self,
         entity_name: str,
@@ -246,6 +295,7 @@ class SecureGraphStore:
 
         return results
 
+    @_synchronized
     def search_context(
         self,
         query: str,
@@ -285,6 +335,7 @@ class SecureGraphStore:
 
         return graph_context
 
+    @_synchronized
     def recall_chunk_ids(
         self,
         query: str,
@@ -331,6 +382,7 @@ class SecureGraphStore:
                     return chunk_ids[:limit]
         return chunk_ids[:limit]
 
+    @_synchronized
     def get_graph_snapshot(self) -> dict:
         entities = [
             {
@@ -338,6 +390,7 @@ class SecureGraphStore:
                 "type": record.entity_type,
                 "description": record.description,
                 "chunk_ids": list(record.chunk_ids),
+                "source_attributes": [dict(item) for item in record.source_attributes],
             }
             for record in self._all_entities()
         ]
@@ -352,6 +405,7 @@ class SecureGraphStore:
         ]
         documents = [
             {
+                "document_id": document_id,
                 "source_filename": record.source_filename,
                 "title": record.title,
                 "summary": record.summary,
@@ -359,13 +413,14 @@ class SecureGraphStore:
                 "chunk_ids": list(record.chunk_ids),
                 "project_id": record.project_id,
             }
-            for record in self._all_documents()
+            for document_id, record in self._document_rows()
         ]
         entities.sort(key=lambda item: item["name"])
         relationships.sort(key=lambda item: (item["source"], item["relation"], item["target"]))
         documents.sort(key=lambda item: item["source_filename"])
         return {"entities": entities, "relationships": relationships, "documents": documents}
 
+    @_synchronized
     def save_graphrag_index(self, payload: dict, index_name: str = "default") -> None:
         index_name = str(index_name or "default").strip() or "default"
         index_id = self._index_id(index_name)
@@ -382,6 +437,7 @@ class SecureGraphStore:
         )
         self.conn.commit()
 
+    @_synchronized
     def load_graphrag_index(self, index_name: str = "default") -> dict | None:
         index_name = str(index_name or "default").strip() or "default"
         index_id = self._index_id(index_name)
@@ -403,6 +459,7 @@ class SecureGraphStore:
         nested = payload.get("payload")
         return nested if isinstance(nested, dict) else None
 
+    @_synchronized
     def remove_chunk_ids(self, chunk_ids: list[str]) -> None:
         removed = {str(chunk_id) for chunk_id in chunk_ids if str(chunk_id)}
         if not removed:
@@ -420,6 +477,11 @@ class SecureGraphStore:
                 "type": entity.entity_type,
                 "description": entity.description,
                 "chunk_ids": kept_chunk_ids,
+                "source_attributes": [
+                    dict(item)
+                    for item in entity.source_attributes
+                    if str(item.get("chunk_id") or "") in set(kept_chunk_ids)
+                ],
             }
             nonce, ciphertext = self._encrypt_json(payload, ENTITY_AAD + entity_id.encode("ascii"))
             self.conn.execute(
@@ -470,6 +532,7 @@ class SecureGraphStore:
                 "summary": document.summary,
                 "keywords": document.keywords,
                 "chunk_ids": kept_chunk_ids,
+                "project_id": document.project_id,
             }
             nonce, ciphertext = self._encrypt_json(
                 payload,
@@ -488,11 +551,20 @@ class SecureGraphStore:
         self.conn.execute("DELETE FROM derived_indexes")
         self.conn.commit()
 
+    @_synchronized
     def remove_project(self, project_id: str, chunk_ids: list[str] | None = None) -> None:
         project_id = str(project_id or "").strip()
         if not project_id:
             return
-        self.remove_chunk_ids(chunk_ids or [])
+        scoped_chunk_ids = _dedupe(chunk_ids or [])
+        if not scoped_chunk_ids:
+            scoped_chunk_ids = _dedupe(
+                chunk_id
+                for document in self._document_rows()
+                if document[1].project_id == project_id
+                for chunk_id in document[1].chunk_ids
+            )
+        self.remove_chunk_ids(scoped_chunk_ids)
         for document_id, document in self._document_rows():
             if document.project_id == project_id:
                 self.conn.execute("DELETE FROM documents WHERE document_id = ?", (document_id,))
@@ -501,6 +573,7 @@ class SecureGraphStore:
         self.conn.execute("DELETE FROM derived_indexes")
         self.conn.commit()
 
+    @_synchronized
     def close(self):
         self.conn.close()
 
@@ -523,6 +596,7 @@ class SecureGraphStore:
                     entity_type=str(payload.get("type") or ""),
                     description=str(payload.get("description") or ""),
                     chunk_ids=[str(item) for item in payload.get("chunk_ids") or []],
+                    source_attributes=_normalize_source_attributes(payload.get("source_attributes")),
                 ),
             )
             for row in rows
@@ -587,8 +661,9 @@ class SecureGraphStore:
     def _relationship_id(self, source: str, relation: str, target: str) -> str:
         return self._digest("rel:" + source + "\0" + relation + "\0" + target)
 
-    def _document_id(self, source_filename: str) -> str:
-        return self._digest("document:" + source_filename)
+    def _document_id(self, source_filename: str, project_id: str | None = None) -> str:
+        scope = str(project_id or "").strip()
+        return self._digest("document:" + scope + "\0" + source_filename)
 
     def _index_id(self, name: str) -> str:
         return self._digest("index:" + name)
@@ -611,6 +686,7 @@ class SecureGraphStore:
             entity_type=str(payload.get("type") or ""),
             description=str(payload.get("description") or ""),
             chunk_ids=[str(item) for item in payload.get("chunk_ids") or []],
+            source_attributes=_normalize_source_attributes(payload.get("source_attributes")),
         )
 
     def _relationship_by_parts(self, source: str, relation: str, target: str) -> _RelationshipRecord | None:
@@ -698,3 +774,19 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(item)
         result.append(item)
     return result
+
+
+def _normalize_source_attributes(value) -> list[dict[str, str]]:
+    result = {}
+    for item in value or []:
+        if not isinstance(item, dict):
+            continue
+        chunk_id = str(item.get("chunk_id") or "").strip()
+        if not chunk_id:
+            continue
+        result[chunk_id] = {
+            "chunk_id": chunk_id,
+            "type": str(item.get("type") or ""),
+            "description": str(item.get("description") or ""),
+        }
+    return [result[key] for key in sorted(result)]

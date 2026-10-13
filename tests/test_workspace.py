@@ -20,6 +20,17 @@ class WorkspaceTests(unittest.TestCase):
             self.assertTrue(Path(workspace.manifest_path).exists())
             self.assertTrue(is_souldrive_workspace(temp_dir))
 
+    def test_workspace_manifest_failure_leaves_no_partial_manifest(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir)
+            with patch("core.atomic_file.os.fsync", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    workspace.ensure()
+
+            manifest = Path(workspace.manifest_path)
+            self.assertFalse(manifest.exists())
+            self.assertEqual(list(manifest.parent.glob(".workspace.json.*.tmp")), [])
+
     def test_workspace_diagnose_reports_product_layout(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()

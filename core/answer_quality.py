@@ -1,8 +1,10 @@
 ﻿import re
+import math
 from dataclasses import dataclass
+from decimal import MAX_EMAX, MIN_EMIN, Decimal, DecimalException, Inexact, localcontext
 from typing import Any
 
-from core.retrieval import classify_query_intent
+from core.retrieval import classify_query_intent, source_diversity_key
 
 
 CITATION_PATTERN = re.compile(r"\[((?:E|V|A|M)\d+)\]")
@@ -18,8 +20,13 @@ _FACT_UNIT_PATTERN = (
     r"msec|milliseconds?|ms|seconds?|sec|s|minutes?|min|hours?|hrs?|hr|h|"
     r"bytes?|b|[A-Za-z]+)"
 )
+_FACT_NUMBER_PATTERN = (
+    # A range/version hyphen is not a unary sign; explicit signs and
+    # scientific exponents remain part of the numeric fact.
+    r"(?:(?<![A-Za-z0-9_.])[+\-−])?(?:\d+(?:[.,]\d+)?|\.\d+)(?:[eE][+\-−]?\d+)?"
+)
 FACT_TOKEN_PATTERN = re.compile(
-    rf"\d+(?:[.,]\d+)?(?:\s*{_FACT_UNIT_PATTERN})?",
+    rf"{_FACT_NUMBER_PATTERN}(?:\s*{_FACT_UNIT_PATTERN})?",
     flags=re.IGNORECASE,
 )
 _FACT_TIME_UNITS = {
@@ -57,6 +64,63 @@ _FACT_STORAGE_UNITS = {
     "tib": 1024.0**4,
 }
 EVIDENCE_QUERY_CHECK_LIMIT = 6
+_QUERY_GENERIC_TERMS = frozenset({
+    "请",
+    "根据",
+    "当前",
+    "本地",
+    "资料",
+    "文档",
+    "文件",
+    "报告",
+    "给出",
+    "列出",
+    "找出",
+    "说明",
+    "概括",
+    "总结",
+    "主要",
+    "哪些",
+    "什么",
+    "如何",
+    "怎么",
+    "是否",
+    "这些",
+    "相关",
+    "里面",
+    "其中",
+    "中的",
+    "建议",
+})
+_QUERY_HARD_TOKEN_PATTERN = re.compile(
+    r"[A-Za-z][A-Za-z0-9_.:/-]{1,}|\b\d+(?:[.,]\d+)?\b"
+)
+_QUERY_HARD_TOKEN_STOPWORDS = frozenset({
+    "a",
+    "an",
+    "and",
+    "are",
+    "can",
+    "does",
+    "for",
+    "from",
+    "give",
+    "how",
+    "is",
+    "list",
+    "local",
+    "please",
+    "the",
+    "these",
+    "this",
+    "those",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+})
 _CITATION_BOILERPLATE_EXACT = {
     "answer",
     "答案",
@@ -156,6 +220,14 @@ def evaluate_evidence_gate(
                 if not detail_hints and title_match:
                     answers_query = True
                     break
+    if query and not answers_query and max_score >= reject_score:
+        return EvidenceGateResult(
+            False,
+            "evidence does not answer query",
+            len(evidence),
+            max_score,
+            "retry",
+        )
     if max_score < retry_score:
         if (
             answers_query
@@ -259,9 +331,9 @@ def has_corroborating_evidence(
     if len(credible) < 2:
         return False
     sources = {
-        str(item.get("source_filename") or "").strip()
+        source_diversity_key(item)
         for item in credible
-        if str(item.get("source_filename") or "").strip()
+        if source_diversity_key(item)
     }
     return len(sources) >= 2
 
@@ -288,14 +360,78 @@ def citation_coverage(answer: str, evidence: list[dict[str, Any]]) -> dict[str, 
     }
 
 
+def _cited_source_keys_for_text(text: str, evidence: list[dict[str, Any]]) -> set[str]:
+    """Return logical source identities behind citations in one text span.
+
+    GraphRAG evidence may carry several original document identities on one
+    derived record.  Count those original identities instead of counting the
+    community report as a single source.  Ordinary evidence falls back to the
+    same scoped source key used by retrieval diagnostics.
+    """
+    evidence_by_id = {
+        str(item.get("id")): item
+        for item in evidence
+        if item.get("id")
+    }
+    source_keys: set[str] = set()
+    for evidence_id in dict.fromkeys(CITATION_PATTERN.findall(text or "")):
+        if not evidence_id.startswith("E"):
+            continue
+        item = evidence_by_id.get(evidence_id)
+        if not item:
+            continue
+        raw_document_ids = item.get("source_document_ids")
+        if isinstance(raw_document_ids, str):
+            raw_document_ids = [raw_document_ids]
+        document_ids = {
+            str(value).strip()
+            for value in (raw_document_ids or [])
+            if str(value).strip()
+        }
+        if document_ids:
+            source_keys.update(f"document:{value}" for value in document_ids)
+            continue
+        source_key = source_diversity_key(
+            item,
+            str(item.get("source_filename") or evidence_id),
+        )
+        if source_key:
+            source_keys.add(f"source:{source_key}")
+    return source_keys
+
+
+def _cited_source_keys(answer: str, evidence: list[dict[str, Any]]) -> set[str]:
+    return _cited_source_keys_for_text(answer, evidence)
+
+
+def citation_source_count(answer: str, evidence: list[dict[str, Any]]) -> int:
+    """Count distinct logical source documents cited by an answer."""
+    return len(_cited_source_keys(answer, evidence))
+
+
 def validate_answer_citations(
     answer: str,
     evidence: list[dict[str, Any]],
     *,
     semantic: bool = False,
+    required_source_count: int = 0,
+    require_source_count_per_claim: bool = False,
 ) -> dict[str, Any]:
+    try:
+        required_source_count = max(0, int(required_source_count))
+    except (TypeError, ValueError):
+        required_source_count = 0
     coverage = citation_coverage(answer, evidence)
     if not evidence:
+        if required_source_count > 0:
+            return {
+                "valid": False,
+                "decision": "retry",
+                "reason": "answer citation source diversity insufficient",
+                "cited_source_count": 0,
+                "required_source_count": required_source_count,
+                **coverage,
+            }
         return {
             "valid": True,
             "decision": "accept",
@@ -352,12 +488,56 @@ def validate_answer_citations(
             **coverage,
         }
 
+    cited_source_count = None
+    if required_source_count > 0:
+        cited_source_count = citation_source_count(answer, evidence)
+        if cited_source_count < required_source_count:
+            return {
+                "valid": False,
+                "decision": "retry",
+                "reason": "answer citation source diversity insufficient",
+                "cited_source_count": cited_source_count,
+                "required_source_count": required_source_count,
+                **coverage,
+            }
+        if require_source_count_per_claim:
+            insufficient_claims = []
+            for index, claim in enumerate(answer_claim_units(answer), start=1):
+                if _is_non_factual_citation_claim(claim):
+                    continue
+                claim_source_count = len(_cited_source_keys_for_text(claim, evidence))
+                if claim_source_count < required_source_count:
+                    insufficient_claims.append({
+                        "claim_index": index,
+                        "cited_source_count": claim_source_count,
+                        "required_source_count": required_source_count,
+                    })
+            if insufficient_claims:
+                return {
+                    "valid": False,
+                    "decision": "retry",
+                    "reason": "answer claim source diversity insufficient",
+                    "cited_source_count": cited_source_count,
+                    "required_source_count": required_source_count,
+                    "insufficient_claim_count": len(insufficient_claims),
+                    "insufficient_claims": insufficient_claims[:8],
+                    **coverage,
+                }
+
     return {
         "valid": True,
         "decision": "accept",
         "reason": "answer citations validated",
         "uncited_claim_count": 0,
         **({"semantic_support": semantic_report} if semantic_report else {}),
+        **(
+            {
+                "cited_source_count": cited_source_count,
+                "required_source_count": required_source_count,
+            }
+            if required_source_count > 0
+            else {}
+        ),
         **coverage,
     }
 
@@ -541,9 +721,9 @@ def _compact_text(text: str) -> str:
 
 
 def _is_non_factual_citation_claim(text: str) -> bool:
-    """Recognize generated source-location scaffolding, not factual claims."""
+    """Recognize location scaffolding and the exact missing-evidence marker."""
     normalized = re.sub(r"\s+", "", text or "")
-    if not normalized or normalized in {"证据", "证据："}:
+    if not normalized or normalized in {"证据", "证据：", "待确认"}:
         return True
     if normalized.startswith(("来源文档：", "证据章节：", "视觉证据范围：")):
         return True
@@ -573,25 +753,34 @@ def _fact_tokens(text: str) -> set[str]:
 
 def _normalize_fact_token(token: str) -> str:
     """Normalize only unambiguous numeric and unit spellings for citation support."""
-    normalized = str(token or "").replace(" ", "").lower()
-    match = re.fullmatch(rf"(\d+(?:[.,]\d+)?)(.*)", normalized)
+    normalized = str(token or "").replace(" ", "").replace("−", "-").lower()
+    match = re.fullmatch(rf"({_FACT_NUMBER_PATTERN})(.*)", normalized)
     if not match:
-        return normalized
-    try:
-        value = float(match.group(1).replace(",", "."))
-    except ValueError:
         return normalized
     unit = match.group(2)
     if unit in {"%", "％"}:
-        value /= 100.0
-        return format(value, ".12g")
-    if unit in _FACT_TIME_UNITS:
-        return f"time_ms:{format(value * _FACT_TIME_UNITS[unit], '.12g')}"
-    if unit in _FACT_STORAGE_UNITS:
-        return f"bytes:{format(value * _FACT_STORAGE_UNITS[unit], '.12g')}"
-    if unit:
-        return f"unit:{unit}:{format(value, '.12g')}"
-    return format(value, ".12g")
+        multiplier, prefix = Decimal("0.01"), ""
+    elif unit in _FACT_TIME_UNITS:
+        multiplier, prefix = Decimal(str(_FACT_TIME_UNITS[unit])), "time_ms:"
+    elif unit in _FACT_STORAGE_UNITS:
+        multiplier, prefix = Decimal(str(_FACT_STORAGE_UNITS[unit])), "bytes:"
+    else:
+        multiplier, prefix = Decimal(1), f"unit:{unit}:" if unit else ""
+    try:
+        with localcontext() as context:
+            value = Decimal(match.group(1).replace(",", "."))
+            if not value.is_finite():
+                return normalized
+            # Multiplying finite decimal coefficients needs at most the sum
+            # of their digit counts; never round citation facts to display precision.
+            context.prec = len(value.as_tuple().digits) + len(multiplier.as_tuple().digits)
+            context.Emax, context.Emin, context.clamp = MAX_EMAX, MIN_EMIN, 0
+            context.traps[Inexact] = True
+            value = (value * multiplier).normalize()
+            return f"{prefix}{'0' if value.is_zero() else value}"
+    except DecimalException:
+        # Keep unsupported exponent literals distinct, not float inf/zero.
+        return normalized
 
 
 def answer_claim_units(answer: str) -> list[str]:
@@ -682,32 +871,76 @@ def evidence_answers_query(query: str, evidence: list[dict[str, Any]]) -> bool:
         if source_topics and content_topics:
             return False
 
+    evidence_text = " ".join(
+        " ".join(
+            str(item.get(key) or "")
+            for key in ("source_filename", "document_title", "section", "section_path", "snippet", "context")
+        )
+        for item in checked_evidence
+    )
+    missing_hard_tokens = [
+        token
+        for token in _query_hard_tokens(query)
+        if _normalize_hard_token(token) not in _normalize_hard_token(evidence_text)
+    ]
+    if missing_hard_tokens:
+        return False
+
     query_terms = content_terms(query)
     if not query_terms:
         return True
 
-    evidence_terms: set[str] = set()
-    for item in checked_evidence:
-        evidence_terms.update(
-            content_terms(
-                " ".join(
-                    str(item.get(key) or "")
-                    for key in ("source_filename", "section", "snippet", "context")
-                )
-            )
-        )
+    evidence_terms = content_terms(evidence_text)
 
     if not evidence_terms:
         return False
 
     overlap = query_terms & evidence_terms
+    signal_terms = _query_signal_terms(query)
+    signal_overlap = signal_terms & evidence_terms
     coverage = len(overlap) / max(len(query_terms), 1)
+    signal_coverage = len(signal_overlap) / max(len(signal_terms), 1)
     if (
         (is_definition_query(query) or is_synthesis_query(query))
         and any(is_strong_entity_term(term) for term in overlap)
     ):
         return True
-    return len(overlap) >= 2 or coverage >= 0.34
+    if signal_terms and not signal_overlap:
+        return False
+    return (
+        len(overlap) >= 2
+        and (not signal_terms or len(signal_overlap) >= 2 or signal_coverage >= 0.34)
+    ) or coverage >= 0.34
+
+
+def _query_hard_tokens(query: str) -> list[str]:
+    tokens = []
+    seen = set()
+    for token in _QUERY_HARD_TOKEN_PATTERN.findall(str(query or "")):
+        normalized = _normalize_hard_token(token)
+        if (
+            len(normalized) < 2
+            or normalized in _QUERY_HARD_TOKEN_STOPWORDS
+            or normalized in seen
+        ):
+            continue
+        seen.add(normalized)
+        tokens.append(token)
+    return tokens
+
+
+def _normalize_hard_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
+
+def _query_signal_terms(query: str) -> set[str]:
+    terms = content_terms(query)
+    return {
+        term
+        for term in terms
+        if term not in _QUERY_GENERIC_TERMS
+        and not any(generic in term for generic in _QUERY_GENERIC_TERMS)
+    }
 
 
 def content_terms(text: str) -> set[str]:
@@ -801,6 +1034,7 @@ def is_strong_entity_term(term: str) -> bool:
 
 def _safe_float(value: Any) -> float:
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return 0.0
+    return parsed if math.isfinite(parsed) else 0.0
