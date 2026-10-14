@@ -14,6 +14,7 @@ from core.rag_engine import (
     _query_rewrite_trigger_reason,
     _retry_preserves_source_diversity,
     _should_correct_rejected_retrieval,
+    _validate_generated_answer_for_workflow,
     build_answer_messages,
     build_global_source_coverage_plan,
     build_learning_context,
@@ -2104,6 +2105,41 @@ class RagPromptingTests(unittest.TestCase):
         self.assertNotIn("context trimmed", answer_text)
         self.assertNotIn("保守结论", answer_text)
         self.assertEqual(engine.llm.call_count, 2)
+
+    def test_invalid_answer_fallback_explains_that_generation_failed(self):
+        for draft in ("未提供的测量支持隐私保护。[M9]", "隐私保护覆盖率为99%。[E1]"):
+            with self.subTest(draft=draft):
+                evidence = [{"id": "E1", "score": 0.2, "source_filename": "privacy.pdf",
+                             "snippet": "该方案通过本地加密存储保护隐私，原始资料保存在用户本机而不是上传云端。"}]
+                engine = _build_engine(_FakeStreamingLlm([draft, draft]), evidence, align_evidence=True)
+                output = "".join(engine.generate_response_stream("这个方案怎么保护隐私？"))
+                answer = output.split("```souldrive-evidence", 1)[0].strip()
+                self.assertIn("自动回答未通过证据或当前模式的输出校验，本轮已改为证据核对。", answer)
+                self.assertNotIn(draft, answer)
+                self.assertEqual(engine.llm.call_count, 2)
+                self.assertTrue(_validate_generated_answer_for_workflow(answer, evidence, None)["valid"])
+                self.assertTrue(any(event == "rag.refused_invalid_answer" for event, _ in engine.audit_logger.events))
+
+    def test_incomplete_answer_fallback_has_a_distinct_notice(self):
+        evidence = [{"id": "E1", "score": 0.2, "source_filename": "privacy.pdf",
+                     "snippet": "该方案通过本地加密存储保护隐私，原始资料保存在用户本机而不是上传云端。"}]
+        engine = _build_engine(_FakeStreamingLlm(["该方案通过本地加密存储保护隐私。[E1]"]), evidence, align_evidence=True)
+        with patch("core.rag_engine.generated_answer_needs_fallback", return_value=True):
+            output = "".join(engine.generate_response_stream("这个方案怎么保护隐私？"))
+        answer = output.split("```souldrive-evidence", 1)[0].strip()
+        self.assertIn("自动回答未满足完整性或证据要求，本轮已改为证据核对。", answer)
+        self.assertNotIn("未通过证据或当前模式的输出校验", answer)
+        self.assertEqual(engine.llm.call_count, 1)
+        self.assertTrue(_validate_generated_answer_for_workflow(answer, evidence, None)["valid"])
+        self.assertTrue(any(event == "rag.answer_quality_fallback" for event, _ in engine.audit_logger.events))
+
+    def test_successful_answer_is_not_labelled_as_a_fallback(self):
+        engine = _build_engine(_FakeStreamingLlm(["该方案通过本地加密存储保护隐私。[E1]"]),
+                               [{"id": "E1", "score": 0.2, "source_filename": "privacy.pdf",
+                                 "snippet": "该方案通过本地加密存储保护隐私。"}])
+        output = "".join(engine.generate_response_stream("这个方案怎么保护隐私？"))
+        self.assertNotIn("本轮已改为证据核对", output)
+        self.assertEqual(engine.llm.call_count, 1)
 
     def test_generate_response_stream_retries_retrieval_before_refusing_weak_evidence(self):
         engine = _build_engine(

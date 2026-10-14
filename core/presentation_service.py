@@ -283,6 +283,7 @@ class PresentationService:
                 raise ValueError("PPT 大纲已变化，请重新查看后确认")
             inputs = dict(plan_task["inputs"])
             self._require_experiment_outline(inputs, result)
+            _require_generated_outline_evidence(inputs, result)
             generation_task_id = _stable_presentation_task_id(
                 "presentation.generate",
                 f"{plan_task_id}:{plan_digest}",
@@ -456,6 +457,7 @@ class PresentationService:
             "plan_digest": _presentation_plan_digest(outline),
             "outline": outline,
             "outline_source": outline.get("outline_source"),
+            "evidence_validation": outline.get("evidence_validation") or {},
             "slide_count": len(outline.get("slides") or []),
             "source_count": outputs["collect_evidence"]["source_count"],
             "source_document_ids": list(inputs.get("source_document_ids") or []),
@@ -526,6 +528,7 @@ class PresentationService:
             "source_refs": source_refs,
             "artifact_id": inputs.get("artifact_id"),
             "outline_source": outline.get("outline_source") or inputs.get("outline_source") or "extractive",
+            "evidence_validation": outline.get("evidence_validation") or {},
             "skill_application": skill_application,
             "skill_execution": skill_execution,
             "skill_gate_passed": verify_output.get("skill_gate_passed"),
@@ -729,7 +732,7 @@ class PresentationService:
             # A source citation does not validate a model's extra claims about
             # hardware or causality. Keep this bounded workflow extractive.
             return self._with_experiment_summary({
-                **build_extractable_presentation_plan(records, inputs),
+                **build_extractable_presentation_plan([], inputs),
                 "outline_source": "experiment_ledger_extractive",
             }, inputs)
         if self.outline_generator is not None:
@@ -738,15 +741,36 @@ class PresentationService:
                 outline_source = str(generated.get("outline_source") or "custom_generator")
                 if outline_source not in {"local_ollama", "extractive", "custom_generator"}:
                     outline_source = "custom_generator"
+                outline = validate_presentation_plan(generated, inputs)
+                validate_generated_presentation_evidence(generated, records, inputs)
+                validate_generated_presentation_evidence(outline, records, inputs)
                 return self._with_experiment_summary({
-                    **validate_presentation_plan(generated, inputs),
+                    **outline,
                     "outline_source": outline_source,
+                    "evidence_validation": {
+                        "status": "source_bound_excerpts",
+                        "notice": "正文仅保留所列来源的原文摘录；不证明跨材料可比性、因果或原始资料本身正确。",
+                    },
                 }, inputs)
             except Exception:
                 pass
+        outline = build_extractable_presentation_plan(records, inputs)
+        for slide in outline["slides"]:
+            if slide["kind"] == "cover":
+                slide["subtitle"] = _compact(slide["subtitle"] + "；原文摘录，不据此判定可比性或因果", 100)
+            elif slide["kind"] == "content":
+                slide["footer"] = _compact("原文摘录 · 可比性/因果未验证 · " + slide["footer"], 90)
         return self._with_experiment_summary({
-            **build_extractable_presentation_plan(records, inputs),
+            **outline,
             "outline_source": "extractive",
+            "evidence_validation": {
+                "status": "extractive_fallback" if self.outline_generator is not None else "extractive",
+                "notice": (
+                    "自动提纲未完成原文绑定校验，已改用来源摘录；不证明跨材料可比性、因果或原始资料本身正确。"
+                    if self.outline_generator is not None
+                    else "正文为来源摘录；不证明跨材料可比性、因果或原始资料本身正确。"
+                ),
+            },
         }, inputs)
 
     @staticmethod
@@ -801,6 +825,7 @@ class PresentationService:
         if str(plan_result.get("plan_digest") or "") != str(inputs.get("plan_digest") or ""):
             raise ValueError("PPT 大纲摘要不匹配，请重新确认")
         self._require_experiment_outline(inputs, plan_result)
+        _require_generated_outline_evidence(inputs, plan_result)
         self._load_experiment_comparison(inputs)
         snapshot = dict(plan_result.get("evidence_snapshot") or {})
         records = list(snapshot.get("records") or [])
@@ -1620,15 +1645,17 @@ def build_extractable_presentation_plan(
     ]
 
     summary_points = []
+    summary_sources = []
     for source in sources:
         sentences = _ranked_sentences(by_source.get(source) or [])
         if sentences:
             summary_points.append(f"{Path(source).stem}：{sentences[0]}")
+            summary_sources.append(source)
     slides.append(
         _content_slide(
             "执行摘要",
-            summary_points[:point_limit] or ["所选文档缺少可用于摘要的结构化正文。"],
-            sources,
+            summary_points[:min(point_limit, 4)] or ["所选文档缺少可用于摘要的结构化正文。"],
+            summary_sources[:4] or sources[:4],
             _compact(f"摘要内容直接提炼自所选文档{footer_suffix}", 90),
         )
     )
@@ -1653,7 +1680,7 @@ def build_extractable_presentation_plan(
             )
 
     if len(sources) > 1 and len(slides) < inputs["max_slides"] - 1:
-        common_terms = _common_terms(records, limit=5)
+        common_terms = _common_terms([record for record in records if record["source_filename"] in sources[:4]], limit=5)
         observations = [f"共同关注主题：{term}" for term in common_terms]
         if not observations:
             observations = ["所选文档的共同主题需要结合原文证据进一步核对。"]
@@ -1702,6 +1729,8 @@ def _skill_stage_slides(
     stages = list(contract.get("section_sequence") or [])
     keywords = list(contract.get("stage_keywords") or [])
     result = []
+    # Content slides can display at most three source labels in this route.
+    records = [record for record in records if record["source_filename"] in sources[:3]]
     for index, stage in enumerate(stages[:limit]):
         terms = [str(item).casefold() for item in (keywords[index] if index < len(keywords) else [])]
         matched = [
@@ -1824,6 +1853,63 @@ def validate_presentation_plan(plan: dict[str, Any], inputs: dict[str, Any]) -> 
             or presentation_skill_application(inputs.get("style_skill"))
         ),
     }
+
+
+def validate_generated_presentation_evidence(
+    plan: dict[str, Any], records: list[dict[str, Any]], inputs: dict[str, Any],
+) -> None:
+    """Bound model selection to whole source sentences, not lexical entailment.
+
+    ponytail: paraphrases fail closed to extraction until an independently
+    evaluated entailment route exists; filename coverage is not fact support.
+    """
+    def normalized(value: Any) -> str:
+        return " ".join(str(value or "").split()).strip("。！？!?；;")
+
+    selected = set(inputs["source_filenames"])
+    source_units: dict[str, set[str]] = {source: set() for source in selected}
+    for record in records:
+        source = str(record.get("source_filename") or "")
+        if source in source_units:
+            source_units[source].update(
+                normalized(unit)
+                for unit in re.split(r"(?<=[。！？!?；;])|\n", str(record.get("content") or ""))
+                if normalized(unit)
+            )
+    editorial = {
+        "", "专题汇报", "资料摘录", "资料来源", "来源", "执行摘要", "文档要点",
+        "多文档综合分析汇报", "SoulDrive 本地证据链",
+        normalized(inputs.get("title")), normalized(_default_title(inputs["source_filenames"])),
+    }
+    editorial.update(normalized(Path(source).stem) for source in selected)
+    if normalized(plan.get("title")) not in editorial:
+        raise ValueError("PPT 标题缺少原文绑定")
+    for slide in plan.get("slides") or []:
+        sources = list(slide.get("sources") or [])
+        if any(source not in selected for source in sources):
+            raise ValueError("PPT 来源超出所选范围")
+        units = set().union(*(source_units[source] for source in sources)) if sources else set()
+        for field in ("title", "subtitle", "eyebrow", "footer"):
+            value = normalized(slide.get(field))
+            if value not in editorial and value not in units:
+                raise ValueError(f"PPT {field} 缺少原文绑定")
+        for point in slide.get("points") or []:
+            if not normalized(point) or normalized(point) not in units:
+                raise ValueError("PPT 正文缺少所列来源的完整原文绑定")
+
+
+def _require_generated_outline_evidence(inputs: dict[str, Any], result: dict[str, Any]) -> None:
+    if inputs.get("baseline_run_id"):
+        # The existing ledger guard independently requires its extractive plan.
+        return
+    outline = result.get("outline") or {}
+    if outline.get("outline_source") in {"local_ollama", "custom_generator"}:
+        try:
+            validate_generated_presentation_evidence(
+                outline, list((result.get("evidence_snapshot") or {}).get("records") or []), inputs,
+            )
+        except ValueError as exc:
+            raise ValueError("自动大纲未通过原文绑定校验，请重新生成并审核；不能继续渲染旧大纲") from exc
 
 
 def presentation_evidence_metrics(
@@ -2091,16 +2177,21 @@ def _evidence_record(parent_id: str, content: str, metadata: dict[str, Any]) -> 
         "section": _compact(section, 200),
         "page_number": _safe_int(metadata.get("page_number") or metadata.get("page"), 0),
         "parent_index": _safe_int(metadata.get("parent_index"), 0),
-        "content": _compact(content, 4200),
+        "content": str(content or "").strip()[:4200],
     }
 
 
 def _ranked_sentences(records: list[dict[str, Any]]) -> list[str]:
     candidates = []
+    table_points = []
     seen = set()
     for record in records:
+        structured = _presentation_table_points(str(record.get("content") or ""))
+        if structured is not None:
+            table_points.extend(structured)
+            continue
         for sentence in SENTENCE_PATTERN.findall(str(record.get("content") or "")):
-            normalized = " ".join(sentence.split()).strip(" -•")
+            normalized = re.sub(r"^#{1,6}\s+", "", " ".join(sentence.split()).strip(" -•"))
             key = re.sub(r"\W+", "", normalized).casefold()
             if len(normalized) < 16 or len(normalized) > 170 or NOISE_PATTERN.match(normalized):
                 continue
@@ -2111,7 +2202,34 @@ def _ranked_sentences(records: list[dict[str, Any]]) -> list[str]:
             score = len(set(terms)) + (2 if any(char.isdigit() for char in normalized) else 0)
             candidates.append((score, normalized))
     candidates.sort(key=lambda item: (-item[0], len(item[1])))
-    return [_compact(sentence, 105) for _, sentence in candidates]
+    return list(dict.fromkeys(table_points + [_compact(sentence, 105) for _, sentence in candidates]))
+
+
+def _presentation_table_points(content: str) -> list[str] | None:
+    """Keep Markdown table headers paired with raw cell values; infer no units."""
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    if len(lines) < 2 or not lines[0].startswith("|") or not (lines[1].startswith("|") and lines[1].endswith("|")):
+        return None
+
+    def cells(line: str) -> list[str]:
+        if not (line.startswith("|") and line.endswith("|")):
+            raise TaskPublicError("资料表格行不完整，请缩小范围或重新索引后生成")
+        return [value.strip().replace(r"\|", "|") for value in re.split(r"(?<!\\)\|", line[1:-1])]
+
+    header = cells(lines[0])
+    separator = cells(lines[1])
+    if len(header) != len(separator) or not all(re.fullmatch(r":?-{3,}:?", value) for value in separator):
+        return None
+    points = []
+    for line in lines[2:]:
+        row = cells(line)
+        if len(row) != len(header):
+            raise TaskPublicError("资料表格列数不一致，请核对原文后生成")
+        point = "；".join(f"{name or '（空表头）'}：{value or '（原文空白）'}" for name, value in zip(header, row))
+        if len(point) > 105:
+            raise TaskPublicError("资料表格行过长，不能截断数值，请缩小证据范围")
+        points.append(point)
+    return points
 
 
 def _common_terms(records: list[dict[str, Any]], limit: int) -> list[str]:

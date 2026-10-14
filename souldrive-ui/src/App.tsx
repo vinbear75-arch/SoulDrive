@@ -909,6 +909,7 @@ interface PresentationTask {
     source_version_ids?: string[];
     artifact_id?: string | null;
     outline_source?: "local_ollama" | "extractive" | "custom_generator" | string;
+    evidence_validation?: { status?: string; notice?: string };
     skill_application?: {
       skill_id?: string | null;
       skill_title?: string | null;
@@ -7477,6 +7478,7 @@ export default function App() {
                     <div className="presentation-outline-review">
                       <strong>大纲审核 · {presentationTask.result.outline.title || presentationTitle || "未命名汇报"}</strong>
                       <span>确认下面的实际大纲摘要后，系统才会生成本地 PPTX。</span>
+                      {presentationTask.result.evidence_validation?.notice && <span role="status">{presentationTask.result.evidence_validation.notice}</span>}
                       <ol>
                         {(presentationTask.result.outline.slides || []).map((slide, index) => (
                           <li key={`${index}-${slide.title || "slide"}`}>
@@ -7492,7 +7494,7 @@ export default function App() {
                   {presentationTask?.result?.output_path && (
                     <p title={presentationTask.result.output_path}>
                       {presentationTask.result.slide_count} 页 · {presentationTask.result.renderer} · {presentationTask.result.outline_source === "local_ollama" ? "Ollama 提纲" : presentationTask.result.outline_source === "experiment_ledger_extractive" ? "账本测量提纲" : presentationTask.result.outline_source === "extractive" ? "证据提炼" : "自定义提纲"}
-                      {presentationTask.result.evidence_metrics ? <><br />证据页 {Math.round(presentationTask.result.evidence_metrics.evidence_slide_coverage * 100)}% · {formatPresentationEvidenceCoverage(presentationTask.result.evidence_metrics)} · {Math.round(presentationTask.result.elapsed_ms || 0)} ms</> : null}
+                      {presentationTask.result.evidence_metrics ? <><br />来源标注页 {Math.round(presentationTask.result.evidence_metrics.evidence_slide_coverage * 100)}% · {formatPresentationEvidenceCoverage(presentationTask.result.evidence_metrics)} · {Math.round(presentationTask.result.elapsed_ms || 0)} ms</> : null}
                       {presentationTask.result.skill_application?.skill_title && <><br />Skill：{presentationTask.result.skill_application.skill_title} · 指令{presentationTask.result.skill_application.instructions_applied ? "已应用" : "未应用"} · 样式{presentationTask.result.skill_application.style_applied ? "已应用" : "未提供"}</>}
                       {presentationTask.result.artifact_id && <><br />项目产物已登记：{presentationTask.result.artifact_id}</>}
                     </p>

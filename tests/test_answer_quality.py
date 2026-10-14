@@ -13,6 +13,18 @@ from core.answer_quality import (
 
 
 class AnswerQualityTests(unittest.TestCase):
+    def test_exact_fallback_notices_do_not_exempt_attached_claims(self):
+        evidence = [{"id": "E1", "snippet": "该方案通过本地加密存储保护隐私。"}]
+        fact = "该方案通过本地加密存储保护隐私。[E1]"
+        for notice in ("自动回答未通过证据或当前模式的输出校验，本轮已改为证据核对。",
+                       "自动回答未满足完整性或证据要求，本轮已改为证据核对。"):
+            with self.subTest(notice=notice):
+                self.assertTrue(validate_answer_citations(notice + "\n\n" + fact, evidence, semantic=True)["valid"])
+                for suffix in ("隐私保护覆盖率为99%。", "\n隐私保护覆盖率为99%。",
+                               "\n\n隐私保护覆盖率为99%。", "隐私保护覆盖率为99%。[E1]"):
+                    with self.subTest(suffix=suffix):
+                        self.assertFalse(validate_answer_citations(notice + suffix + "\n\n" + fact, evidence, semantic=True)["valid"])
+
     def test_evidence_gate_rejects_non_finite_scores(self):
         gate = evaluate_evidence_gate([{"id": "E1", "score": float("nan")}])
 

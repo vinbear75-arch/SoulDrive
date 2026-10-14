@@ -14,6 +14,8 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from core.answer_quality import (
+    INVALID_ANSWER_FALLBACK_NOTICE,
+    INCOMPLETE_ANSWER_FALLBACK_NOTICE,
     citation_source_count,
     citation_coverage,
     evidence_answers_query,
@@ -1845,6 +1847,7 @@ class RAGEngine:
                     if visual_observation_only
                     else evidence_fallback_answer(query, answer_evidence, prefer_primary=True)
                 )
+                fallback_answer = INVALID_ANSWER_FALLBACK_NOTICE + "\n\n" + fallback_answer
             answer = ensure_answer_section_label(
                 fallback_answer,
                 answer_evidence,
@@ -1884,7 +1887,7 @@ class RAGEngine:
             or generated_answer_needs_fallback(generated_text, answer_evidence, query=query)
         ):
             answer = ensure_answer_section_label(
-                (
+                INCOMPLETE_ANSWER_FALLBACK_NOTICE + "\n\n" + (
                     visual_transform_fallback_answer(answer_evidence)
                     if visual_transform_nonresponsive
                     else visual_evidence_fallback_answer(answer_evidence)

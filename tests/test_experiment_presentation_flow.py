@@ -134,6 +134,18 @@ def test_comparison_outline_does_not_retain_model_invented_environment_changes(c
     assert outline["title"] == body["title"]
 
 
+def test_ledger_outline_does_not_parse_unused_wide_table_excerpts(comparison_presentation):
+    _, service, body, records, _ = comparison_presentation
+    records[0]["content"] = "| metric | value | note |\n| --- | --- | --- |\n| accuracy | 0.81 | " + "engineering-note-" * 12 + " |"
+    planned = service.run_task(service.create_plan(body)["task_id"])
+    assert planned["status"] == "completed", planned
+    outline = planned["result"]["outline"]
+    assert outline["outline_source"] == "experiment_ledger_extractive"
+    text = json.dumps(outline, ensure_ascii=False)
+    assert "0.81" in text and "0.86" in text and "0.05" in text
+    assert "engineering-note" not in text
+
+
 def test_comparison_outline_rejects_an_incomplete_evidence_budget():
     comparison = {"status": "comparable", "compatibility": {"change_computation": "enabled"},
                   "baseline": {}, "current": {}, "changes": [

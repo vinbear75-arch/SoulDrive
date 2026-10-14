@@ -134,6 +134,50 @@ class McpServerLearningTests(unittest.TestCase):
 
         self.assertEqual(response.media_type, "text/event-stream", getattr(response, "body", b""))
 
+    def test_chat_fallback_notice_survives_http_archive_and_reopen_replay(self):
+        from core.answer_quality import INVALID_ANSWER_FALLBACK_NOTICE, INCOMPLETE_ANSWER_FALLBACK_NOTICE
+
+        class FallbackRag:
+            calls = 0
+
+            def generate_response_stream(self, query, **_kwargs):
+                self.calls += 1
+                yield query
+                yield "\n\n该方案通过本地加密存储保护隐私。[E1]"
+
+        fake_rag = FallbackRag()
+        state = self._mounted_state()
+        with patch.dict(os.environ, {"SOULDRIVE_REDIS_ENABLED": "0", "SOULDRIVE_POSTGRES_ENABLED": "0"}), patch.object(
+            mcp_server, "get_runtime_state", return_value=state
+        ), patch.object(mcp_server, "effective_runtime_state", return_value=state), patch.object(
+            mcp_server, "current_workspace", return_value=self.workspace
+        ), patch.object(mcp_server, "_reconcile_indexer_state"), patch.object(
+            mcp_server, "ensure_runtime_loaded", side_effect=lambda: setattr(mcp_server, "rag", fake_rag)
+        ) as load:
+            for index, notice in enumerate((INVALID_ANSWER_FALLBACK_NOTICE, INCOMPLETE_ANSWER_FALLBACK_NOTICE)):
+                with self.subTest(notice=notice):
+                    session_id = f"fallback-session-{index}"
+                    store = mcp_server._conversation_store(self.workspace)
+                    store.create_session(session_id, project_id=None, title="回退保存验收")
+                    body = {"query": notice, "session_id": session_id, "request_id": f"fallback-request-{index}"}
+                    first = self.client.post("/chat", json=body, headers=self._headers())
+                    self.assertEqual(first.status_code, 200)
+                    expected = notice + "\n\n该方案通过本地加密存储保护隐私。[E1]"
+                    self.assertEqual(first.text, expected)
+                    mcp_server._close_session_store()
+                    loads_before_replay = load.call_count
+                    replay = self.client.post("/chat", json=body, headers=self._headers())
+                    self.assertEqual(replay.status_code, 200)
+                    self.assertEqual(replay.text, expected)
+                    self.assertEqual(load.call_count, loads_before_replay)
+                    archive = ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)
+                    try:
+                        messages = archive.recent(session_id, limit=10)
+                        self.assertEqual([item["content"] for item in messages if item["role"] == "assistant"], [expected])
+                    finally:
+                        archive.close()
+        self.assertEqual(fake_rag.calls, 2)
+
     def test_chat_compaction_failure_does_not_reclassify_persisted_answer(self):
         session_id = "chat-compaction-failure-session"
         request_id = "chat-compaction-failure-request"

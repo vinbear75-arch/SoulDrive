@@ -8,6 +8,8 @@ from core.retrieval import classify_query_intent, source_diversity_key
 
 
 CITATION_PATTERN = re.compile(r"\[((?:E|V|A|M)\d+)\]")
+INVALID_ANSWER_FALLBACK_NOTICE = "自动回答未通过证据或当前模式的输出校验，本轮已改为证据核对。"
+INCOMPLETE_ANSWER_FALLBACK_NOTICE = "自动回答未满足完整性或证据要求，本轮已改为证据核对。"
 CLAIM_BULLET_PATTERN = re.compile(r"^(?:[-*+] |\d+[.)、．]?\s+)")
 DEFAULT_REJECT_SCORE = 0.015
 DEFAULT_RETRY_SCORE = 0.08
@@ -723,7 +725,10 @@ def _compact_text(text: str) -> str:
 def _is_non_factual_citation_claim(text: str) -> bool:
     """Recognize location scaffolding and the exact missing-evidence marker."""
     normalized = re.sub(r"\s+", "", text or "")
-    if not normalized or normalized in {"证据", "证据：", "待确认"}:
+    if not normalized or normalized in {
+        "证据", "证据：", "待确认",
+        INVALID_ANSWER_FALLBACK_NOTICE, INCOMPLETE_ANSWER_FALLBACK_NOTICE,
+    }:
         return True
     if normalized.startswith(("来源文档：", "证据章节：", "视觉证据范围：")):
         return True

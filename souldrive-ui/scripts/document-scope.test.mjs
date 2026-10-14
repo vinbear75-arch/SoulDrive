@@ -454,6 +454,12 @@ test("PPT generation exposes outline confirmation and cancellation controls", ()
   assert.match(app, /presentationRequestId/);
 });
 
+test("PPT review displays the binding boundary without presenting source coverage as fact validation", () => {
+  assert.ok(app.includes('presentationTask.result.evidence_validation?.notice'));
+  assert.ok(app.includes('<span role="status">{presentationTask.result.evidence_validation.notice}</span>'));
+  assert.ok(app.includes("来源标注页"));
+});
+
 test("PPT task controls carry the durable project scope", () => {
   assert.match(app, /project_id\?: string \| null;/);
   assert.match(app, /const projectQuery = presentationTask\?\.project_id/);

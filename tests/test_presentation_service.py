@@ -1309,9 +1309,143 @@ class PresentationServiceTests(unittest.TestCase):
                 "slides": [{"kind": "cover", "title": "自定义"}, {"kind": "sources", "title": "来源", "sources": ["A方案.pdf"]}],
             },
         )
-        result = service._build_outline_step({"source_filenames": ["A方案.pdf"], "max_slides": 4}, {"collect_evidence": {"records": []}})
+        result = service._build_outline_step(
+            validate_presentation_request({"source_filenames": ["A方案.pdf"], "max_slides": 4, "title": "自定义"}),
+            {"collect_evidence": {"records": []}},
+        )
 
         self.assertEqual(result["outline_source"], "custom_generator")
+
+    def test_generated_outline_rejects_unbound_claims_before_review(self):
+        inputs = validate_presentation_request({"source_filenames": ["old.txt", "new.txt"], "title": "资料核对"})
+        records = [
+            {"source_filename": "old.txt", "section": "记录", "content": "独立工程样例的指标甲记录值为0.40，数据版本为demo-v1。"},
+            {"source_filename": "new.txt", "section": "记录", "content": "独立工程样例的指标甲记录值为0.55，未记录数据版本。"},
+        ]
+        cases = (
+            {"points": ["指标甲记录值为0.99。"]},
+            {"points": [records[1]["content"]], "sources": ["old.txt"]},
+            {"points": ["配置变更显著提升指标甲，证明优化有效。"]},
+            {"points": ["数据版本保持demo-v1不变。"]},
+            {"title": "指标甲显著提升"},
+            {"subtitle": "配置变更证明优化有效"},
+            {"footer": "数据版本完全一致"},
+            {"points": ["记录值为0.55。"], "sources": ["not-selected.txt"]},
+            {"points": ["独立工程样例的指标甲记录值为0.5，未记录数据版本。"], "sources": ["new.txt"]},
+            {"points": ["独立工程样例的指标甲记录值为0.55%，未记录数据版本。"], "sources": ["new.txt"]},
+        )
+        for changed in cases:
+            with self.subTest(changed=changed):
+                slide = {"kind": "content", "title": "资料摘录", "points": [records[0]["content"]], "sources": ["old.txt"], **changed}
+                proposal = {"title": "资料核对", "outline_source": "local_ollama", "slides": [
+                    {"kind": "cover", "title": "资料核对"}, slide,
+                    {"kind": "sources", "title": "资料来源", "sources": inputs["source_filenames"]},
+                ]}
+                service = PresentationService(self.workspace, None, outline_generator=lambda _records, _inputs: proposal)
+                result = service._build_outline_step(inputs, {"collect_evidence": {"records": records}})
+                self.assertEqual(result["outline_source"], "extractive")
+                self.assertEqual(result["evidence_validation"]["status"], "extractive_fallback")
+                self.assertIn("原文", result["evidence_validation"]["notice"])
+                self.assertNotIn("显著提升", json.dumps(result, ensure_ascii=False))
+                self.assertNotIn("0.99", json.dumps(result, ensure_ascii=False))
+                self.assertIn("不据此判定可比性或因果", result["slides"][0]["subtitle"])
+                self.assertTrue(all("原文摘录" in slide["footer"] for slide in result["slides"] if slide["kind"] == "content"))
+
+    def test_generated_outline_accepts_source_bound_excerpts(self):
+        inputs = validate_presentation_request({"source_filenames": ["source.txt"], "title": "资料核对"})
+        record = {"source_filename": "source.txt", "section": "记录", "content": "本地资料保留原始证据，记录值为0.55。"}
+        proposal = {"title": "资料核对", "outline_source": "local_ollama", "slides": [
+            {"kind": "cover", "title": "资料核对"},
+            {"kind": "content", "title": "资料摘录", "points": [record["content"]], "sources": ["source.txt"]},
+            {"kind": "sources", "title": "资料来源", "sources": ["source.txt"]},
+        ]}
+        service = PresentationService(self.workspace, None, outline_generator=lambda _records, _inputs: proposal)
+        result = service._build_outline_step(inputs, {"collect_evidence": {"records": [record]}})
+        self.assertEqual(result["outline_source"], "local_ollama")
+        self.assertEqual(result["evidence_validation"]["status"], "source_bound_excerpts")
+        self.assertIn("不证明", result["evidence_validation"]["notice"])
+
+    def test_legacy_document_outline_cannot_bypass_confirm_or_resume_guard(self):
+        initialize_keystore(self.workspace, "correct horse battery staple")
+        keys = unlock_keystore(self.workspace, "correct horse battery staple")
+        conn = sqlite3.connect(self.workspace.parent_doc_path)
+        try:
+            conn.execute("CREATE TABLE parent_documents (parent_id TEXT PRIMARY KEY, content TEXT, metadata_json TEXT)")
+            conn.execute("INSERT INTO parent_documents VALUES (?, ?, ?)", (
+                "engineering-record", "工程资料记录值为0.55，未证明配置变更改善结果。",
+                json.dumps({"source_filename": "record.txt"}),
+            ))
+            conn.commit()
+        finally:
+            conn.close()
+        service = PresentationService(self.workspace, keys)
+        inputs = validate_presentation_request({"source_filenames": ["record.txt"], "title": "资料核对", "open_in_wps": False})
+        legacy_outline = presentation_service_module.validate_presentation_plan({"title": "资料核对", "slides": [
+            {"kind": "cover", "title": "资料核对"},
+            {"kind": "content", "title": "资料摘录", "points": ["配置变更改善结果。"], "sources": ["record.txt"]},
+        ]}, inputs)
+        legacy_outline["outline_source"] = "local_ollama"
+        # Reproduce an older persisted proposal without mutating the real fixture.
+        with patch.object(service, "_build_outline_step", return_value=legacy_outline):
+            planned = service.run_task(service.create_plan(inputs)["task_id"])
+        self.assertEqual(planned["status"], "completed")
+        with self.assertRaisesRegex(ValueError, "原文绑定.*重新"):
+            service.confirm_plan(planned["task_id"], planned["result"]["plan_digest"])
+        with patch.object(presentation_service_module, "_require_generated_outline_evidence"):
+            generation = service.confirm_plan(planned["task_id"], planned["result"]["plan_digest"])
+        journal = TaskJournal(self.workspace, keys)
+        try:
+            generation_inputs = journal.get_task(generation["task_id"])["inputs"]
+        finally:
+            journal.close()
+        with self.assertRaisesRegex(ValueError, "原文绑定.*重新"):
+            service._load_confirmed_plan_step(generation_inputs, {})
+        self.assertEqual(list(Path(self.workspace.presentations_path).glob("*.pptx")), [])
+
+    def test_extractive_summary_and_stages_do_not_lose_their_actual_source_labels(self):
+        sources = [f"source-{index}.txt" for index in range(6)]
+        records = [{"source_filename": source, "section": "记录", "content": (
+            "" if index == 0 else f"工程资料{index}保留独立原始记录，不能借用其他文件的标签。"
+        )} for index, source in enumerate(sources)]
+        inputs = validate_presentation_request({"source_filenames": sources, "title": "资料核对", "max_slides": 16})
+        plan = build_extractable_presentation_plan(records, inputs)
+        summary = plan["slides"][1]
+        self.assertEqual(summary["sources"], sources[1:5])
+        self.assertEqual(len(summary["points"]), 4)
+        for point in summary["points"]:
+            self.assertTrue(any(point.startswith(Path(source).stem + "：") for source in summary["sources"]))
+        stages = presentation_service_module._skill_stage_slides(records, sources,
+            {"section_sequence": ["记录"], "stage_keywords": [["工程资料5"]]}, 1, 5, "")
+        self.assertNotIn("工程资料5", " ".join(stages[0]["points"]))
+        self.assertEqual(stages[0]["sources"], sources[:3])
+
+    def test_presentation_evidence_preserves_structured_lines(self):
+        content = "| metric | value |\n| --- | --- |\n| alpha | 0.40 |\n| beta | -0.55 |\n| latency | 1234 |"
+        record = presentation_service_module._evidence_record("table-record", content, {"source_filename": "metrics.csv"})
+        self.assertEqual(record["content"], content)
+
+    def test_extractive_table_keeps_each_header_value_pair_without_ellipsis(self):
+        content = "| metric | value |\n| --- | --- |\n| alpha | 0.40 |\n| beta | -0.55 |\n| latency | 1234 |"
+        record = presentation_service_module._evidence_record("table-record", content, {"source_filename": "metrics.csv"})
+        plan = build_extractable_presentation_plan([record], validate_presentation_request({"source_filenames": ["metrics.csv"]}))
+        slide = next(slide for slide in plan["slides"] if slide["kind"] == "content" and slide["title"] == "metrics")
+        self.assertEqual(slide["points"], ["metric：alpha；value：0.40", "metric：beta；value：-0.55", "metric：latency；value：1234"])
+        self.assertNotIn("…", " ".join(slide["points"]))
+
+    def test_structured_table_never_silently_cuts_a_long_value(self):
+        record = {"source_filename": "metrics.csv", "section": "记录", "content": (
+            "| metric | value |\n| --- | --- |\n| alpha | " + "long-value-" * 15 + " |"
+        )}
+        with self.assertRaisesRegex(TaskPublicError, "表格.*过长"):
+            build_extractable_presentation_plan([record], validate_presentation_request({"source_filenames": ["metrics.csv"]}))
+
+    def test_table_extraction_keeps_empty_cells_and_escaped_pipes_without_inferring_units(self):
+        content = "| name | value | unit |\n| --- | --- | --- |\n| alpha\\|beta | 0.55 | |"
+        self.assertEqual(presentation_service_module._presentation_table_points(content),
+                         ["name：alpha|beta；value：0.55；unit：（原文空白）"])
+        self.assertIsNone(presentation_service_module._presentation_table_points("| 非表格段落 |\n另一条普通正文。"))
+        with self.assertRaisesRegex(TaskPublicError, "表格列数"):
+            presentation_service_module._presentation_table_points("| name | value |\n| --- | --- |\n| alpha |")
 
     def test_template_skill_is_bound_to_task_and_changes_safe_palette(self):
         initialize_keystore(self.workspace, "correct horse battery staple")
