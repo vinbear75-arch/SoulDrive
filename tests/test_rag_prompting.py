@@ -31,6 +31,66 @@ from core.rag_engine import (
 
 
 class RagPromptingTests(unittest.TestCase):
+    def test_unconfirmed_metric_comparison_returns_preparation_card_without_model(self):
+        evidence = [
+            {"id": "E1", "score": 0.4, "source_filename": "old.csv", "document_id": "old",
+             "content_kind": "table", "context": "| metric | value | | --- | --- | | target_accuracy | 0.4 |"},
+            {"id": "E2", "score": 0.4, "source_filename": "new.csv", "document_id": "new",
+             "content_kind": "table", "context": "| metric | value | | --- | --- | | target_accuracy | 0.7 |"},
+            {"id": "E3", "score": 0.3, "source_filename": "report.md", "document_id": "report",
+             "context": "两轮实验的指标和延迟变化需要核对数据集与评测条件。"},
+            {"id": "E4", "score": 0.3, "source_filename": "config.yaml", "document_id": "config",
+             "context": "encoder_model: demo-small dataset_version: fixture-v3"},
+        ]
+        llm = _FakeStreamingLlm([])
+        engine = _build_engine(llm=llm, evidence=evidence, align_evidence=True)
+        traces = []
+        output = "".join(engine.generate_response_stream(
+            "比较这两轮实验的指标和延迟变化", top_k=6,
+            interaction_context={"workflow_id": "experiment_compare", "active_context": {
+                "project_id": "project-1", "document_names": ["old.csv", "new.csv", "report.md", "config.yaml"]}},
+            on_retrieval_completed=traces.append,
+        ))
+        visible = output.split("```souldrive-evidence")[0]
+        self.assertEqual(llm.call_count, 0)
+        self.assertEqual(traces[-1]["stop_reason"], "experiment_measurement_confirmation_required")
+        self.assertEqual(traces[-1]["agentic_decision"], "clarify")
+        self.assertEqual(traces[-1]["experiment_material_review"]["writes"], False)
+        for value in ("0.4", "0.7", "fixture-v3", "表头未显式登记", "最小验证实验", "[E4]"):
+            self.assertIn(value, visible)
+        self.assertNotIn("0.3", visible)  # no inferred numerical delta
+        self.assertNotIn("[M1]", visible)
+        self.assertNotIn("自动回答未通过", visible)  # preparation, not a generation failure
+
+    def test_only_scoped_experiment_workflow_admits_task_configuration(self):
+        evidence = [
+            {"id": "E1", "score": 0.3, "source_filename": "report.md", "document_id": "doc-report",
+             "context": "两轮实验的指标和候选原因需要核对数据集与评测条件。"},
+            {"id": "E2", "score": 0.012, "support_score": 0.01, "source_filename": "conditions.yaml",
+             "document_id": "doc-config", "context": "encoder_model: demo-small\ndataset_version: fixture-v3"},
+        ]
+        for workflow_id, project_id, selected, expected in (
+            ("experiment_compare", "project-1", True, 2),
+            (None, "project-1", True, 1),
+            ("paper_review", "project-1", True, 1),
+            ("experiment_compare", None, True, 1),
+            ("experiment_compare", "project-1", False, 1),
+        ):
+            with self.subTest(workflow_id=workflow_id, project_id=project_id, selected=selected):
+                engine = _build_engine(llm=_FakeStreamingLlm(["无法确定。"] * 2), evidence=evidence, align_evidence=True)
+                traces = []
+                list(engine.generate_response_stream(
+                    "比较这两轮实验的指标和候选原因", top_k=6,
+                    interaction_context={"workflow_id": workflow_id, "active_context": {
+                        "project_id": project_id, "document_names": ["report.md", "conditions.yaml"] if selected else [],
+                    }},
+                    learning_context={"context_focuses": ["model dataset"]},
+                    on_retrieval_completed=traces.append,
+                ))
+                self.assertEqual(traces[-1]["context_gate"]["accepted_count"], expected)
+                supported = traces[-1]["context_gate"]["task_supported_evidence"]
+                self.assertEqual(len(supported), expected - 1)
+
     def test_measurement_fallback_keeps_values_instead_of_ranking_metadata(self):
         evidence = [{"id": "M1", "evidence_type": "experiment_measurement", "metric": "accuracy", "unit": "%",
                      "baseline_value": 0.81, "current_value": 0.86, "absolute_delta": 0.05,

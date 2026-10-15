@@ -97,6 +97,10 @@ WORKFLOW_CATALOG: dict[str, dict[str, Any]] = {
         "retrieval_policy": {
             "profile": "experiment_compare",
             "requires_source_diversity": True,
+            "context_focuses": [
+                "model dataset split metric unit evaluation script",
+                "configuration retrieval modality environment seed alignment conflict profile",
+            ],
             "query_focuses": [
                 "指标 数值 单位 数据集 评测脚本",
                 "版本 配置 环境 变化 候选原因 验证实验",

@@ -90,6 +90,11 @@ class ContextGateResult:
             "query_term_coverage": self.query_term_coverage,
             "source_count": self.source_count,
             "untrusted_instruction_count": self.untrusted_instruction_count,
+            "task_supported_evidence": [
+                {"id": item["id"], "source_filename": item.get("source_filename"),
+                 "task_support": item["task_support"]}
+                for item in self.evidence if item.get("admission_basis") == "workflow_task_focus"
+            ],
             "rejected": list(self.rejected),
         }
 
@@ -288,6 +293,7 @@ def admit_context(
     max_evidence: int = 6,
     max_chars_per_evidence: int = 1800,
     minimum_score: float = 0.015,
+    task_focuses: list[str] | tuple[str, ...] = (),
 ) -> ContextGateResult:
     budget_chars = max(800, int(budget_chars))
     max_evidence = max(1, int(max_evidence))
@@ -297,7 +303,7 @@ def admit_context(
     accepted_evidence: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     accepted_terms: set[str] = set()
-    fingerprints: list[set[str]] = []
+    fingerprints: dict[str, list[tuple[set[str], str]]] = {}
     accepted_chars = 0
     untrusted_instruction_count = 0
     support_scores = [
@@ -319,6 +325,8 @@ def admit_context(
     item_count = max(len(documents), len(evidence))
     for index in range(item_count):
         item = dict(evidence[index]) if index < len(evidence) else {}
+        item.pop("admission_basis", None)
+        item.pop("task_support", None)
         metadata = dict(metadatas[index]) if index < len(metadatas) else {}
         document = str(documents[index] if index < len(documents) else "").strip()
         if not document:
@@ -349,7 +357,14 @@ def admit_context(
         ) < 0.60:
             rejected.append(_rejection(candidate_id, source, score, "low_ocr_confidence"))
             continue
-        if score < minimum_score:
+        # Only the bound workflow supplies these focuses, never memory or
+        # model-generated retrieval hints. This admits task conditions, not
+        # proof of a conclusion; the original-query evidence gate is unchanged.
+        remaining = budget_chars - accepted_chars
+        admitted = _compact_context(document, min(max_chars_per_evidence, remaining))
+        task_support = _task_support(admitted, task_focuses) if score > 0 else {}
+        task_score = float(task_support.get("score") or 0.0)
+        if max(score, task_score) < minimum_score:
             rejected.append(_rejection(candidate_id, source, score, "score_below_floor"))
             continue
 
@@ -370,6 +385,7 @@ def admit_context(
             and score < 0.08
             and query_terms
             and query_coverage < LOW_SCORE_QUERY_COVERAGE_FLOOR
+            and task_score < LOW_SCORE_QUERY_COVERAGE_FLOOR
         ):
             rejected.append(_rejection(candidate_id, source, score, "no_query_signal"))
             continue
@@ -379,24 +395,28 @@ def admit_context(
             index > 0
             and support_floor is not None
             and support_score is not None
-            and support_score < support_floor
+            and max(support_score, task_score) < support_floor
         ):
             rejected.append(_rejection(candidate_id, source, score, "weak_query_support"))
             continue
 
         fingerprint = content_terms(document[:2400])
-        if any(_jaccard(fingerprint, existing) >= 0.88 for existing in fingerprints):
+        normalized_document = " ".join(document[:2400].split())
+        structured = str(source_metadata.get("content_kind") or "").lower() in {"table", "code", "config"}
+        if any(
+            _jaccard(fingerprint, existing) >= 0.88
+            and (not structured or normalized_document == existing_text)
+            for existing, existing_text in fingerprints.get(source_scope_key, [])
+        ):
             rejected.append(_rejection(candidate_id, source, score, "near_duplicate"))
             continue
         if len(accepted_evidence) >= max_evidence:
             rejected.append(_rejection(candidate_id, source, score, "evidence_limit"))
             continue
 
-        remaining = budget_chars - accepted_chars
         if remaining < 240:
             rejected.append(_rejection(candidate_id, source, score, "context_budget_exhausted"))
             continue
-        admitted = _compact_context(document, min(max_chars_per_evidence, remaining))
         if len(admitted) < 8:
             rejected.append(_rejection(candidate_id, source, score, "context_too_short"))
             continue
@@ -409,9 +429,12 @@ def admit_context(
         accepted_metas.append(metadata)
         item["context"] = admitted
         item["id"] = f"E{len(accepted_evidence) + 1}"
+        if task_support:
+            item["admission_basis"] = "workflow_task_focus"
+            item["task_support"] = task_support
         accepted_evidence.append(item)
         accepted_terms.update(item_terms)
-        fingerprints.append(fingerprint)
+        fingerprints.setdefault(source_scope_key, []).append((fingerprint, normalized_document))
         accepted_chars += len(admitted)
 
     accepted_sources = set()
@@ -445,6 +468,20 @@ def admit_context(
         source_count=len(accepted_sources),
         untrusted_instruction_count=untrusted_instruction_count,
     )
+
+
+def _task_support(document: str, focuses: list[str] | tuple[str, ...]) -> dict[str, Any]:
+    body_terms = content_terms(document[:1800])
+    best: dict[str, Any] = {}
+    for focus in focuses[:3]:
+        terms = content_terms(str(focus)[:320])
+        matched = sorted(terms & body_terms)
+        if len(matched) < 2:
+            continue
+        score = len(matched) / max(1, len(terms))
+        if score >= LOW_SCORE_QUERY_COVERAGE_FLOOR and score > float(best.get("score") or 0):
+            best = {"focus": str(focus)[:320], "score": round(score, 6), "matched_terms": matched}
+    return best
 
 
 def _rejection(candidate_id: str, source: str, score: float, reason: str) -> dict[str, Any]:

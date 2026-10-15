@@ -39,6 +39,49 @@ MLFLOW_ARCHIVE_MAX_MEMBERS = 512
 MLFLOW_ARCHIVE_MAX_BYTES = 16 * 1024 * 1024
 
 
+def plan_experiment_material_review(query: str, evidence: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Describe metric-table candidates, never infer or confirm their protocol.
+
+    This is a preparation card for the experiment workflow, not a substitute
+    for parsing originals, human confirmation or compare_experiment_runs().
+    A missing header means only that this table does not declare that field.
+    """
+    if not re.search(r"比较|对比|差异|变化|提升|下降|上升|增幅|compare|difference|change", query, re.I):
+        return None
+    if not re.search(r"指标|准确率|延迟|响应时间|数值|metric|accuracy|latency|p95|p50", query, re.I):
+        return None
+    fields = (
+        ("unit", UNIT_ALIASES, "单位"), ("direction", DIRECTION_ALIASES, "指标方向"),
+        ("definition_version", DEFINITION_ALIASES, "指标定义版本"), ("split", SPLIT_ALIASES, "数据划分"),
+        ("dataset_version", DATASET_ALIASES, "数据集版本"), ("performed_at", TIME_ALIASES, "实验实际时间"),
+        ("evaluation_script_ref", SCRIPT_ALIASES, "评测脚本版本"),
+    )
+    tables = []
+    for item in evidence[:6]:
+        derived = item.get("derived_index")
+        if (derived is True or str(derived or "").strip().lower() in {"1", "true", "yes"}
+                or not re.fullmatch(r"E\d+", str(item.get("id") or ""))
+                or item.get("content_kind") != "table"):
+            continue
+        # Accept the parser's Markdown header with either retained or compacted
+        # newlines; do not parse values or infer units from metric names.
+        match = re.match(r"\s*\|(.+?)\|\s*(?=\|\s*:?-{3,})", str(item.get("context") or ""), re.S)
+        if not match:
+            continue
+        columns = {cell.strip(" `\r\n\t").casefold() for cell in match.group(1).split("|")}
+        if not columns.intersection(METRIC_ALIASES) or not columns.intersection(VALUE_ALIASES):
+            continue
+        missing = [(field, label) for field, aliases, label in fields if not columns.intersection(aliases)]
+        tables.append({"evidence_id": item["id"], "source_filename": item.get("source_filename"),
+                       "source_locator": item.get("source_locator"),
+                       "missing_header_fields": [field for field, _ in missing],
+                       "missing_header_labels": [label for _, label in missing]})
+    if not tables:
+        return None
+    return {"schema_version": "experiment_material_review_v1", "status": "needs_confirmation",
+            "reason": "measurement_comparison_not_confirmed", "tables": tables, "confirmed": False, "writes": False}
+
+
 def parse_metric_source(path: Path) -> dict[str, Any]:
     """Parse a local metrics source into explicit row proposals."""
     if path.is_dir():

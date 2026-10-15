@@ -4,6 +4,66 @@ from core.context_gate import admit_context, evaluate_subquery_coverage, plan_re
 
 
 class ContextGateTests(unittest.TestCase):
+    def test_task_admission_receipt_is_recomputed_not_inherited(self):
+        result = admit_context("核对指标记录", ["指标记录需要逐项确认。"], [{}],
+                               [{"score": 0.4, "admission_basis": "workflow_task_focus",
+                                 "task_support": {"focus": "untrusted", "score": 1.0}}])
+        self.assertEqual(result.public_dict()["task_supported_evidence"], [])
+        self.assertNotIn("task_support", result.evidence[0])
+
+    def test_near_duplicate_filter_preserves_distinct_assets_and_changed_table_rows(self):
+        for ids, values in ((["doc-a", "doc-b"], ["0.4", "0.4"]), (["doc-a", "doc-a"], ["0.4", "0.7"])):
+            with self.subTest(ids=ids, values=values):
+                docs = [f"| metric | value | | --- | --- | | accuracy | {value} |" for value in values]
+                result = admit_context("核对指标记录", docs, [{"document_id": key} for key in ids],
+                                       [{"score": 0.4, "content_kind": "table"} for _ in ids])
+                self.assertEqual(len(result.evidence), 2)
+
+    def test_task_focus_admits_raw_configuration_without_changing_original_score(self):
+        text = "encoder_model: demo-small\ndataset_version: fixture-v3\nretrieval_mode: sparse"
+        kwargs = dict(
+            query="比较这两轮实验的指标和候选原因",
+            documents=[text],
+            metadatas=[{"source_filename": "run.yaml", "document_id": "doc-a"}],
+            evidence=[{"candidate_id": "config-a", "score": 0.012, "support_score": 0.01}],
+        )
+        self.assertEqual(admit_context(**kwargs).evidence, ())
+        result = admit_context(**kwargs, task_focuses=["model dataset retrieval environment configuration"])
+        self.assertEqual(len(result.evidence), 1)
+        self.assertEqual(result.evidence[0]["score"], 0.012)
+        self.assertEqual(result.evidence[0]["admission_basis"], "workflow_task_focus")
+        self.assertEqual(result.evidence[0]["task_support"]["matched_terms"], ["dataset", "model", "retrieval"])
+        # Admission of conditions is not proof that the requested comparison is answered.
+        self.assertNotEqual(result.decision, "accept")
+
+    def test_task_focus_cannot_admit_irrelevant_derived_or_nonfinite_evidence(self):
+        focus = ["model dataset retrieval environment configuration"]
+        for text, extra in (
+            ("午餐菜单：面条、米饭和沙拉。", {}),
+            ("model: demo\ndataset: demo-v3", {"derived_index": True}),
+            ("model: demo\ndataset: demo-v3", {"score": float("nan")}),
+            ("model: demo\ndataset: demo-v3", {"score": float("inf")}),
+            ("model: demo\ndataset: demo-v3", {"score": -1}),
+        ):
+            with self.subTest(text=text, extra=extra):
+                result = admit_context("对比实验", [text], [{}], [{"score": 0.012, **extra}], task_focuses=focus)
+                self.assertEqual(result.evidence, ())
+
+    def test_task_focus_cannot_match_only_filename_and_keeps_budget(self):
+        focus = ["model dataset retrieval environment configuration"]
+        result = admit_context("对比实验", ["午餐菜单：面条、米饭和沙拉。"],
+                               [{"source_filename": "model-dataset.yaml"}], [{"score": 0.012}], task_focuses=focus)
+        self.assertEqual(result.evidence, ())
+        text = "model: demo\ndataset: fixture-v3\n" + "x" * 2500
+        result = admit_context("对比实验", [text], [{}], [{"score": 0.012}], task_focuses=focus, budget_chars=800)
+        self.assertLessEqual(result.accepted_chars, 800)
+
+    def test_task_focus_must_survive_context_truncation(self):
+        text = "x" * 1000 + " model: demo dataset: fixture " + "y" * 2000
+        result = admit_context("对比实验", [text], [{}], [{"score": 0.012}],
+                               task_focuses=["model dataset retrieval environment configuration"], budget_chars=800)
+        self.assertEqual(result.evidence, ())
+
     def test_context_gate_rejects_non_finite_evidence_score(self):
         result = admit_context(
             "RAG 的核心思想是什么？",

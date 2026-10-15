@@ -33,7 +33,7 @@ from core.context_gate import (
     non_retrieval_response,
     plan_retrieval,
 )
-from core.experiment_ledger import build_experiment_evidence, build_experiment_evidence_text
+from core.experiment_ledger import build_experiment_evidence, build_experiment_evidence_text, plan_experiment_material_review
 from core.graph_db import LocalGraphDB
 from core.graph_rag import GraphRAGIndex, GraphRoute, route_graph_query
 from core.interaction_context import (
@@ -957,6 +957,11 @@ class RAGEngine:
             and selected_document_count >= 2
             and not experiment_authorized
         )
+        task_context_focuses = (
+            workflow_policy.get("context_focuses") or []
+            if active_project_id and workflow_source_diversity_required
+            else []
+        )
         workflow_focus_variants = (
             workflow_retrieval_variants(
                 interaction_context.get("workflow_id"),
@@ -1220,6 +1225,7 @@ class RAGEngine:
             query,
             retrieval_result,
             top_k=top_k,
+            task_focuses=task_context_focuses,
         )
         vector_docs = retrieval_result["documents"]
         vector_metas = retrieval_result["metadatas"]
@@ -1322,6 +1328,7 @@ class RAGEngine:
                     query,
                     retry_result,
                     top_k=retry_top_k,
+                    task_focuses=task_context_focuses,
                 )
                 retry_evidence = retry_result["evidence"]
                 retry_gate = evaluate_evidence_gate(retry_evidence, query=query)
@@ -1416,6 +1423,15 @@ class RAGEngine:
             )
             else 0
         )
+        experiment_material_review = (
+            plan_experiment_material_review(query, evidence)
+            if (
+                workflow_source_diversity_required and active_project_id
+                and not experiment_authorized and not visual_authorized
+                and evidence_gate.decision == "accept"
+                and not workflow_source_coverage_missing and not subquery_coverage_missing
+            ) else None
+        )
 
         # Report retrieval only after the bounded corrective pass has either
         # been accepted or discarded. Consumers must observe the path that
@@ -1452,6 +1468,10 @@ class RAGEngine:
                 retrieval_status = "refused"
                 agentic_decision = "refuse"
                 stop_reason = "evidence_retry_exhausted"
+            elif experiment_material_review:
+                retrieval_status = "needs_confirmation"
+                agentic_decision = "clarify"
+                stop_reason = "experiment_measurement_confirmation_required"
             else:
                 retrieval_status = "pass"
                 agentic_decision = "generate"
@@ -1468,6 +1488,7 @@ class RAGEngine:
                 ),
                 "experiment_evidence_authorized": experiment_authorized,
                 "experiment_evidence_count": len(experiment_evidence) if experiment_authorized else 0,
+                "experiment_material_review": experiment_material_review,
                 "retrieval_mode": retrieval_result.get("retrieval_mode"),
                 "correction_triggered": bool(correction_triggered),
                 "correction_attempted": correction_attempted,
@@ -1596,6 +1617,16 @@ class RAGEngine:
             *(experiment_evidence if experiment_authorized else []),
             *evidence,
         ]
+        if experiment_material_review:
+            self.audit_logger.append_event(
+                "rag.experiment_material_review_required",
+                {"query_chars": len(query), "table_count": len(experiment_material_review["tables"]),
+                 "evidence_count": len(evidence), "side_effect": "none", "generation_attempts": 0},
+                trace_id=trace_id,
+            )
+            yield build_experiment_material_review_answer(experiment_material_review, evidence)
+            yield _evidence_block(answer_evidence)
+            return
         if visual_authorized:
             self.audit_logger.append_event(
                 "rag.visual_evidence_admitted",
@@ -2328,6 +2359,7 @@ def gate_retrieval_context(
     retrieval_result: dict[str, Any],
     *,
     top_k: int,
+    task_focuses: list[str] | tuple[str, ...] = (),
 ) -> tuple[dict[str, Any], Any]:
     gate = admit_context(
         query,
@@ -2335,6 +2367,7 @@ def gate_retrieval_context(
         list(retrieval_result.get("metadatas") or []),
         list(retrieval_result.get("evidence") or []),
         max_evidence=min(max(1, int(top_k)), 6),
+        task_focuses=task_focuses,
     )
     observability = dict(retrieval_result.get("observability") or {})
     observability["context_gate"] = gate.public_dict()
@@ -2787,6 +2820,40 @@ def global_graph_source_fallback_answer(
         for source_label, point, evidence_id in selected
     )
     lines.append("如需共同结论，请缩小问题范围，或补充能够分别支撑各项结论的材料。")
+    return "\n".join(lines)
+
+
+def build_experiment_material_review_answer(plan: dict[str, Any], evidence: list[dict]) -> str:
+    lines = [
+        "## 结论",
+        "本轮尚未提供通过可比性门的结构化实验测量。可以核对材料记录，"
+        "但不能据同名指标计算提升或确认原因；请先完成指标口径确认。",
+    ]
+    for table in plan["tables"]:
+        missing = "、".join(table["missing_header_labels"])
+        detail = "表头未显式登记：" + missing if missing else "表头候选字段齐全，但值与来源绑定仍待确认"
+        lines.append(f"- {table.get('source_filename') or '指标表'}：{detail}。[{table['evidence_id']}]")
+    lines.extend([
+        "这些是当前指标表的登记缺口，不代表其他资料不存在相关条件；"
+        "不能把一份配置中的数据集套到所有指标。",
+        "", "## 已证实变化", "待确认。以下仅为选定材料的有限原文核对，不是已验证变化或因果结论：",
+    ])
+    for item in evidence[:6]:
+        text = str(item.get("context") or "").strip()
+        if text and re.fullmatch(r"E\d+", str(item.get("id") or "")):
+            lines.append(f"- 原文摘录（{item.get('source_filename') or '来源'}）："
+                         f"{compact_context_text(text, 600)} [{item['id']}]")
+    lines.extend([
+        "", "## 高可信候选原因", "待确认。配置记录只是待核对的候选因素，不等于已证实原因。",
+        "", "## 待验证假设", "待确认。是否同一数据集/划分、指标定义/单位和评测脚本，须逐指标绑定证据；"
+        "本轮不推断缺失口径，也不沿用报告中的因果说法。",
+        "", "## 最小验证实验",
+        "1. 在当前项目的指标导入预览中逐项确认原文件、实际实验时间、单位、方向、定义版本、"
+        "数据集版本/划分和评测脚本；缺少依据的字段保持待确认，不批量补同一值。",
+        "2. 确认后选择基线与当前运行，先执行可比性检查；不兼容时补齐证据或按相同评测协议重新运行。",
+        "3. 可比后再固定数据、脚本、模型和环境，每次只改变一个候选配置因素，记录种子、原始指标与分阶段耗时。"
+        "重复次数和判据需确认；以上仅为验证草案，不自动写入账本或执行实验。",
+    ])
     return "\n".join(lines)
 
 
