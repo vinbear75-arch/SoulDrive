@@ -2429,6 +2429,7 @@ button {
   font-size: 14px;
   line-height: 1.75;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .message.user .message-content {
@@ -2444,6 +2445,48 @@ button {
   margin: 0.8rem 0 0.45rem;
   color: #1c312e;
   letter-spacing: 0;
+  font-weight: 650;
+}
+
+.evidence-table-scroll {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 12px 0;
+  border: 1px solid #d8d0be;
+  border-radius: 8px;
+}
+
+.evidence-table-scroll table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.evidence-table-scroll :where(th, td) {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e4ddcf;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.evidence-table-scroll th {
+  background: #eef3ed;
+  font-weight: 650;
+}
+
+.message-content blockquote {
+  margin: 8px 0;
+  border-left: 3px solid #b7cdbf;
+  padding-left: 12px;
+  color: #555d54;
+}
+
+.evidence-image-notice {
+  color: #767566;
+  font-size: 12px;
 }
 
 .message-actions {

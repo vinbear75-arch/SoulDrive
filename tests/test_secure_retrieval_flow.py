@@ -17,6 +17,45 @@ from core.workspace_crypto import initialize_keystore, unlock_keystore
 
 
 class SecureRetrievalFlowTests(unittest.TestCase):
+    def test_selected_project_documents_survive_low_project_relevance_without_scope_expansion(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = SoulDriveWorkspace.from_drive(temp_dir).ensure()
+            (Path(workspace.models_path) / "bge-small-zh-v1.5").mkdir(parents=True, exist_ok=True)
+            initialize_keystore(workspace, "secret-passphrase")
+            set_workspace_keys(workspace.root_path, unlock_keystore(workspace, "secret-passphrase"))
+            try:
+                with patch("core.knowledge_base._sentence_transformer", return_value=_FakeEmbeddingModel()):
+                    kb = LocalKnowledgeBase(workspace_path=workspace.root_path)
+                    try:
+                        for identity, project, filename, value in (
+                            ("a", "p1", "selected.csv", "0.71"),
+                            ("b", "p1", "current.csv", "0.74"),
+                            ("foreign", "p2", "selected.csv", "0.99"),
+                            ("global", None, "selected.csv", "0.98"),
+                        ):
+                            kb.ingest_chunks("doc-" + identity, [_FakeChunk(
+                                f"| metric | value |\n| --- | --- |\n| precision | {value} |",
+                                {"document_id": "secure_" + identity, "project_id": project,
+                                 "source_filename": filename, "content_kind": "table", "page": 1},
+                            )])
+                        with patch("core.knowledge_base._evaluate_project_candidates", return_value={
+                            "relevant": False, "threshold": 0.34, "max_score": 0.05, "candidate_scores": [],
+                        }):
+                            for ids, expected in ((["a", "b"], {"secure_a", "secure_b"}),
+                                                  (["foreign"], set()), (["missing"], set()),
+                                                  (["global"], {"secure_global"})):
+                                with self.subTest(ids=ids):
+                                    result = kb.search_with_evidence("比较两份 precision 指标的口径", project_id="p1",
+                                        document_names=["selected.csv", "current.csv"], document_ids=ids, top_k=4)
+                                    self.assertEqual({item["document_id"] for item in result["metadatas"]}, expected)
+                                    self.assertEqual(result["observability"]["project_focus"]["route"], "selected_documents")
+                                    self.assertFalse(result["observability"]["project_focus"]["relevance_evaluation"]["relevant"])
+                                    self.assertEqual(result["observability"]["stage_counts"]["graph"], 0)
+                    finally:
+                        kb.close()
+            finally:
+                clear_workspace_keys(workspace.root_path)
+
     def test_project_relevance_rejects_non_finite_dense_distance(self):
         candidate = SearchCandidate(
             id="invalid-dense-score",

@@ -328,10 +328,10 @@ def admit_context(
         item.pop("admission_basis", None)
         item.pop("task_support", None)
         metadata = dict(metadatas[index]) if index < len(metadatas) else {}
-        document = str(documents[index] if index < len(documents) else "").strip()
-        if not document:
-            document = str(item.get("context") or item.get("snippet") or "").strip()
-            if document:
+        document = str(documents[index] if index < len(documents) else "").strip("\r\n")
+        if not document.strip():
+            document = str(item.get("context") or item.get("snippet") or "").strip("\r\n")
+            if document.strip():
                 item["context_recovered_from_evidence"] = True
         score = _safe_float(item.get("score"))
         source = str(item.get("source_filename") or metadata.get("source_filename") or "未知文件")
@@ -348,7 +348,7 @@ def admit_context(
             rejected.append(_rejection(candidate_id, source, score, "exact_section_scope"))
             continue
 
-        if not document:
+        if not document.strip():
             rejected.append(_rejection(candidate_id, source, score, "empty_context"))
             continue
         ocr_confidence = metadata.get("ocr_mean_confidence")
@@ -361,7 +361,8 @@ def admit_context(
         # model-generated retrieval hints. This admits task conditions, not
         # proof of a conclusion; the original-query evidence gate is unchanged.
         remaining = budget_chars - accepted_chars
-        admitted = _compact_context(document, min(max_chars_per_evidence, remaining))
+        structured = is_structured_source(source_metadata)
+        admitted = compact_source_context(document, min(max_chars_per_evidence, remaining), structured=structured)
         task_support = _task_support(admitted, task_focuses) if score > 0 else {}
         task_score = float(task_support.get("score") or 0.0)
         if max(score, task_score) < minimum_score:
@@ -402,7 +403,6 @@ def admit_context(
 
         fingerprint = content_terms(document[:2400])
         normalized_document = " ".join(document[:2400].split())
-        structured = str(source_metadata.get("content_kind") or "").lower() in {"table", "code", "config"}
         if any(
             _jaccard(fingerprint, existing) >= 0.88
             and (not structured or normalized_document == existing_text)
@@ -545,10 +545,22 @@ def _exact_section_sources(
     return sources
 
 
-def _compact_context(text: str, max_chars: int) -> str:
-    normalized = " ".join(str(text or "").split())
+def is_structured_source(metadata: dict[str, Any]) -> bool:
+    return (
+        str(metadata.get("content_kind") or "").lower() in {"table", "code", "config"}
+        or str(metadata.get("source_filename") or "").lower().endswith((".yaml", ".yml", ".json"))
+    )
+
+
+def compact_source_context(text: str, max_chars: int, *, structured: bool = False) -> str:
+    """Keep source syntax; a truncated structured excerpt contains complete prefix lines only."""
+    normalized = str(text or "").strip("\r\n")
     if len(normalized) <= max_chars:
         return normalized
+    if structured:
+        marker = "\n…（原文截断，请查看来源）"
+        prefix, boundary, _ = normalized[:max(0, max_chars - len(marker))].rpartition("\n")
+        return prefix.rstrip("\r\n") + marker if boundary else ""
     marker = " ... [context gated] ... "
     if max_chars <= len(marker) + 120:
         return normalized[:max_chars]

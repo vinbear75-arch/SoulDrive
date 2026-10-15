@@ -43,8 +43,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { EvidenceMarkdown } from "./EvidenceMarkdown";
 import "./App.css";
 import {
   canUseSelectedRegionWithoutClarification,
@@ -1134,8 +1133,6 @@ interface LocalContact {
 }
 
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
-const MINDMAP_BLOCK_PATTERN = /```souldrive-mindmap\s*([\s\S]*?)```/g;
-const EVIDENCE_BLOCK_PATTERN = /```souldrive-evidence\s*([\s\S]*?)```/g;
 const GRAPH_WHEEL_STEP = 0.006;
 const GRAPH_BUTTON_ZOOM_STEP = 0.12;
 const WORKBENCH_LAYOUT_STORAGE_KEY = "souldrive.workbench.layout.v1";
@@ -1332,22 +1329,41 @@ function parseEvidence(raw: string): EvidenceItem[] {
   }
 }
 
-function parseMessageArtifacts(content: string): ParsedMessage {
-  const artifacts = Array.from(content.matchAll(MINDMAP_BLOCK_PATTERN)).map((match) =>
-    parseMindmap(match[1].trim()),
-  );
-  const evidence = Array.from(content.matchAll(EVIDENCE_BLOCK_PATTERN)).flatMap((match) =>
-    parseEvidence(match[1].trim()),
-  );
+function messageArtifactBlocks(content: string) {
+  const blocks: Array<{ kind: string; body: string; start: number; end: number }> = [];
+  let open: { marker: string; kind: string; start: number; bodyStart: number } | null = null;
+  let offset = 0;
+  // Only column-zero protocol fences are artifacts. Quotes/indented examples
+  // remain source text; an outer literal fence consumes its nested fences.
+  for (const line of content.match(/[^\n]*\n|[^\n]+$/g) || []) {
+    const fence = /^([ ]{0,3})(`{3,}|~{3,})([^\r\n]*)\r?\n?$/.exec(line);
+    if (fence && open) {
+      if (fence[2][0] === open.marker[0] && fence[2].length >= open.marker.length && !fence[3].trim()) {
+        if (open.kind === "souldrive-evidence" || open.kind === "souldrive-mindmap") {
+          blocks.push({ kind: open.kind, body: content.slice(open.bodyStart, offset).trim(), start: open.start, end: offset + line.length });
+        }
+        open = null;
+      }
+    } else if (fence && !(fence[2][0] === "`" && fence[3].includes("`"))) {
+      open = { marker: fence[2], kind: fence[1] ? "literal" : fence[3].trim(), start: offset, bodyStart: offset + line.length };
+    }
+    offset += line.length;
+  }
+  return blocks;
+}
 
-  return {
-    cleanContent: content
-      .replace(MINDMAP_BLOCK_PATTERN, "")
-      .replace(EVIDENCE_BLOCK_PATTERN, "")
-      .trim(),
-    artifacts,
-    evidence,
-  };
+function parseMessageArtifacts(content: string): ParsedMessage {
+  const blocks = messageArtifactBlocks(content);
+  const mindmaps = blocks.filter((block) => block.kind === "souldrive-mindmap");
+  // The backend appends its evidence snapshot last. Earlier model/source
+  // examples must not be merged into the snapshot's citation namespace.
+  const terminalEvidence = blocks.filter((block) => block.kind === "souldrive-evidence" && !content.slice(block.end).trim()).slice(-1);
+  let cleanContent = content;
+  for (const block of [...mindmaps, ...terminalEvidence].sort((left, right) => right.start - left.start)) {
+    cleanContent = cleanContent.slice(0, block.start) + cleanContent.slice(block.end);
+  }
+  return { cleanContent: cleanContent.trim(), artifacts: mindmaps.map((block) => parseMindmap(block.body)),
+           evidence: terminalEvidence.flatMap((block) => parseEvidence(block.body)) };
 }
 
 function formatAuditTime(timestamp?: number) {
@@ -6539,7 +6555,7 @@ export default function App() {
                       <p>{message.content}</p>
                     ) : (
                       <>
-                        {displayContent && <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>}
+                        {displayContent && <EvidenceMarkdown>{displayContent}</EvidenceMarkdown>}
                       </>
                     )}
                     {isGenerating && index === messages.length - 1 && <span className="stream-caret" />}
@@ -6782,7 +6798,7 @@ export default function App() {
                 }
               }}
               disabled={isGenerating || locked || indexBusy || sessionLoading || !activeSessionId}
-              placeholder={locked ? "私有工作区尚未解锁" : sessionLoading ? "正在切换项目对话..." : !activeProjectId ? "请先创建或选择项目" : isGenerating ? "端侧模型生成中..." : selectedWorkflow ? `例如：${selectedWorkflow.suggested_query}` : "输入文档归纳、对比、方案分析或问答任务"}
+              placeholder={locked ? "私有工作区尚未解锁" : sessionLoading ? "正在切换项目对话..." : !activeProjectId ? "请先创建或选择项目" : isGenerating ? "正在检索、核对与整理..." : selectedWorkflow ? `例如：${selectedWorkflow.suggested_query}` : "输入文档归纳、对比、方案分析或问答任务"}
             />
             <button
               type="submit"
@@ -7053,11 +7069,11 @@ export default function App() {
                       {documentPreview.chunks.map((chunk) => (
                         <section key={chunk.id} className="document-preview-chunk">
                           <header><strong>切片 {chunk.index}</strong><span>{chunk.page ? `第 ${chunk.page} 页` : "未标页码"} · {chunk.section} · 已生成 {chunk.child_count} 个检索子块</span></header>
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{chunk.text}</ReactMarkdown>
+                          <EvidenceMarkdown>{chunk.text}</EvidenceMarkdown>
                         </section>
                       ))}
                     </div>
-                  ) : documentPreview.text ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{documentPreview.text}</ReactMarkdown> : <p>该文件暂无可直接预览的文本内容。</p>}
+                  ) : documentPreview.text ? <EvidenceMarkdown>{documentPreview.text}</EvidenceMarkdown> : <p>该文件暂无可直接预览的文本内容。</p>}
                 </article>
                 {documentPreview.truncated && <footer className="document-viewer-footer">预览已截取前 30,000 个字符；完整内容仍保留在本地索引中。</footer>}
               </section>

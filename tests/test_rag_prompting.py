@@ -16,6 +16,7 @@ from core.rag_engine import (
     _should_correct_rejected_retrieval,
     _validate_generated_answer_for_workflow,
     build_answer_messages,
+    build_experiment_material_review_answer,
     build_global_source_coverage_plan,
     build_learning_context,
     build_vector_context,
@@ -31,6 +32,24 @@ from core.rag_engine import (
 
 
 class RagPromptingTests(unittest.TestCase):
+    def test_material_review_displays_raw_table_and_nested_config_as_separate_blocks(self):
+        table = "| metric | value |\n| --- | --- |\n| latency | 125 |\n| accuracy | 0.750 |"
+        config = "model:\n  name: demo\nthresholds:\n  conflict: 0.4"
+        answer = build_experiment_material_review_answer({"tables": []}, [
+            {"id": "E1", "content_kind": "table", "source_filename": "metrics.csv", "context": table},
+            {"id": "E2", "source_filename": "config.yaml", "context": config},
+        ])
+        self.assertIn("\n\n" + table + "\n", answer)
+        self.assertIn("```text\n" + config + "\n```", answer)
+        self.assertIn("[E1]", answer)
+        self.assertIn("[E2]", answer)
+        self.assertNotIn("125ms", answer)
+
+    def test_vector_prompt_preserves_structured_source_lines(self):
+        text = "| metric | value |\n| --- | --- |\n| latency | 125 |\n\nmodel:\n  name: demo"
+        context = build_vector_context([text], [{"source_filename": "record.md"}], [{"id": "E1"}])
+        self.assertIn(text, context)
+
     def test_unconfirmed_metric_comparison_returns_preparation_card_without_model(self):
         evidence = [
             {"id": "E1", "score": 0.4, "source_filename": "old.csv", "document_id": "old",

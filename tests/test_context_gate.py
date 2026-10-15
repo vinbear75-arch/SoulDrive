@@ -4,6 +4,24 @@ from core.context_gate import admit_context, evaluate_subquery_coverage, plan_re
 
 
 class ContextGateTests(unittest.TestCase):
+    def test_context_preserves_table_rows_and_nested_configuration(self):
+        for text in ("| metric | value |\n| --- | --- |\n| latency | 125 |\n| accuracy | 0.75 |",
+                     "model: demo\nthresholds:\n  conflict: 0.4\n  alignment: 900"):
+            result = admit_context("核对实验指标", [text], [{}], [{"score": 0.4}])
+            self.assertEqual(result.documents, (text,))
+
+    def test_multiline_truncation_keeps_complete_prefix_lines_not_tail_splices(self):
+        header = "| metric | value |\n| --- | --- |\n"
+        rows = [f"| row-{index} | {'9' * 90} |" for index in range(25)]
+        result = admit_context("核对实验指标", [header + "\n".join(rows)], [{}],
+                               [{"score": 0.4, "content_kind": "table"}], budget_chars=800)
+        text = result.documents[0]
+        self.assertLessEqual(len(text), 800)
+        for line in text.splitlines():
+            if line.startswith("| row-"):
+                self.assertIn(line, rows)
+        self.assertNotIn(rows[-1], text)
+
     def test_task_admission_receipt_is_recomputed_not_inherited(self):
         result = admit_context("核对指标记录", ["指标记录需要逐项确认。"], [{}],
                                [{"score": 0.4, "admission_basis": "workflow_task_focus",

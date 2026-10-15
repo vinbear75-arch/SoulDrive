@@ -1672,7 +1672,10 @@ class LocalKnowledgeBase:
         elif scoped_project_id:
             scoped_candidate_count = len(candidates)
             project_relevance = _evaluate_project_candidates(query, candidates)
-            if project_relevance["relevant"]:
+            # Explicit document selection fixes the corpus. A low project-level
+            # language-overlap score must not replace it with global fallback;
+            # candidate filters and downstream evidence/answer gates still apply.
+            if scoped_document_names or scoped_document_ids or project_relevance["relevant"]:
                 # 项目相关命中不能遮蔽未绑定项目的共享知识。先保留当前
                 # 项目候选，再以同样的多路召回召回全局候选，合并后统一重排。
                 shared_graph_candidates = self._graph_candidates(
@@ -1761,7 +1764,9 @@ class LocalKnowledgeBase:
                 section_candidates.extend(shared_section_candidates)
                 merged_candidate_count = len(candidates)
                 project_route = (
-                    "project_first_with_global"
+                    "selected_documents"
+                    if scoped_document_names or scoped_document_ids
+                    else "project_first_with_global"
                     if shared_candidates
                     else "project_first"
                 )
@@ -1933,7 +1938,7 @@ class LocalKnowledgeBase:
 
         project_focus_enabled = bool(
             scoped_project_id
-            and project_route in {"project_first", "project_first_with_global"}
+            and project_route in {"project_first", "project_first_with_global", "selected_documents"}
         )
         focused_candidate_count = 0
         for candidate in candidates:

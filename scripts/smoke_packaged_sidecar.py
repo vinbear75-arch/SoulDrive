@@ -262,6 +262,27 @@ def _exercise_experiment_flow(request, workspace: Path, output_dir: Path, result
     specs = request("/multimodal/workflows?project_id=flow-a")[1]["workflows"]
     spec = next(item for item in specs if item["workflow_id"] == "experiment_compare")
     assert request("/projects/flow-a/playbooks/experiment_compare/approval", {"playbook_version": spec["playbook_version"], "approved": True})[0] == 200
+
+    step("unconfirmed_material_preparation")
+    assert request("/projects/flow-a/sessions", {"session_id": "flow-preparation", "title": "未绑定测量材料核对", "workflow_id": "experiment_compare"})[0] == 200
+    material_context = {key: value for key, value in context.items() if key not in pair}
+    preparation_body = {"session_id": "flow-preparation", "request_id": "flow-preparation-request",
+                        "query": "对比这两份 accuracy 指标表，先检查比较口径再给出验证计划。", "active_context": material_context}
+    code, preparation = request("/chat", preparation_body, raw=True, timeout=900)
+    assert code == 200 and "指标口径确认" in preparation and "```souldrive-evidence" in preparation, preparation
+    preparation_prose = preparation.split("```souldrive-evidence", 1)[0]
+    assert "[M1]" not in preparation_prose and "| metric | value |" in preparation_prose, preparation
+    preparation_events = [json.loads(line) for line in (workspace / "audit/audit_log.jsonl").read_text(encoding="utf-8").splitlines()]
+    preparation_reviews = [event for event in preparation_events if event["event_type"] == "rag.experiment_material_review_required"]
+    assert len(preparation_reviews) == 1 and preparation_reviews[0]["payload"]["generation_attempts"] == 0
+    assert preparation_reviews[0]["payload"]["side_effect"] == "none"
+    preparation_history = request("/sessions/flow-preparation/history?project_id=flow-a")[1]["history"]
+    assert len(preparation_history) == 2 and preparation.endswith(preparation_history[-1]["content"])
+    assert request("/chat", preparation_body, raw=True, timeout=900)[1] == preparation_history[-1]["content"]
+    assert len(request(runs_url)[1]["runs"]) == 3
+    result["material_preparation"] = {"request": preparation_body, "persisted_answer": preparation_history[-1]["content"],
+                                      "trace_id": preparation_reviews[0]["trace_id"], "generation_attempts": 0, "new_runs": 0}
+
     code, answer = request("/chat", chat_body, raw=True, timeout=900)
     result["answer"] = answer
     result["chat_request"] = chat_body
@@ -315,6 +336,8 @@ def _verify_experiment_reopen(request, result: dict):
     runs = request("/projects/flow-a/experiments/runs")[1]["runs"]
     assert {item["run_id"] for item in runs} == {item["run_id"] for item in result["runs"].values()}
     assert request("/chat", result["chat_request"], raw=True, timeout=900)[1] == result["persisted_answer"]
+    preparation = result["material_preparation"]
+    assert request("/chat", preparation["request"], raw=True, timeout=900)[1] == preparation["persisted_answer"]
     code, task = request(f"/presentations/tasks/{result['generation']['task_id']}?project_id=flow-a")
     assert code == 200 and task["status"] == "completed", task
     assert task["result"]["output_path"] == result["generation"]["result"]["output_path"]

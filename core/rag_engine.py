@@ -29,7 +29,9 @@ from core.audit_log import append_audit_event_best_effort, default_audit_logger
 from core.cloud_model import OpenAICompatibleChatModel, load_cloud_model_config
 from core.context_gate import (
     admit_context,
+    compact_source_context,
     evaluate_subquery_coverage,
+    is_structured_source,
     non_retrieval_response,
     plan_retrieval,
 )
@@ -2414,7 +2416,7 @@ def build_vector_context(vector_docs: list[str], vector_metas: list[dict], evide
             source_label += f" | 定位: {str(source_locator).strip()[:600]}"
         blocks.append(
             f"[{evidence_id} | {source_label} | 章节: {section} | 切片: {chunk_index}]\n"
-            f"{compact_context_text(doc, MAX_CONTEXT_CHARS_PER_EVIDENCE)}"
+            f"{compact_source_context(doc, MAX_CONTEXT_CHARS_PER_EVIDENCE, structured=is_structured_source(evidence_item) or is_structured_source(metadata))}"
         )
     return "\n\n".join(blocks)
 
@@ -2839,10 +2841,20 @@ def build_experiment_material_review_answer(plan: dict[str, Any], evidence: list
         "", "## 已证实变化", "待确认。以下仅为选定材料的有限原文核对，不是已验证变化或因果结论：",
     ])
     for item in evidence[:6]:
-        text = str(item.get("context") or "").strip()
+        text = str(item.get("context") or "").strip("\r\n")
         if text and re.fullmatch(r"E\d+", str(item.get("id") or "")):
-            lines.append(f"- 原文摘录（{item.get('source_filename') or '来源'}）："
-                         f"{compact_context_text(text, 600)} [{item['id']}]")
+            source = re.sub(r"([\\`*_{}\[\]()#+.!|>~-])", r"\\\1", str(item.get("source_filename") or "来源"))
+            excerpt = compact_source_context(text, 600, structured=is_structured_source(item))
+            lines.extend(["", f"### 原文摘录：{source} [{item['id']}]", ""])
+            if not excerpt:
+                lines.append("原文行超出摘录预算，请查看完整来源。")
+            elif item.get("content_kind") == "table":
+                lines.extend(excerpt.splitlines())
+            elif is_structured_source(item):
+                fence = "`" * max(3, 1 + max((len(run) for run in re.findall(r"`+", excerpt)), default=0))
+                lines.extend([fence + "text", excerpt, fence])
+            else:
+                lines.extend("> " + line for line in excerpt.splitlines())
     lines.extend([
         "", "## 高可信候选原因", "待确认。配置记录只是待核对的候选因素，不等于已证实原因。",
         "", "## 待验证假设", "待确认。是否同一数据集/划分、指标定义/单位和评测脚本，须逐指标绑定证据；"
