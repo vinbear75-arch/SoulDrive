@@ -814,8 +814,13 @@ interface LearningMemory {
   title: string;
   content: string;
   source_excerpt?: string;
+  source_session_id?: string;
   source_trace?: {
     candidate_id?: string;
+    session_id?: string;
+    workflow_id?: string;
+    message_ids?: string[];
+    message_sequences?: number[];
     message_indexes?: number[];
     excerpt?: string;
   };
@@ -828,6 +833,29 @@ interface LearningMemory {
   record_version?: number;
   created_at?: number;
   updated_at?: number;
+}
+
+function LearningMemorySource({ memory }: { memory: LearningMemory }) {
+  const trace = memory.source_trace;
+  const session = trace?.session_id || memory.source_session_id;
+  const messageIds = trace?.message_ids || [];
+  const sequences = trace?.message_sequences || [];
+  const indexes = trace?.message_indexes || [];
+  return (
+    <div className="learning-memory-source">
+      来源：{memory.source_excerpt || trace?.excerpt || "没有可展示的原文摘录"}
+      <details>
+        <summary>{messageIds.length > 0
+          ? `已绑定原消息${sequences.length > 0 ? ` · 会话消息 ${sequences.join(", ")}` : ""}`
+          : "原消息定位未核验"}</summary>
+        {session && <div>来源会话：{session}</div>}
+        {trace?.workflow_id && <div>来源工作流：{trace.workflow_id}</div>}
+        {messageIds.length > 0
+          ? <div>消息主键：{messageIds.join(", ")}</div>
+          : indexes.length > 0 && <div>候选片段第 {indexes.map((index) => index + 1).join(", ")} 条（非会话序号）</div>}
+      </details>
+    </div>
+  );
 }
 
 interface MemoryHealth {
@@ -7265,7 +7293,6 @@ export default function App() {
               )}
               {!memoryManagerBusy && learningMemories.map((memory) => {
                 const edit = memoryEdits[memory.memory_id] || { title: memory.title, content: memory.content };
-                const sourceIndexes = memory.source_trace?.message_indexes || [];
                 const validityLabel = memory.validity_status === "scheduled"
                   ? "计划生效"
                   : memory.validity_status === "expired"
@@ -7310,10 +7337,7 @@ export default function App() {
                       <span>最近使用：{memory.last_used_at ? formatDocumentTime(memory.last_used_at) : "尚未注入"}</span>
                       <span>更新：{formatDocumentTime(memory.updated_at)}</span>
                     </div>
-                    <p className="learning-memory-source">
-                      来源：{memory.source_excerpt || memory.source_trace?.excerpt || "已保存来源，但没有可展示的原文摘录"}
-                      {sourceIndexes.length > 0 && ` · 会话消息 ${sourceIndexes.join(", ")}`}
-                    </p>
+                    <LearningMemorySource memory={memory} />
                     <div className="learning-memory-actions">
                       <button type="button" disabled={memoryManagerBusy} onClick={() => void saveLearningMemory(memory)}>保存修改</button>
                       <button type="button" disabled={memoryManagerBusy} onClick={() => void revokeLearningMemory(memory)}>停用</button>

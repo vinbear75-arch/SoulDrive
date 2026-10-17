@@ -8747,6 +8747,7 @@ async def learning_memory_runtime(request: RuntimeMemoryRequest):
     workspace = current_workspace()
     effective_project_id = str(request.project_id or "").strip() or None
     effective_workflow_id = None
+    source_message = None
     if request.session_id:
         session_store = _conversation_store(workspace)
         if session_store is None:
@@ -8763,6 +8764,16 @@ async def learning_memory_runtime(request: RuntimeMemoryRequest):
             return JSONResponse({"error": "session belongs to another project"}, status_code=409)
         effective_project_id = effective_project_id or session_project_id
         effective_workflow_id = str(session.get("workflow_id") or "").strip() or None
+        if request.request_id:
+            try:
+                source_message = session_store.find_message_by_request_id(
+                    request.session_id, request.request_id, role="user",
+                )
+            except Exception:
+                logger.exception("failed to load runtime memory source message")
+                return JSONResponse({"error": "memory source message unavailable"}, status_code=503)
+            if source_message is not None and str(source_message.get("content") or "") != request.message:
+                return JSONResponse({"error": "runtime memory message does not match the archived request"}, status_code=409)
     messages = [{"role": "user", "content": request.message}]
     review_key = _runtime_memory_review_key(request.session_id, request.request_id)
     review_digest = (
@@ -8904,6 +8915,11 @@ async def learning_memory_runtime(request: RuntimeMemoryRequest):
             candidate["source_session_id"] = request.session_id
             if effective_workflow_id:
                 candidate["source_workflow_id"] = effective_workflow_id
+            # A standalone explicit signal may have no archived chat message.
+            # Never resolve identical text from a different request by guessing.
+            if source_message is not None:
+                candidate["source_message_ids"] = [source_message["message_id"]]
+                candidate["source_message_sequences"] = [source_message["sequence"]]
     if not candidates:
         receipt_completed = complete_receipt("__ignored__")
         return apply_receipt_warning(

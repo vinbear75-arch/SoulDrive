@@ -7,6 +7,7 @@ import threading
 import time
 import unittest
 import uuid
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -1207,6 +1208,95 @@ class McpServerLearningTests(unittest.TestCase):
         self.assertEqual(revoked.status_code, 200)
         self.assertEqual(revoked.json()["status"], "revoked")
         self.assertEqual(after_revoke.json()["memories"], [])
+
+    def test_runtime_memory_binds_the_exact_archived_request_not_an_earlier_equal_message(self):
+        message = "以后请默认用中文回答。"
+        with closing(ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)) as archive:
+            archive.create_session("runtime-source", project_id="project-a", title="来源测试", workflow_id="paper_review")
+            archive.append("runtime-source", "user", message, message_id="msg_old_preference", request_id="old-request")
+            archive.append("runtime-source", "assistant", message, message_id="msg_assistant", request_id="source-request")
+            archive.append("runtime-source", "user", message, message_id="msg_exact_preference", request_id="source-request")
+        state = self._mounted_state()
+        with patch.object(mcp_server, "get_runtime_state", return_value=state), patch.object(
+            mcp_server, "effective_runtime_state", return_value=state
+        ), patch.object(mcp_server, "current_workspace", return_value=self.workspace):
+            body = {"message": message, "session_id": "runtime-source", "project_id": "project-a", "request_id": "source-request"}
+            saved = self.client.post("/learning/memories/runtime", json=body, headers=self._headers())
+            replay = self.client.post("/learning/memories/runtime", json=body, headers=self._headers())
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(replay.json()["memory_id"], saved.json()["memory_id"])
+        store = LearningStore(self.workspace, self.keys)
+        try:
+            memory = store.list_memories(project_id="project-a", include_metadata=True)[0]
+        finally:
+            store.close()
+        self.assertEqual(memory["source_trace"]["message_ids"], ["msg_exact_preference"])
+        self.assertEqual(memory["source_trace"]["message_sequences"], [3])
+        with closing(ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)) as archive:
+            persisted = archive.read_memory(saved.json()["memory_id"])
+        self.assertEqual(persisted["source_message_ids"], ["msg_exact_preference"])
+
+    def test_runtime_memory_rejects_a_message_changed_from_its_archived_request_before_writing(self):
+        with closing(ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)) as archive:
+            archive.create_session("runtime-source", project_id="project-a", title="来源测试")
+            archive.append("runtime-source", "user", "以后请默认用中文回答。", request_id="source-request")
+        state = self._mounted_state()
+        with patch.object(mcp_server, "get_runtime_state", return_value=state), patch.object(
+            mcp_server, "effective_runtime_state", return_value=state
+        ), patch.object(mcp_server, "current_workspace", return_value=self.workspace):
+            response = self.client.post("/learning/memories/runtime", json={
+                "message": "以后请默认用英文回答。", "session_id": "runtime-source",
+                "project_id": "project-a", "request_id": "source-request",
+            }, headers=self._headers())
+        self.assertEqual(response.status_code, 409)
+        store = LearningStore(self.workspace, self.keys)
+        try:
+            self.assertEqual(store.list_memories(project_id="project-a"), [])
+        finally:
+            store.close()
+        with closing(ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)) as archive:
+            self.assertEqual(archive.connection.execute("SELECT COUNT(*) FROM request_receipts").fetchone()[0], 0)
+
+    def test_runtime_memory_never_borrows_another_requests_equal_text_for_provenance(self):
+        message = "以后请默认用中文回答。"
+        with closing(ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)) as archive:
+            archive.create_session("runtime-source", project_id="project-a", title="来源测试")
+            archive.append("runtime-source", "user", message, message_id="msg_unrelated", request_id="unrelated")
+        state = self._mounted_state()
+        with patch.object(mcp_server, "get_runtime_state", return_value=state), patch.object(
+            mcp_server, "effective_runtime_state", return_value=state
+        ), patch.object(mcp_server, "current_workspace", return_value=self.workspace):
+            response = self.client.post("/learning/memories/runtime", json={
+                "message": message, "session_id": "runtime-source", "project_id": "project-a", "request_id": "direct-input",
+            }, headers=self._headers())
+        self.assertEqual(response.json()["status"], "saved")
+        store = LearningStore(self.workspace, self.keys)
+        try:
+            memory = store.list_memories(project_id="project-a", include_metadata=True)[0]
+        finally:
+            store.close()
+        self.assertNotIn("message_ids", memory["source_trace"])
+        self.assertNotIn("message_sequences", memory["source_trace"])
+
+    def test_runtime_memory_source_read_failure_does_not_become_an_unbound_save(self):
+        with closing(ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)) as archive:
+            archive.create_session("runtime-source", project_id="project-a", title="来源测试")
+        state = self._mounted_state()
+        with patch.object(mcp_server, "get_runtime_state", return_value=state), patch.object(
+            mcp_server, "effective_runtime_state", return_value=state
+        ), patch.object(mcp_server, "current_workspace", return_value=self.workspace), patch.object(
+            ProductionSessionStore, "find_message_by_request_id", side_effect=RuntimeError("source unavailable")
+        ):
+            response = self.client.post("/learning/memories/runtime", json={
+                "message": "以后请默认用中文回答。", "session_id": "runtime-source",
+                "project_id": "project-a", "request_id": "source-request",
+            }, headers=self._headers())
+        self.assertEqual(response.status_code, 503)
+        store = LearningStore(self.workspace, self.keys)
+        try:
+            self.assertEqual(store.list_memories(project_id="project-a"), [])
+        finally:
+            store.close()
 
     def test_runtime_memory_rejects_project_override_on_bound_session(self):
         archive = ConversationStore(self.workspace.conversation_store_path, self.keys.metadata_key)

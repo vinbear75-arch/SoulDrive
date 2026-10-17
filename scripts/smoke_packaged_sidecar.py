@@ -9,6 +9,7 @@ import re
 import secrets
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -345,14 +346,86 @@ def _verify_experiment_reopen(request, result: dict):
     result["reopened_result_verified"] = True
 
 
-def run(executable: Path, output_dir: Path, *, project_flow: bool = False, experiment_flow: bool = False) -> dict:
+def _exercise_memory_flow(request, result: dict):
+    """Independent fake preference lifecycle; not a business-quality evaluation."""
+    def step(name):
+        result.setdefault("steps", []).append(name)
+        print(json.dumps({"phase": name}), flush=True)
+
+    step("memory_projects_and_sessions")
+    for project_id, policy in (("memory-a", "project_plus_global"), ("memory-b", "project_only")):
+        assert request("/projects", {"project_id": project_id, "name": project_id, "memory_policy": policy})[0] == 200
+    # General chat records the preference; a paper-review window correctly
+    # requires indexed paper inputs and is not bypassed for this lifecycle test.
+    for session_id, workflow in (("memory-source", None), ("memory-other", "experiment_compare")):
+        assert request("/projects/memory-a/sessions", {"session_id": session_id, "title": session_id, "workflow_id": workflow})[0] == 200
+    message = "以后请默认用中文回答。"
+    step("memory_source_chat_requests")
+    for request_id in ("older-same-text", "memory-source-request"):
+        code, answer = request("/chat", {"query": message, "session_id": "memory-source", "request_id": request_id,
+                                  "active_context": {"project_id": "memory-a"}}, raw=True, timeout=900)
+        assert code == 200, (code, answer)
+    records = request("/sessions/memory-source/history?project_id=memory-a")[1]["records"]
+    original = next(item for item in records if item["role"] == "user" and item["request_id"] == "memory-source-request")
+    body = {"message": message, "session_id": "memory-source", "project_id": "memory-a", "request_id": "memory-source-request"}
+    step("memory_save_and_provenance")
+    code, saved = request("/learning/memories/runtime", body)
+    assert code == 200 and saved["status"] == "saved", saved
+    memory_id = saved["memory_id"]
+    code, replay = request("/learning/memories/runtime", body)
+    assert code == 200 and replay["idempotent"] and replay["memory_id"] == memory_id
+    assert request("/learning/memories/runtime", {**body, "message": "以后请默认用英文回答。"})[0] == 409
+    assert request("/learning/memories/runtime", {**body, "project_id": "memory-b"})[0] == 409
+    memory = next(item for item in request("/learning/memories?project_id=memory-a", timeout=120)[1]["memories"] if item["memory_id"] == memory_id)
+    result.update(memory_id=memory_id, source_message_id=original["message_id"], source_sequence=original["sequence"], original=memory)
+    assert memory["source_trace"]["message_ids"] == [original["message_id"]], memory
+    assert memory["source_trace"]["message_sequences"] == [original["sequence"]], memory
+    assert memory["scope"] == "global" and memory["project_id"] is None
+    step("memory_search_scope_and_revision")
+    search_body = {"query": message, "project_id": "memory-a", "workflow_id": "experiment_compare", "top_k_skill": 0}
+    search = request("/learning/search", search_body, timeout=120)[1]
+    assert any((item.get("memory_id") or item.get("asset_id")) == memory_id for item in search["memories"]), search
+    result["semantic_projection"] = search["memory_retrieval"]
+    assert request("/learning/search", {**search_body, "project_id": "memory-b"}, timeout=120)[1]["memories"] == []
+    old_as_of = max(float(memory["updated_at"]), float(memory.get("valid_from") or 0))
+    update = {"title": memory["title"], "content": "以后请默认用中文回答，并先给出结论。", "expected_updated_at": memory["updated_at"]}
+    headers = {"Idempotency-Key": "memory-edit-once"}
+    code, edited = request(f"/learning/memories/{memory_id}?project_id=memory-a", update, method="PATCH", extra_headers=headers, timeout=120)
+    assert code == 200 and edited["memory"]["record_version"] > memory["record_version"], edited
+    result["edit_storage_sync"] = edited["storage_sync"]
+    assert edited["memory"]["source_trace"]["message_ids"] == [original["message_id"]]
+    assert request(f"/learning/memories/{memory_id}?project_id=memory-a", update, method="PATCH", extra_headers=headers, timeout=120)[1]["idempotent_replay"]
+    historical = request("/learning/search", {**search_body, "as_of": old_as_of}, timeout=120)[1]["memories"]
+    assert any((item.get("memory_id") or item.get("asset_id")) == memory_id and item["content"] == memory["content"] for item in historical), historical
+    revoke_url = f"/learning/memories/{memory_id}/revoke?project_id=memory-a"
+    revoke_headers = {"Idempotency-Key": "memory-revoke-once"}
+    assert request(revoke_url, {}, extra_headers=revoke_headers)[0] == 200
+    assert request(revoke_url, {}, extra_headers=revoke_headers)[1]["idempotent_replay"]
+    result.update(search_body=search_body, old_as_of=old_as_of, edited=edited["memory"], status="pass")
+    _verify_memory_reopen(request, result)
+
+
+def _verify_memory_reopen(request, result: dict):
+    assert request("/learning/search", result["search_body"], timeout=120)[1]["memories"] == []
+    historical = request("/learning/search", {**result["search_body"], "as_of": result["old_as_of"]}, timeout=120)[1]["memories"]
+    old = next(item for item in historical if (item.get("memory_id") or item.get("asset_id")) == result["memory_id"])
+    assert old["content"] == result["original"]["content"]
+    assert old["source_trace"]["message_ids"] == [result["source_message_id"]]
+    assert old["source_trace"]["message_sequences"] == [result["source_sequence"]]
+    result["revoked_current_and_historical_provenance_verified"] = True
+
+
+def run(executable: Path, output_dir: Path, *, project_flow: bool = False, experiment_flow: bool = False, memory_flow: bool = False, source: bool = False) -> dict:
     if not __debug__:
         raise ValueError("run smoke without Python assertion optimization")
-    if project_flow and experiment_flow:
+    if sum((project_flow, experiment_flow, memory_flow)) > 1:
         raise ValueError("select one independent synthetic workflow")
     if os.name != "nt":
         raise ValueError("packaged sidecar smoke requires Windows")
     executable = executable.resolve(strict=True)
+    root = Path(__file__).resolve().parents[1]
+    source_hashes = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                     for path in sorted((root / "core").glob("*.py"))} if source else {}
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=False)
     workspace = output_dir / "workspace"
@@ -362,7 +435,9 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
     token, passphrase = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     opener = build_opener(ProxyHandler({}))
     report = {
-        "schema_version": "souldrive_packaged_sidecar_smoke_v1",
+        "schema_version": "souldrive_source_sidecar_smoke_v1" if source else "souldrive_packaged_sidecar_smoke_v1",
+        "source_mode": source,
+        "source_sha256": source_hashes,
         "status": "running",
         "executable": str(executable),
         "exe_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
@@ -378,14 +453,15 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
                 port = reserved.getsockname()[1]
             base_url = f"http://127.0.0.1:{port}"
 
-            def request(path, body=None, *, authenticated=True, raw=False, timeout=30):
+            def request(path, body=None, *, authenticated=True, raw=False, timeout=30, method=None, extra_headers=None):
                 headers = {"X-SoulDrive-Token": token} if authenticated else {}
+                headers.update(extra_headers or {})
                 data = None
                 if body is not None:
                     headers["Content-Type"] = "application/json"
                     data = json.dumps(body).encode("utf-8")
                 try:
-                    with opener.open(Request(base_url + path, data=data, headers=headers), timeout=timeout) as response:
+                    with opener.open(Request(base_url + path, data=data, headers=headers, method=method), timeout=timeout) as response:
                         return response.status, response.read().decode("utf-8") if raw else json.load(response)
                 except HTTPError as error:
                     return error.code, json.load(error)
@@ -414,7 +490,10 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
                 "PYTHONUTF8": "1",
                 "PATH": os.pathsep.join((str(Path(os.environ["SystemRoot"]) / "System32"), os.environ["SystemRoot"])),
             })
-            if project_flow or experiment_flow:
+            if source:
+                environment["PATH"] = os.environ.get("PATH", "")
+                environment["PYTHONPATH"] = str(root)
+            if project_flow or experiment_flow or memory_flow:
                 environment.update({
                     "SOULDRIVE_CHAT_PROVIDER": "ollama",
                     "SOULDRIVE_OLLAMA_MODEL": "qwen3.5:9b",
@@ -429,7 +508,8 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
             report["runs"].append(run_report)
             with (output_dir / f"process-{run_number}.log").open("xb") as process_log:
                 process = subprocess.Popen(
-                    [str(executable)], cwd=output_dir, env=environment,
+                    [str(executable), "-m", "core.sidecar_runtime"] if source else [str(executable)],
+                    cwd=root if source else output_dir, env=environment,
                     stdout=process_log, stderr=subprocess.STDOUT,
                     startupinfo=startup, creationflags=subprocess.CREATE_NO_WINDOW,
                 )
@@ -472,6 +552,13 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
                             report["experiment_flow"] = {"status": "running"}
                             _exercise_experiment_flow(request, workspace, output_dir, report["experiment_flow"])
                             report["model_inference_tested"] = True
+                        if memory_flow:
+                            report["memory_flow"] = {"status": "running"}
+                            _exercise_memory_flow(request, report["memory_flow"])
+                            report["model_inference_tested"] = bool(
+                                report["memory_flow"]["semantic_projection"].get("semantic_count")
+                                or any(item.get("vector_requested") for item in report["memory_flow"]["edit_storage_sync"].get("items", []))
+                            )
                         assert request("/security/lock", {})[0] == 200
 
                     assert request("/security/unlock", {"passphrase": passphrase + "-wrong"})[0] == 403
@@ -480,6 +567,9 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
                     assert request("/documents/list")[0] == 200
                     if experiment_flow and run_number == 2:
                         _verify_experiment_reopen(request, report["experiment_flow"])
+                    if memory_flow and run_number == 2:
+                        _verify_memory_reopen(request, report["memory_flow"])
+                        report["memory_flow"]["reopened_result_verified"] = True
                     assert not request("/security/lock", {})[1]["software_unlocked"]
                     run_report["checks"].append("wrong_passphrase_rejected_correct_unlock_and_relock")
                     assert request("/shutdown", {})[0] == 200
@@ -494,6 +584,8 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
                             process.kill()
                             process.wait(timeout=10)
                     run_report["exit_code"] = process.returncode
+        if source:
+            assert source_hashes == {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in source_hashes}
         report["status"] = "pass"
     except Exception as error:
         report["status"] = "fail"
@@ -510,13 +602,17 @@ def run(executable: Path, output_dir: Path, *, project_flow: bool = False, exper
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--executable", type=Path, required=True)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--executable", type=Path)
+    target.add_argument("--source", action="store_true", help="Run the current source with this Python interpreter, not a packaged executable")
     parser.add_argument("--output-dir", type=Path, required=True)
     flows = parser.add_mutually_exclusive_group()
     flows.add_argument("--project-flow", action="store_true")
     flows.add_argument("--experiment-flow", action="store_true")
+    flows.add_argument("--memory-flow", action="store_true")
     args = parser.parse_args()
-    report = run(args.executable, args.output_dir, project_flow=args.project_flow, experiment_flow=args.experiment_flow)
+    report = run(Path(sys.executable) if args.source else args.executable, args.output_dir,
+                 project_flow=args.project_flow, experiment_flow=args.experiment_flow, memory_flow=args.memory_flow, source=args.source)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["status"] == "pass" else 1
 

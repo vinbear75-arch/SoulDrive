@@ -2,8 +2,57 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
+import { createElement } from "react";
+import * as jsxRuntime from "react/jsx-runtime";
+import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 
 const app = readFileSync(resolve("src", "App.tsx"), "utf8");
+
+function renderMemorySource(memory) {
+  const source = app.match(/function LearningMemorySource\([\s\S]*?\n\}/)?.[0];
+  assert.ok(source, "Missing memory source renderer");
+  const js = ts.transpileModule(source, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020,
+  } }).outputText;
+  const Source = new Function("exports", "require", `${js}; return LearningMemorySource;`)({}, (name) => {
+    assert.equal(name, "react/jsx-runtime");
+    return jsxRuntime;
+  });
+  return renderToStaticMarkup(createElement(Source, { memory }));
+}
+
+test("memory source renders exact archive identities instead of candidate-local offsets", () => {
+  const html = renderMemorySource({ source_excerpt: "以后请默认用中文回答。", source_trace: {
+    session_id: "runtime-source", workflow_id: "paper_review", message_ids: ["msg_exact_preference"],
+    message_sequences: [3], message_indexes: [0],
+  } });
+  assert.match(html, /runtime-source/);
+  assert.match(html, /paper_review/);
+  assert.match(html, /msg_exact_preference/);
+  assert.match(html, /会话消息 3/);
+  assert.match(html, /<details><summary>已绑定原消息/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
+  assert.doesNotMatch(html, /会话消息 0|原消息定位未核验/);
+  assert.match(app, /<LearningMemorySource memory=\{memory\} \/>/);
+});
+
+test("unbound direct memory never presents a candidate offset as an archive message", () => {
+  const html = renderMemorySource({ source_session_id: "direct-source", source_trace: {
+    excerpt: "以后请默认用中文回答。", message_indexes: [0],
+  } });
+  assert.match(html, /direct-source/);
+  assert.match(html, /原消息定位未核验/);
+  assert.match(html, /候选片段第 1 条（非会话序号）/);
+  assert.doesNotMatch(html, /会话消息 0/);
+});
+
+test("legacy memory source remains explicit and renders excerpts as text", () => {
+  const html = renderMemorySource({ source_excerpt: "<script>private source</script>" });
+  assert.match(html, /原消息定位未核验/);
+  assert.match(html, /&lt;script&gt;/);
+  assert.doesNotMatch(html, /<script>/);
+});
 
 test("learning review UI is wired to reflection APIs", () => {
   assert.match(app, /ReflectionCandidate/);
