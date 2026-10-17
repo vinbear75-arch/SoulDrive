@@ -46,6 +46,16 @@ B0 为 `f2b1614d411577ae762125c4580a7f4554873e85`。上一轮实际桌面仍把 
 
 ## 仍未闭环
 
+### 2026-10-17 补齐第五十五轮已结束的发行证据
+
+修复后独立四 CSV 的同链路 smoke **pass**，两个真实服务进程均正常退出 0，冷启动 2109 / 1063 ms。4/4 索引、指标确认/同键重放/跨项目拒绝、未绑定测量准备、已选运行比较、四页 OpenXML PPT 和第二次进程启动后的结果回放均完成；准备结果模型调用 0、新运行 0。回答的模型生成仍两次未通过事实校验，最终为证据核对，不能把链路通过当作自由研究生成通过。
+
+最终服务包 SHA-256 `6e5d7768becce03084743607e038655cb5dfa857408af9f7432d38dea9ffa0c5`；七个相关模块（含选定来源修复）封装字节码与源码一致，核验日志 SHA-256 `8edc0f1bfe7903cc411fcd884f69e344d40fb43ba7cae75ae6c176e3e6e98996`。第二次正常构建仅复用自有 R55 工作目录，无 `--clean`，不触及先前被拦截的清理目标；构建日志 SHA-256 `3ca60bfb5b3281de2b3056330a3c2bf16eeb668156627be3f102346b7debe97e`。
+
+Smoke 报告 `build/quality-gates/packaged-round55-scope-repair/report.json`，SHA-256 `77fad852a0034cd10c4d5ae1a2b1ab4a05e236f26f3b23f72455a9c87087242f`；PPT SHA-256 `00462a0e2830a5ac8cd817edfa5a1046d059366c24185c57de09c82d4e76072f`。该项 `desktop_or_installer_tested=false` 保持原值，本轮没有重新逐页视觉检查此工程 PPT，也不将其当安装器验收。
+
+当时验证的 R55 Release SHA-256 `9d535c8a0227dc6794e51b23f9afe5c0bfac61e58d0bb4b565bd7f2d3bbc30f8`，构建日志 SHA-256 `2fba228e2f15f6a6a42097b887ecff41b24afe82b06a0fdd6bec19f853e8e44f`。2026-10-17 使用该包实际启动自有虚构工作区，运行态 `locked=true / software_unlocked=false / HARDWARE_ONLY`，实际界面锁定，继承的开发解锁变量没有生效；未输入口令。用户随后按 Escape 停止桌面控制，立即停止，没有宣称已关闭该窗口或完成解锁后发行流程。源码提交 `b7e8a4a` 已核对 GitHub 同步；后续源码变更不由本次包验证自动覆盖。
+
 此轮未修复证据侧栏的单行片段展示、窄窗口标题拥挤，也未证明自由研究综合、因果、长期记忆业务质量或 5 秒性能。尚未审核冻结的业务标签不能用来调参/评分。
 
 下一记忆验收参考 [Graphiti 时间字段与原始 episode](https://github.com/getzep/graphiti/blob/main/graphiti_core/edges.py)、[Graphiti 检索与有效时间示例](https://help.getzep.com/graphiti/getting-started/quick-start) 和 [Copilot 记忆管理及保留边界](https://learn.microsoft.com/en-us/microsoft-365/copilot/copilot-personalization-memory)：在独立虚构项目核查来源定位、修订历史/有效时间、跨项目和跨研究窗口隔离、撤销后不再使用。只借鉴机制，不接入云服务/图数据库，不把对方能力当成本项目已实现。当前 goal 保持 active。

@@ -2890,9 +2890,10 @@ def evidence_fallback_answer(
         if not all(math.isfinite(value) for value in (baseline, current, delta)) or not item.get("metric"):
             continue
         unit = str(item.get("unit") or "")
+        delta_unit = str(item.get("absolute_delta_unit", unit))
         measurement_points.append(
             f"- {item['metric']}：基线 {baseline:.12g}{unit}，当前 {current:.12g}{unit}，"
-            f"绝对变化 {delta:+.12g}{unit} [{item['id']}]"
+            f"绝对变化 {delta:+.12g}{delta_unit} [{item['id']}]"
         )
         measurement_citations.append(f"[{item['id']}]")
     if measurement_points:

@@ -17,7 +17,7 @@ DEFAULT_VISUAL_REJECT_CONFIDENCE = 0.60
 CITATION_SUPPORT_MIN_OVERLAP = 2
 CITATION_SUPPORT_MIN_COVERAGE = 0.12
 _FACT_UNIT_PATTERN = (
-    r"(?:%|％|毫秒|秒钟|秒|分钟|小时|天|字节|"
+    r"(?:个百分点|%|％|毫秒|秒钟|秒|分钟|小时|天|字节|"
     r"KiB|MiB|GiB|TiB|"
     r"msec|milliseconds?|ms|seconds?|sec|s|minutes?|min|hours?|hrs?|hr|h|"
     r"bytes?|b|[A-Za-z]+)"
@@ -29,6 +29,16 @@ _FACT_NUMBER_PATTERN = (
 )
 FACT_TOKEN_PATTERN = re.compile(
     rf"{_FACT_NUMBER_PATTERN}(?:\s*{_FACT_UNIT_PATTERN})?",
+    flags=re.IGNORECASE,
+)
+REFERENCE_TOKEN_PATTERN = re.compile(
+    r"(?<![\w.-])(?:env|config|dataset|eval)-[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?",
+    flags=re.IGNORECASE,
+)
+MEASUREMENT_ROLE_PATTERN = re.compile(
+    rf"(基线值|当前(?:值|运行值|运行版本)|绝对(?:变化量?|差值)|相对(?:变化量?|增长率|增幅)|"
+    rf"(?:基线|当前)(?=\s*(?:为|是|[:：=])))"
+    rf"\s*(?:为|是|[:：=])?\s*({_FACT_NUMBER_PATTERN}(?:\s*{_FACT_UNIT_PATTERN})?)",
     flags=re.IGNORECASE,
 )
 _FACT_TIME_UNITS = {
@@ -675,12 +685,17 @@ def _validate_claim_support(
         claim_fact_tokens = _fact_tokens(_strip_location_tokens(claim_text))
         support_fact_tokens = _fact_tokens(support_text)
         missing_fact_tokens = sorted(claim_fact_tokens - support_fact_tokens)
+        cited_filenames = {re.split(r"[\\/]", str(item.get("source_filename") or ""))[-1] for item in cited_items}
+        missing_reference_tokens = sorted(
+            set(REFERENCE_TOKEN_PATTERN.findall(claim_text)) - set(REFERENCE_TOKEN_PATTERN.findall(support_text)) - cited_filenames
+        )
+        measurement_role_errors = _measurement_role_errors(claim_text, cited_items)
         missing_scoped_topics = [
             topic
             for topic in _scoped_quoted_topics(claim_text)
             if _compact_text(topic) not in _compact_text(support_text)
         ]
-        supported = bool(cited_items) and not missing_fact_tokens and (
+        supported = bool(cited_items) and not missing_fact_tokens and not missing_reference_tokens and not measurement_role_errors and (
             len(overlap) >= CITATION_SUPPORT_MIN_OVERLAP
             or coverage >= CITATION_SUPPORT_MIN_COVERAGE
         ) and not missing_scoped_topics
@@ -691,6 +706,8 @@ def _validate_claim_support(
             "claim_term_count": len(claim_terms),
             "coverage": round(coverage, 6),
             "missing_fact_tokens": missing_fact_tokens,
+            "missing_reference_tokens": missing_reference_tokens,
+            "measurement_role_errors": measurement_role_errors,
             "missing_scoped_topics": missing_scoped_topics,
             "status": "supported" if supported else "unsupported",
         })
@@ -704,6 +721,49 @@ def _validate_claim_support(
         "unsupported_claims": unsupported[:8],
         "claims": claims[:16],
     }
+
+
+def _measurement_role_errors(claim: str, cited_items: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Bind explicit numeric roles to citable ledger fields, never infer a missing relative change.
+
+    ponytail: this covers explicit field labels, not arbitrary language entailment;
+    a semantic evaluator is still required before claiming open research quality.
+    """
+    measurements = [item for item in cited_items
+                    if item.get("evidence_type") == "experiment_measurement"
+                    and re.fullmatch(r"M\d+", str(item.get("id") or ""))
+                    and all(key in item for key in ("baseline_value", "current_value", "absolute_delta"))]
+    if not measurements:
+        return []
+    named = [item for item in measurements if str(item.get("metric") or "").strip()
+             and str(item["metric"]).casefold() in claim.casefold()]
+    if named:
+        measurements = named
+    errors = []
+    for role, literal in MEASUREMENT_ROLE_PATTERN.findall(claim.replace("*", "").replace("`", "")):
+        if role.startswith("基线"):
+            field = "baseline_value"
+        elif role.startswith("当前"):
+            field = "current_value"
+        elif role.startswith("绝对"):
+            field = "absolute_delta"
+        else:
+            field = "relative_delta"
+        expected = set()
+        for item in measurements:
+            value = item.get(field)
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+                continue
+            unit = str(item.get("unit") or "")
+            if field == "relative_delta":
+                value, unit = value * 100, "%"
+            elif field == "absolute_delta":
+                unit = str(item.get("absolute_delta_unit", unit))
+            if math.isfinite(value):
+                expected.update(_fact_tokens(f"{value:.12g}{unit}"))
+        if not _fact_tokens(literal).issubset(expected):
+            errors.append({"role": role, "value": literal, "field": field})
+    return errors
 
 
 def _scoped_quoted_topics(text: str) -> list[str]:

@@ -76,3 +76,23 @@ test("literal source code cannot create evidence cards", () => {
   assert.ok(parse(earlier + "\n\n" + actual).cleanContent.includes(earlier));
   assert.deepEqual(parse('```souldrive-evidence\n[{"id":"E96"}]').evidence, []);
 });
+
+test("real evidence panel separates percent values, point deltas and relative percent", () => {
+  const app = readFileSync("src/App.tsx", "utf8");
+  const source = ["formatEvidenceNumber", "formatEvidenceSignedNumber", "formatEvidenceSource", "EvidencePanel"]
+    .map((name) => app.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n\\}`))?.[0] || "").join("\n");
+  const js = ts.transpileModule(source, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020,
+  } }).outputText;
+  const Panel = new Function("exports", "require", `${js}; return EvidencePanel;`)({}, (name) => {
+    assert.equal(name, "react/jsx-runtime");
+    return jsxRuntime;
+  });
+  const base = { id: "M1", evidence_type: "experiment_measurement", unit: "%", metric: "quality_score",
+    baseline_value: 40, current_value: 44, absolute_delta: 4, relative_delta: 0.1 };
+  const html = renderToStaticMarkup(createElement(Panel, { evidence: [{ ...base, absolute_delta_unit: "个百分点" }] }));
+  assert.match(html, /基线 40% → 当前 44%/);
+  assert.match(html, /绝对变化 \+4个百分点（相对 \+10%）/);
+  const legacy = renderToStaticMarkup(createElement(Panel, { evidence: [base] }));
+  assert.match(legacy, /绝对变化 \+4%（相对 \+10%）/);
+});

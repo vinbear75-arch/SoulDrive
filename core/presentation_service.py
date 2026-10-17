@@ -785,7 +785,7 @@ class PresentationService:
         for offset in range(0, len(measurements), 4):
             points = [
                 f"{item['metric']}：{item['baseline_value']:.12g}{item['unit']} → {item['current_value']:.12g}{item['unit']}；"
-                f"绝对变化 {item['absolute_delta']:+.12g}{item['unit']} [{item['id']}]"
+                f"绝对变化 {item['absolute_delta']:+.12g}{item['absolute_delta_unit']} [{item['id']}]"
                 for item in measurements[offset:offset + 4]
             ]
             points.append("配置/环境如有差异，仅为候选因素，不能单独证明因果；需单因素验证。")

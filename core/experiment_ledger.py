@@ -839,6 +839,9 @@ def build_experiment_evidence(comparison: dict[str, Any] | None) -> list[dict[st
             continue
         relative_delta = _finite_float(raw_change.get("relative_delta"))
         unit = _bounded_text(raw_change.get("unit"), 64)
+        # Percent-valued measurements differ by percentage points. This is a
+        # display unit for the already-computed delta, not a metric conversion.
+        absolute_delta_unit = "个百分点" if unit in {"%", "％"} else unit
         split = _bounded_text(raw_change.get("split"), 64)
         definition_version = _bounded_text(raw_change.get("definition_version"), 128)
         assessment = _bounded_text(raw_change.get("assessment"), 32)
@@ -848,7 +851,7 @@ def build_experiment_evidence(comparison: dict[str, Any] | None) -> list[dict[st
             f"指标={metric}",
             f"基线值={_format_number(values['baseline_value'])}{unit}",
             f"当前值={_format_number(values['current_value'])}{unit}",
-            f"绝对变化={_format_signed_number(values['absolute_delta'])}{unit}",
+            f"绝对变化={_format_signed_number(values['absolute_delta'])}{absolute_delta_unit}",
         ]
         if relative_delta is not None:
             context_parts.append(f"相对变化={_format_signed_number(relative_delta * 100)}%")
@@ -903,6 +906,7 @@ def build_experiment_evidence(comparison: dict[str, Any] | None) -> list[dict[st
             "baseline_value": values["baseline_value"],
             "current_value": values["current_value"],
             "absolute_delta": values["absolute_delta"],
+            "absolute_delta_unit": absolute_delta_unit,
             "relative_delta": relative_delta,
             "assessment": assessment,
             "baseline_source": baseline_source,

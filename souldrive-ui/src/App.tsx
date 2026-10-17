@@ -202,6 +202,7 @@ interface EvidenceItem {
   baseline_value?: number | null;
   current_value?: number | null;
   absolute_delta?: number | null;
+  absolute_delta_unit?: string;
   relative_delta?: number | null;
   assessment?: string;
   baseline_source?: { file_ref?: string; source_locator?: string };
@@ -8084,7 +8085,7 @@ function EvidencePanel({ evidence }: { evidence: EvidenceItem[] }) {
               <>
                 <span>{item.metric || item.section || "未标注指标"}</span>
                 <span>基线 {formatEvidenceNumber(item.baseline_value, item.unit)} → 当前 {formatEvidenceNumber(item.current_value, item.unit)}</span>
-                <span>变化 {formatEvidenceSignedNumber(item.absolute_delta, item.unit)}{typeof item.relative_delta === "number" ? `（相对 ${formatEvidenceSignedNumber(item.relative_delta * 100, "%")}）` : ""}</span>
+                <span>绝对变化 {formatEvidenceSignedNumber(item.absolute_delta, item.absolute_delta_unit ?? item.unit)}{typeof item.relative_delta === "number" ? `（相对 ${formatEvidenceSignedNumber(item.relative_delta * 100, "%")}）` : ""}</span>
                 {item.split && <span>split {item.split}</span>}
                 {item.definition_version && <span>定义 {item.definition_version}</span>}
               </>
